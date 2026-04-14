@@ -4,22 +4,12 @@ import tailwindcss from '@tailwindcss/vite'
 import tsconfigPaths from "vite-tsconfig-paths"
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
       react(),
       tailwindcss(),
       tsconfigPaths()
   ],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://82.146.35.179:8000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-      },
-    },
-  },
   resolve: {
       alias: {
           '@': path.resolve(__dirname, './src'),
