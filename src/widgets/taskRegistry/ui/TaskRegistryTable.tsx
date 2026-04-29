@@ -12,21 +12,21 @@ import {
   TableRow,
 } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { Archive, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
 
 type Props = {
   tasks: Task[];
-  archivingTaskId?: number | null;
+  togglingTaskId?: number | null;
   onTaskClick?: (task: Task) => void;
-  onArchive?: (task: Task) => void;
+  onToggleArchive?: (task: Task) => void;
   onEdit?: (task: Task) => void;
 };
 
 export function TaskRegistryTable({
   tasks,
-  archivingTaskId,
+  togglingTaskId,
   onTaskClick,
-  onArchive,
+  onToggleArchive,
   onEdit,
 }: Props) {
   return (
@@ -121,18 +121,26 @@ export function TaskRegistryTable({
                             size="icon-sm"
                             variant="ghost"
                             className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            disabled={archivingTaskId === task.id}
+                            disabled={togglingTaskId === task.id}
                             onClick={(event) => {
                               event.stopPropagation();
-                              onArchive?.(task);
+                              onToggleArchive?.(task);
                             }}
-                            aria-label={`Архивировать задачу ${task.id}`}
+                            aria-label={
+                              task.status === 'archived'
+                                ? `Активировать задачу ${task.id}`
+                                : `Архивировать задачу ${task.id}`
+                            }
                           >
-                            <Archive size={15} />
+                            {task.status === 'archived' ? (
+                              <ArchiveRestore size={15} />
+                            ) : (
+                              <Archive size={15} />
+                            )}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>
-                          <p>Архивировать</p>
+                          <p>{task.status === 'archived' ? 'Активировать' : 'Архивировать'}</p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

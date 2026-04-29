@@ -19,6 +19,7 @@ import {
 } from "@/shared/ui/table";
 import { TableScrollArea } from "@/shared/ui/table-scroll-area";
 import { getStatusClassName } from "@/widgets/taskRegistry/ui/TaskRegistryTable";
+import { Archive, ArchiveRestore } from "lucide-react";
 
 function getTaskTypeLabel(type: Task["type"]) {
   const labels: Record<Task["type"], string> = {
@@ -32,10 +33,18 @@ function getTaskTypeLabel(type: Task["type"]) {
 type Props = {
   task: Task | null;
   open: boolean;
+  isTogglingArchive?: boolean;
+  onToggleArchive?: (task: Task) => void;
   onOpenChange: (open: boolean) => void;
 };
 
-export function TaskDetailsDialog({ task, open, onOpenChange }: Props) {
+export function TaskDetailsDialog({
+  task,
+  open,
+  isTogglingArchive,
+  onToggleArchive,
+  onOpenChange,
+}: Props) {
   if (!task) {
     return null;
   }
@@ -94,6 +103,16 @@ export function TaskDetailsDialog({ task, open, onOpenChange }: Props) {
                 </Button>
 
                 <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:flex-wrap">
+                  <Button
+                    type="button"
+                    variant={task.status === "archived" ? "outline" : "destructive"}
+                    className="w-full sm:w-auto"
+                    disabled={isTogglingArchive}
+                    onClick={() => onToggleArchive?.(task)}
+                  >
+                    {task.status === "archived" ? <ArchiveRestore /> : <Archive />}
+                    {task.status === "archived" ? "Активировать задачу" : "Архивировать задачу"}
+                  </Button>
                   <Button className="w-full bg-[#4f63d8] text-white hover:bg-[#4457c4] sm:w-auto">
                     Одобрить неотклоненные отчеты
                   </Button>

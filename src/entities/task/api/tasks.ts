@@ -41,6 +41,12 @@ export async function archiveTask(taskId: number) {
   });
 }
 
+export async function activateTask(taskId: number) {
+  await http<void>(`${TASKS_ENDPOINT}/${taskId}/activate`, {
+    method: 'POST',
+  });
+}
+
 export function mapTaskDtoToTask(task: TaskDto): Task {
   return {
     id: task.task_id,

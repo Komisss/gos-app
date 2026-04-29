@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 
-import { archiveTask, getTasks, updateTask } from '@/entities/task/api/tasks';
+import { activateTask, archiveTask, getStatusLabel, getTasks, updateTask } from '@/entities/task/api/tasks';
 import type { Task, TaskPayload } from '@/entities/task/model/types';
 import { Button } from '@/shared/ui/button';
 import { CardTitle } from '@/shared/ui/card';
@@ -15,20 +15,26 @@ export function TaskRegistry() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
-  const [archivingTaskId, setArchivingTaskId] = useState<number | null>(null);
+  const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
 
   const tasksQuery = useQuery({
     queryKey: ['tasks'],
     queryFn: getTasks,
   });
 
-  const archiveMutation = useMutation({
-    mutationFn: archiveTask,
-    onMutate: (taskId) => setArchivingTaskId(taskId),
-    onSuccess: async () => {
+  const toggleArchiveMutation = useMutation({
+    mutationFn: (task: Task) => (task.status === 'archived' ? activateTask(task.id) : archiveTask(task.id)),
+    onMutate: (task) => setTogglingTaskId(task.id),
+    onSuccess: async (_data, task) => {
+      const nextStatus = task.status === 'archived' ? 'active' : 'archived';
+      setSelectedTask((currentTask) =>
+        currentTask?.id === task.id
+          ? { ...currentTask, status: nextStatus, statusLabel: getStatusLabel(nextStatus) }
+          : currentTask,
+      );
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
-    onSettled: () => setArchivingTaskId(null),
+    onSettled: () => setTogglingTaskId(null),
   });
 
   const updateMutation = useMutation({
@@ -69,16 +75,18 @@ export function TaskRegistry() {
         ) : (
           <TaskRegistryTable
             tasks={tasks}
-            archivingTaskId={archivingTaskId}
+            togglingTaskId={togglingTaskId}
             onTaskClick={setSelectedTask}
             onEdit={setEditingTask}
-            onArchive={(task) => archiveMutation.mutate(task.id)}
+            onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
           />
         )}
 
         <TaskDetailsDialog
           open={selectedTask !== null}
           task={selectedTask}
+          isTogglingArchive={togglingTaskId === selectedTask?.id}
+          onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
           onOpenChange={(open) => {
             if (!open) {
               setSelectedTask(null);

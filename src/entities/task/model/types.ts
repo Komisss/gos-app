@@ -21,6 +21,7 @@ export interface TaskDto {
 export type TaskPayload = {
   title: string;
   scope: TaskScope;
+  assigned_user_id?: number;
   status: TaskStatus;
   task_type: TaskType;
   report_format: TaskReportFormat;

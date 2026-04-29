@@ -1,132 +1,331 @@
-import { ArrowLeft, BarChart3, ClipboardList, Eye, Home, Link2, Pencil, Shield, UserCog, Users } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, Power, PowerOff, Save } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { Button } from "@/shared/ui/button";
-import { Card, CardContent } from "@/shared/ui/card";
-import { mockUsers } from "@/widgets/userRegistry/ui/UserRegistryTable";
+import {
+  activateUser,
+  deactivateUser,
+  getUserById,
+  getUserStatusLabel,
+  updateUser,
+} from '@/entities/user/api/users';
+import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
+import { Badge } from '@/shared/ui/badge';
+import { Button } from '@/shared/ui/button';
+import { Card, CardContent } from '@/shared/ui/card';
+import { Input } from '@/shared/ui/input';
 
-const sidebarItems = [
-  { icon: Home, label: "Общая информация" },
-  { icon: ClipboardList, label: "Отчеты по задачам" },
-  { icon: BarChart3, label: "Статистика по задачам" },
-  { icon: Link2, label: "Ссылки на соцсети" },
-  { icon: Shield, label: "Лояльность" },
-  { icon: Users, label: "Пройденные семинары" },
-  { icon: UserCog, label: "Подчиненные" },
-  { icon: Pencil, label: "Действия" },
-  { icon: Eye, label: "Активность в ТГ" },
-];
+type UserFormState = {
+  username: string;
+  full_name: string;
+  phone: string;
+  birthday: string;
+  role: string;
+  region: string;
+  org_unit: string;
+};
 
 export function UserProfileCard() {
   const { userId } = useParams();
-  const user = mockUsers.find((item) => String(item.id) === userId) ?? mockUsers[0];
+  const parsedUserId = Number(userId);
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<UserFormState>(emptyForm);
+
+  const userQuery = useQuery({
+    queryKey: ['users', parsedUserId],
+    queryFn: () => getUserById(parsedUserId),
+    enabled: Number.isFinite(parsedUserId),
+  });
+
+  useEffect(() => {
+    if (userQuery.data) {
+      setForm(getInitialForm(userQuery.data));
+    }
+  }, [userQuery.data]);
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: UserPatchPayload) => updateUser(parsedUserId, payload),
+    onSuccess: async (updatedUser) => {
+      setForm(getInitialForm(updatedUser));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['users', parsedUserId] }),
+      ]);
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: (user: UserDetails) => (user.active ? deactivateUser(user.id) : activateUser(user.id)),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['users'] }),
+        queryClient.invalidateQueries({ queryKey: ['users', parsedUserId] }),
+      ]);
+    },
+  });
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    updateMutation.mutate({
+      username: form.username,
+      full_name: form.full_name,
+      phone: form.phone,
+      birthday: form.birthday || null,
+      role: parseOptionalNumber(form.role),
+      region: parseOptionalNumber(form.region),
+      org_unit: parseOptionalNumber(form.org_unit),
+    });
+  }
+
+  if (!Number.isFinite(parsedUserId)) {
+    return <UserProfileMessage text="Некорректный id пользователя." tone="error" />;
+  }
+
+  if (userQuery.isLoading) {
+    return <UserProfileMessage text="Загружаем пользователя..." />;
+  }
+
+  if (userQuery.isError || !userQuery.data) {
+    return <UserProfileMessage text="Не удалось загрузить пользователя." tone="error" />;
+  }
+
+  const user = userQuery.data;
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-6 px-6 py-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <Button asChild variant="ghost" className="h-auto justify-start px-0 text-slate-600">
+              <Link to="/users">
+                <ArrowLeft />
+                Все пользователи
+              </Link>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold !text-slate-900">{user.fullName}</h1>
+              <p className="text-sm text-slate-500">@{user.username}</p>
+            </div>
+          </div>
 
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold !text-slate-900">
-            <span className="">Пользователь</span> {user.name}
-          </h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              className={`w-fit rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
+                user.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+              }`}
+            >
+              {getUserStatusLabel(user)}
+            </Badge>
+            <Button
+              type="button"
+              variant={user.active ? 'destructive' : 'outline'}
+              disabled={toggleActiveMutation.isPending}
+              onClick={() => toggleActiveMutation.mutate(user)}
+            >
+              {user.active ? <PowerOff /> : <Power />}
+              {user.active ? 'Деактивировать' : 'Активировать'}
+            </Button>
+          </div>
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)]">
-          <Card className="gap-0 border-slate-200 bg-white shadow-sm">
-            <CardContent className="px-4">
-              <div className="space-y-3">
-                <Button variant="outline" className="w-full justify-start border-slate-200">
-                  <Pencil />
-                  Редактировать
+        <Card className="gap-0 border-slate-200 bg-white shadow-sm">
+          <CardContent className="px-6">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div>
+                <h2 className="text-xl font-semibold !text-slate-900">Основная информация</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Статус меняется только кнопкой активации или деактивации.
+                </p>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <Field label="Логин">
+                  <Input
+                    value={form.username}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, username: event.target.value }))
+                    }
+                    required
+                  />
+                </Field>
+
+                <Field label="ФИО">
+                  <Input
+                    value={form.full_name}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, full_name: event.target.value }))
+                    }
+                    required
+                  />
+                </Field>
+
+                <Field label="Телефон">
+                  <Input
+                    value={form.phone}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, phone: event.target.value }))
+                    }
+                  />
+                </Field>
+
+                <Field label="Дата рождения">
+                  <Input
+                    type="date"
+                    value={form.birthday}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, birthday: event.target.value }))
+                    }
+                  />
+                </Field>
+
+                <ReadonlyField label="Статус" value={getUserStatusLabel(user)} />
+                <ReadonlyField label="Дата создания" value={formatDateTime(user.createdAt)} />
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-3">
+                <Field label="ID роли">
+                  <Input
+                    type="number"
+                    value={form.role}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, role: event.target.value }))
+                    }
+                  />
+                  <p className="text-xs text-slate-500">{user.role?.name ?? 'Роль не указана'}</p>
+                </Field>
+
+                <Field label="ID региона">
+                  <Input
+                    type="number"
+                    value={form.region}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, region: event.target.value }))
+                    }
+                  />
+                  <p className="text-xs text-slate-500">{user.region?.name ?? 'Регион не указан'}</p>
+                </Field>
+
+                <Field label="ID оргструктуры">
+                  <Input
+                    type="number"
+                    value={form.org_unit}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, org_unit: event.target.value }))
+                    }
+                  />
+                  <p className="text-xs text-slate-500">
+                    {user.orgUnit?.name ?? 'Оргструктура не указана'}
+                  </p>
+                </Field>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <ReadonlyField label="Руководитель" value={user.headUser?.full_name ?? 'Не указан'} />
+                <ReadonlyField label="Роль руководителя" value={user.headUser?.role ?? 'Не указана'} />
+              </div>
+
+              {updateMutation.isError && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  Не удалось сохранить пользователя.
+                </div>
+              )}
+
+              {updateMutation.isSuccess && (
+                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                  Данные пользователя сохранены.
+                </div>
+              )}
+
+              <div className="flex justify-end border-t border-slate-200 pt-4">
+                <Button className="bg-[#465cd3] text-white hover:bg-[#3c50bd]" disabled={updateMutation.isPending}>
+                  <Save />
+                  {updateMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                 </Button>
-
-                <div className="space-y-1">
-                  {sidebarItems.map((item) => {
-                    const Icon = item.icon;
-
-                    return (
-                      <button
-                        key={item.label}
-                        type="button"
-                        className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          item.label === "Общая информация"
-                            ? "bg-slate-100 text-slate-900"
-                            : "text-slate-600 hover:bg-slate-50"
-                        }`}
-                      >
-                        <Icon className="size-4" />
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="border-t border-slate-200 pt-3">
-                  <Button asChild variant="ghost" className="w-full justify-start text-slate-600 hover:bg-slate-50">
-                    <Link to="/users">
-                      <ArrowLeft />
-                      Все пользователи
-                    </Link>
-                  </Button>
-                </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="gap-0 border-slate-200 bg-white shadow-sm">
-            <CardContent className="px-6">
-              <div className="space-y-6">
-                <h2 className="text-xl font-semibold !text-slate-900">Общая информация</h2>
-
-                <div className="grid gap-8 md:grid-cols-2">
-                  <InfoColumn
-                    items={[
-                      ["Дата регистрации", "2026-03-27 07:01:25"],
-                      ["Дата рождения", "2005-09-16"],
-                      ["Организация", "не указана"],
-                      ["Логин в телеграм", user.nickname],
-                      ["Идентификатор в телеграм", "не указан"],
-                      ["Телефон", "+7 (900) 000-00-00"],
-                    ]}
-                  />
-
-                  <InfoColumn
-                    items={[
-                      ["Группа", user.group],
-                      ["Роль", user.role],
-                      ["Команды", user.manager],
-                      ["Задачи", "задач: 0 / отчетов: 0"],
-                      ["Позиция на карте", "показать на карту"],
-                      ["Руководитель", `${user.manager}\nДемо-куратор • уровень 3`],
-                      ["Подчиненные", "не назначены"],
-                      ["Используемые боты", "или используемые"],
-                    ]}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </form>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-function InfoColumn({
-  items,
-}: {
-  items: [string, string][];
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="space-y-5">
-      {items.map(([label, value]) => (
-        <div key={label} className="space-y-1">
-          <p className="text-sm font-medium text-slate-500">{label}</p>
-          <p className="whitespace-pre-line text-sm text-slate-900">{value}</p>
-        </div>
-      ))}
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      {children}
     </div>
   );
 }
 
+function ReadonlyField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-slate-500">{label}</p>
+      <p className="text-sm text-slate-900">{value}</p>
+    </div>
+  );
+}
 
+function UserProfileMessage({ text, tone = 'default' }: { text: string; tone?: 'default' | 'error' }) {
+  return (
+    <div className="min-h-full bg-slate-50 px-6 py-6">
+      <div
+        className={`mx-auto max-w-[900px] rounded-lg border p-8 text-center text-sm ${
+          tone === 'error'
+            ? 'border-red-200 bg-red-50 text-red-700'
+            : 'border-slate-200 bg-white text-slate-500'
+        }`}
+      >
+        {text}
+      </div>
+    </div>
+  );
+}
+
+function getInitialForm(user: UserDetails): UserFormState {
+  return {
+    username: user.username,
+    full_name: user.fullName,
+    phone: user.phone ?? '',
+    birthday: user.birthday ?? '',
+    role: user.role ? String(user.role.id) : '',
+    region: user.region ? String(user.region.id) : '',
+    org_unit: user.orgUnit ? String(user.orgUnit.id) : '',
+  };
+}
+
+const emptyForm: UserFormState = {
+  username: '',
+  full_name: '',
+  phone: '',
+  birthday: '',
+  role: '',
+  region: '',
+  org_unit: '',
+};
+
+function parseOptionalNumber(value: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
+}
