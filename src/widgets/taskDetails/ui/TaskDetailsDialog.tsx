@@ -18,6 +18,16 @@ import {
   TableRow,
 } from "@/shared/ui/table";
 import { TableScrollArea } from "@/shared/ui/table-scroll-area";
+import { getStatusClassName } from "@/widgets/taskRegistry/ui/TaskRegistryTable";
+
+function getTaskTypeLabel(type: Task["type"]) {
+  const labels: Record<Task["type"], string> = {
+    online_action: "Онлайн",
+    street_action: "Уличная",
+  };
+
+  return labels[type];
+}
 
 type Props = {
   task: Task | null;
@@ -63,7 +73,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange }: Props) {
                   <p>{task.answerFormat ?? "Ответ: не указан"}</p>
                   <div className="flex items-center gap-2">
                     <span>Статус:</span>
-                    <Badge className="border-0 bg-emerald-100 px-2.5 py-1 text-emerald-700">
+                    <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
                       {task.statusLabel ?? task.status}
                     </Badge>
                   </div>
@@ -103,7 +113,7 @@ export function TaskDetailsDialog({ task, open, onOpenChange }: Props) {
                     <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                       Тип
                     </p>
-                    <p className="mt-1 font-medium text-slate-900">{task.type}</p>
+                    <p className="mt-1 font-medium text-slate-900">{getTaskTypeLabel(task.type)}</p>
                   </div>
                   <Separator />
                   <div>

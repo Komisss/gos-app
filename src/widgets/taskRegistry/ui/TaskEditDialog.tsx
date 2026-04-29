@@ -1,74 +1,69 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { createTask } from '@/entities/task/api/tasks';
-import type { TaskPayload } from '@/entities/task/model/types';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import type { Task, TaskPayload } from '@/entities/task/model/types';
 import { Button } from '@/shared/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
-const initialForm: TaskPayload = {
-  title: '',
-  scope: 'federal',
-  status: 'draft',
-  task_type: 'online_action',
-  report_format: 'link',
-  deadline_at: new Date().toISOString(),
+type Props = {
+  task: Task | null;
+  open: boolean;
+  isSubmitting?: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (taskId: number, payload: TaskPayload) => void;
 };
 
-export function NewTaskForm() {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState<TaskPayload>(initialForm);
+export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmit }: Props) {
+  const [form, setForm] = useState<TaskPayload>(() => getInitialForm(task));
 
-  const createMutation = useMutation({
-    mutationFn: createTask,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      navigate('/tasks');
-    },
-  });
+  useEffect(() => {
+    setForm(getInitialForm(task));
+  }, [task]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate(form);
+
+    if (!task) {
+      return;
+    }
+
+    onSubmit(task.id, form);
   }
 
   return (
-    <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-5 px-6 py-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold !text-slate-900">Новая задача</h1>
-          <p className="text-sm text-slate-500">
-            Заполните поля, которые принимает API создания задачи.
-          </p>
-        </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[560px]">
+        <DialogHeader>
+          <DialogTitle className="text-xl text-slate-950">Редактирование задачи</DialogTitle>
+          <DialogDescription>Изменения будут отправлены методом PATCH.</DialogDescription>
+        </DialogHeader>
 
-        <form
-          className="space-y-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-          onSubmit={handleSubmit}
-        >
-          <Field label="Название задачи">
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <Field label="Название">
             <Input
-              placeholder="Введите название задачи"
-              className="border-slate-200"
               value={form.title}
               onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
               required
             />
           </Field>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Уровень">
               <Select
                 value={form.scope}
                 onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
               >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
+                <SelectTrigger className="w-full bg-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent>
                   <SelectItem value="federal">Федеральная</SelectItem>
                   <SelectItem value="regional">Региональная</SelectItem>
                   <SelectItem value="municipal">Муниципальная</SelectItem>
@@ -81,10 +76,10 @@ export function NewTaskForm() {
                 value={form.status}
                 onValueChange={(status) => setForm((current) => ({ ...current, status }))}
               >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
+                <SelectTrigger className="w-full bg-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent>
                   <SelectItem value="draft">Черновик</SelectItem>
                   <SelectItem value="active">Активная</SelectItem>
                   <SelectItem value="pending">В работе</SelectItem>
@@ -94,16 +89,16 @@ export function NewTaskForm() {
             </Field>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Тип задачи">
               <Select
                 value={form.task_type}
                 onValueChange={(task_type) => setForm((current) => ({ ...current, task_type }))}
               >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
+                <SelectTrigger className="w-full bg-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent>
                   <SelectItem value="online_action">Онлайн-акция</SelectItem>
                   <SelectItem value="street_action">Уличная акция</SelectItem>
                 </SelectContent>
@@ -117,10 +112,10 @@ export function NewTaskForm() {
                   setForm((current) => ({ ...current, report_format }))
                 }
               >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
+                <SelectTrigger className="w-full bg-white">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent>
                   <SelectItem value="link">Ссылка</SelectItem>
                   <SelectItem value="image">Изображение</SelectItem>
                 </SelectContent>
@@ -131,7 +126,6 @@ export function NewTaskForm() {
           <Field label="Дедлайн">
             <Input
               type="datetime-local"
-              className="border-slate-200"
               value={toDateTimeLocalValue(form.deadline_at)}
               onChange={(event) => {
                 if (!event.target.value) {
@@ -148,33 +142,38 @@ export function NewTaskForm() {
             />
           </Field>
 
-          {createMutation.isError && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Не удалось создать задачу.
-            </div>
-          )}
-
-          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 pt-4">
-            <Button asChild variant="outline" className="border-slate-200">
-              <Link to="/tasks">К списку задач</Link>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Отмена
             </Button>
-            <Button className="bg-[#465cd3] text-white hover:bg-[#3c50bd]" disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Создание...' : 'Создать задачу'}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Сохранение...' : 'Сохранить'}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium text-slate-700 !mb-1">{label}</p>
+      <p className="text-sm font-medium text-slate-700">{label}</p>
       {children}
     </div>
   );
+}
+
+function getInitialForm(task: Task | null): TaskPayload {
+  return {
+    title: task?.title ?? '',
+    scope: task?.scope ?? 'federal',
+    status: task?.status ?? 'draft',
+    task_type: task?.taskType ?? 'online_action',
+    report_format: task?.reportFormat ?? 'link',
+    deadline_at: task?.deadlineAt ?? new Date().toISOString(),
+  };
 }
 
 function toDateTimeLocalValue(value: string) {

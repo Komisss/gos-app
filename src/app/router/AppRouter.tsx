@@ -3,7 +3,6 @@ import { MainLayout } from '@app/layouts/layout.tsx';
 import LoginPage from '@pages/login/ui/LoginPage';
 import NewTaskPage from '@pages/newTask/ui/NewTaskPage';
 import ProfilePage from '@pages/profile/ui/ProfilePage';
-import ReportsPage from '@pages/reports/ui/ReportsPage';
 import StatsPage from '@pages/stats/ui/StatsPage';
 import TasksListPage from '@pages/tasks/ui/TasksListPage';
 import UserProfilePage from '@pages/users/ui/UserProfilePage';
@@ -26,7 +25,6 @@ export const AppRouter = () => {
             <Route path="/users" element={<UsersPage />} />
             <Route path="/users/:userId" element={<UserProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/" element={<StatsPage />} />
           </Route>
         </Route>

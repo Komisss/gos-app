@@ -1,4 +1,31 @@
-export type TaskStatus = "active" | "pending" | "completed";
+export type TaskStatus = "draft" | "active" | "pending" | "completed" | "archived" | string;
+
+export type TaskScope = "federal" | "regional" | "municipal" | string;
+
+export type TaskType = "online_action" | "street_action";
+
+export type TaskReportFormat = "link" | "image";
+
+export interface TaskDto {
+  task_id: number;
+  title: string;
+  scope: TaskScope;
+  status: TaskStatus;
+  task_type: TaskType;
+  report_format: TaskReportFormat;
+  deadline_at: string;
+  created_at: string;
+  created_by_user_id: number;
+}
+
+export type TaskPayload = {
+  title: string;
+  scope: TaskScope;
+  status: TaskStatus;
+  task_type: TaskType;
+  report_format: TaskReportFormat;
+  deadline_at: string;
+};
 
 export interface TaskReport {
   id: number;
@@ -13,10 +40,17 @@ export interface TaskReport {
 
 export interface Task {
   id: number;
+  taskId?: number;
   title: string;
   subtitle?: string;
   department?: string;
-  type: string;
+  type: TaskType;
+  scope?: TaskScope;
+  taskType?: TaskType;
+  reportFormat?: TaskReportFormat;
+  createdAt?: string;
+  deadlineAt?: string;
+  createdByUserId?: number;
   region: string;
   assignee: string;
   assigneeMeta?: string;

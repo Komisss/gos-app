@@ -47,5 +47,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
     return undefined as T;
   }
 
+  const contentLength = response.headers.get('Content-Length');
+  const contentType = response.headers.get('Content-Type');
+
+  if (contentLength === '0' || !contentType?.includes('application/json')) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
