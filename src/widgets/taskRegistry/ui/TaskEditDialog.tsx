@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import type { Task, TaskPayload } from '@/entities/task/model/types';
 import { Button } from '@/shared/ui/button';
+import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import {
   Dialog,
   DialogContent,
@@ -124,21 +125,10 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
           </div>
 
           <Field label="Дедлайн">
-            <Input
-              type="datetime-local"
-              value={toDateTimeLocalValue(form.deadline_at)}
-              onChange={(event) => {
-                if (!event.target.value) {
-                  setForm((current) => ({ ...current, deadline_at: '' }));
-                  return;
-                }
-
-                setForm((current) => ({
-                  ...current,
-                  deadline_at: new Date(event.target.value).toISOString(),
-                }));
-              }}
-              required
+            <DateTimePicker
+              value={form.deadline_at}
+              onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
+              placeholder="Выберите дедлайн"
             />
           </Field>
 
@@ -172,19 +162,6 @@ function getInitialForm(task: Task | null): TaskPayload {
     status: task?.status ?? 'draft',
     task_type: task?.taskType ?? 'online_action',
     report_format: task?.reportFormat ?? 'link',
-    deadline_at: task?.deadlineAt ?? new Date().toISOString(),
+    deadline_at: task?.deadlineAt ?? '',
   };
-}
-
-function toDateTimeLocalValue(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-
-  return localDate.toISOString().slice(0, 16);
 }

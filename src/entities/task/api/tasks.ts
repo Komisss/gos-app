@@ -1,7 +1,19 @@
 import { http } from '@/shared/api/http';
+import { toApiDateTime } from '@/shared/lib/dateTime';
 import type { Task, TaskDto, TaskPayload } from '@/entities/task/model/types';
 
 const TASKS_ENDPOINT = '/api/v1/tasks';
+
+export type TaskFilters = Partial<{
+  created_by_user_id: string;
+  created_from: string;
+  created_to: string;
+  region_id: string;
+  scope: string;
+  status: string;
+  target_id: string;
+  target_type: string;
+}>;
 
 type TasksResponse =
   | TaskDto[]
@@ -11,10 +23,36 @@ type TasksResponse =
       data?: TaskDto[];
     };
 
-export async function getTasks() {
-  const response = await http<TasksResponse>(TASKS_ENDPOINT);
+export async function getTasks(filters: TaskFilters = {}) {
+  const response = await http<TasksResponse>(`${TASKS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeTasksResponse(response).map(mapTaskDtoToTask);
+}
+
+function buildQueryString(filters: TaskFilters) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+
+    params.set(key, normalizeDateTimeFilter(key, value));
+  });
+
+  const query = params.toString();
+
+  return query ? `?${query}` : '';
+}
+
+function normalizeDateTimeFilter(key: string, value: string) {
+  if (key !== 'created_from' && key !== 'created_to') {
+    return value;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? value : toApiDateTime(date);
 }
 
 export async function createTask(payload: TaskPayload) {

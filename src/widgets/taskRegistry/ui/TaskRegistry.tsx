@@ -1,25 +1,48 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { ListFilter, Plus } from 'lucide-react';
 
-import { activateTask, archiveTask, getStatusLabel, getTasks, updateTask } from '@/entities/task/api/tasks';
+import {
+  activateTask,
+  archiveTask,
+  getStatusLabel,
+  getTasks,
+  type TaskFilters,
+  updateTask,
+} from '@/entities/task/api/tasks';
 import type { Task, TaskPayload } from '@/entities/task/model/types';
 import { Button } from '@/shared/ui/button';
 import { CardTitle } from '@/shared/ui/card';
+import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { Input } from '@/shared/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { TaskDetailsDialog } from '@/widgets/taskDetails/ui/TaskDetailsDialog';
 import { TaskEditDialog } from './TaskEditDialog';
 import { TaskRegistryTable } from './TaskRegistryTable';
+
+const emptyTaskFilters: TaskFilters = {
+  created_by_user_id: '',
+  created_from: '',
+  created_to: '',
+  region_id: '',
+  scope: '',
+  status: '',
+  target_id: '',
+  target_type: '',
+};
 
 export function TaskRegistry() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
+  const [filters, setFilters] = useState<TaskFilters>(emptyTaskFilters);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const tasksQuery = useQuery({
-    queryKey: ['tasks'],
-    queryFn: getTasks,
+    queryKey: ['tasks', filters],
+    queryFn: () => getTasks(filters),
   });
 
   const toggleArchiveMutation = useMutation({
@@ -52,17 +75,105 @@ export function TaskRegistry() {
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-3xl font-semibold text-slate-900">Задачи</CardTitle>
-          </div>
+          <CardTitle className="text-3xl font-semibold text-slate-900">Задачи</CardTitle>
 
-          <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
-            <Link to="/tasks/new">
-              <Plus />
-              Добавить задачу
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-200 bg-white"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <ListFilter />
+              Фильтры
+            </Button>
+            <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
+              <Link to="/tasks/new">
+                <Plus />
+                Добавить задачу
+              </Link>
+            </Button>
+          </div>
         </div>
+
+        {filtersOpen && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FilterInput
+                label="Автор ID"
+                type="number"
+                value={filters.created_by_user_id}
+                onChange={(created_by_user_id) => setFilters((current) => ({ ...current, created_by_user_id }))}
+              />
+              <FilterInput
+                label="Создана от"
+                type="datetime"
+                value={filters.created_from}
+                onChange={(created_from) => setFilters((current) => ({ ...current, created_from }))}
+              />
+              <FilterInput
+                label="Создана до"
+                type="datetime"
+                value={filters.created_to}
+                onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
+              />
+              <FilterInput
+                label="Регион ID"
+                type="number"
+                value={filters.region_id}
+                onChange={(region_id) => setFilters((current) => ({ ...current, region_id }))}
+              />
+              <FilterInput
+                label="Scope"
+                type="number"
+                value={filters.scope}
+                onChange={(scope) => setFilters((current) => ({ ...current, scope }))}
+              />
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
+                <Select
+                  value={filters.status || 'all'}
+                  onValueChange={(status) =>
+                    setFilters((current) => ({ ...current, status: status === 'all' ? '' : status }))
+                  }
+                >
+                  <SelectTrigger className="w-full border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="draft">Черновик</SelectItem>
+                    <SelectItem value="active">Активная</SelectItem>
+                    <SelectItem value="pending">В работе</SelectItem>
+                    <SelectItem value="completed">Завершена</SelectItem>
+                    <SelectItem value="archived">В архиве</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <FilterInput
+                label="Target ID"
+                type="number"
+                value={filters.target_id}
+                onChange={(target_id) => setFilters((current) => ({ ...current, target_id }))}
+              />
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-slate-500 !mb-1">Target type</p>
+                <Input
+                  className="h-9 border-slate-200 text-sm"
+                  value={filters.target_type ?? ''}
+                  onChange={(event) =>
+                    setFilters((current) => ({ ...current, target_type: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
+              <Button type="button" variant="outline" onClick={() => setFilters(emptyTaskFilters)}>
+                Сбросить фильтры
+              </Button>
+            </div>
+          </div>
+        )}
 
         {tasksQuery.isLoading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
@@ -106,6 +217,34 @@ export function TaskRegistry() {
           onSubmit={(taskId, payload) => updateMutation.mutate({ taskId, payload })}
         />
       </div>
+    </div>
+  );
+}
+
+function FilterInput({
+  label,
+  type,
+  value,
+  onChange,
+}: {
+  label: string;
+  type: 'number' | 'datetime';
+  value?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      {type === 'datetime' ? (
+        <DateTimePicker value={value} onChange={onChange} placeholder="Выберите дату" />
+      ) : (
+        <Input
+          type="number"
+          className="h-9 border-slate-200 text-sm"
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
     </div>
   );
 }

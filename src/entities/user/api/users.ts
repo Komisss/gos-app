@@ -1,4 +1,5 @@
 import { http } from '@/shared/api/http';
+import { toApiDateTime } from '@/shared/lib/dateTime';
 import type {
   UserDetails,
   UserDetailsDto,
@@ -9,6 +10,16 @@ import type {
 
 const USERS_ENDPOINT = '/api/v1/users';
 
+export type UserFilters = Partial<{
+  created_from: string;
+  created_to: string;
+  org_unit: string;
+  region: string;
+  role: string;
+  search: string;
+  status: string;
+}>;
+
 type UsersResponse =
   | UserListDto[]
   | {
@@ -17,10 +28,36 @@ type UsersResponse =
       data?: UserListDto[];
     };
 
-export async function getUsers() {
-  const response = await http<UsersResponse>(USERS_ENDPOINT);
+export async function getUsers(filters: UserFilters = {}) {
+  const response = await http<UsersResponse>(`${USERS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeUsersResponse(response).map(mapUserListDto);
+}
+
+function buildQueryString(filters: UserFilters) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+
+    params.set(key, normalizeDateTimeFilter(key, value));
+  });
+
+  const query = params.toString();
+
+  return query ? `?${query}` : '';
+}
+
+function normalizeDateTimeFilter(key: string, value: string) {
+  if (key !== 'created_from' && key !== 'created_to') {
+    return value;
+  }
+
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? value : toApiDateTime(date);
 }
 
 export async function getUserById(userId: number) {

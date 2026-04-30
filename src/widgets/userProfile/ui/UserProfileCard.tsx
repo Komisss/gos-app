@@ -14,6 +14,7 @@ import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types'
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
+import { DatePicker } from '@/shared/ui/date-picker';
 import { Input } from '@/shared/ui/input';
 
 type UserFormState = {
@@ -170,12 +171,15 @@ export function UserProfileCard() {
                 </Field>
 
                 <Field label="Дата рождения">
-                  <Input
-                    type="date"
-                    value={form.birthday}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, birthday: event.target.value }))
+                  <DatePicker
+                    value={parseDateOnly(form.birthday)}
+                    onChange={(birthday) =>
+                      setForm((current) => ({
+                        ...current,
+                        birthday: birthday ? toDateOnly(birthday) : '',
+                      }))
                     }
+                    placeholder="Выберите дату"
                   />
                 </Field>
 
@@ -328,4 +332,22 @@ function formatDateTime(value: string) {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(date);
+}
+
+function parseDateOnly(value: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function toDateOnly(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }

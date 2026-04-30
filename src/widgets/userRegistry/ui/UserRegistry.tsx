@@ -1,19 +1,39 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
+import { Download, ListFilter } from 'lucide-react';
 
-import { activateUser, deactivateUser, getUsers } from '@/entities/user/api/users';
+import {
+  activateUser,
+  deactivateUser,
+  getUsers,
+  type UserFilters,
+} from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
 import { Button } from '@/shared/ui/button';
+import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { Input } from '@/shared/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { UserRegistryTable } from './UserRegistryTable';
+
+const emptyUserFilters: UserFilters = {
+  created_from: '',
+  created_to: '',
+  org_unit: '',
+  region: '',
+  role: '',
+  search: '',
+  status: '',
+};
 
 export function UserRegistry() {
   const queryClient = useQueryClient();
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
+  const [filters, setFilters] = useState<UserFilters>(emptyUserFilters);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: getUsers,
+    queryKey: ['users', filters],
+    queryFn: () => getUsers(filters),
   });
 
   const toggleActiveMutation = useMutation({
@@ -39,11 +59,92 @@ export function UserRegistry() {
             </div>
           </div>
 
-          <Button className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
-            <Download />
-            Скачать XLSX
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-200 bg-white"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <ListFilter />
+              Фильтры
+            </Button>
+            <Button className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
+              <Download />
+              Скачать XLSX
+            </Button>
+          </div>
         </div>
+
+        {filtersOpen && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-slate-500 !mb-1">Поиск</p>
+                <Input
+                  className="h-9 border-slate-200 text-sm"
+                  placeholder="ФИО, логин"
+                  value={filters.search ?? ''}
+                  onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                />
+              </div>
+              <FilterInput
+                label="Создан от"
+                type="datetime"
+                value={filters.created_from}
+                onChange={(created_from) => setFilters((current) => ({ ...current, created_from }))}
+              />
+              <FilterInput
+                label="Создан до"
+                type="datetime"
+                value={filters.created_to}
+                onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
+              />
+              <FilterInput
+                label="Оргструктура"
+                type="number"
+                value={filters.org_unit}
+                onChange={(org_unit) => setFilters((current) => ({ ...current, org_unit }))}
+              />
+              <FilterInput
+                label="Регион"
+                type="number"
+                value={filters.region}
+                onChange={(region) => setFilters((current) => ({ ...current, region }))}
+              />
+              <FilterInput
+                label="Роль"
+                type="number"
+                value={filters.role}
+                onChange={(role) => setFilters((current) => ({ ...current, role }))}
+              />
+              <div className="space-y-1 md:col-span-2">
+                <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
+                <Select
+                  value={filters.status || 'all'}
+                  onValueChange={(status) =>
+                    setFilters((current) => ({ ...current, status: status === 'all' ? '' : status }))
+                  }
+                >
+                  <SelectTrigger className="w-full border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="all">Все</SelectItem>
+                    <SelectItem value="active">Активен</SelectItem>
+                    <SelectItem value="inactive">Неактивен</SelectItem>
+                    <SelectItem value="deactivated">Деактивирован</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
+              <Button type="button" variant="outline" onClick={() => setFilters(emptyUserFilters)}>
+                Сбросить фильтры
+              </Button>
+            </div>
+          </div>
+        )}
 
         {usersQuery.isLoading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
@@ -61,6 +162,34 @@ export function UserRegistry() {
           />
         )}
       </div>
+    </div>
+  );
+}
+
+function FilterInput({
+  label,
+  type,
+  value,
+  onChange,
+}: {
+  label: string;
+  type: 'number' | 'datetime';
+  value?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      {type === 'datetime' ? (
+        <DateTimePicker value={value} onChange={onChange} placeholder="Выберите дату" />
+      ) : (
+        <Input
+          type="number"
+          className="h-9 border-slate-200 text-sm"
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      )}
     </div>
   );
 }

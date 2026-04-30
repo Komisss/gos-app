@@ -8,6 +8,7 @@ import type { TaskPayload, TaskScope } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
 import { Button } from '@/shared/ui/button';
+import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
@@ -30,7 +31,7 @@ const initialForm: TaskPayload = {
   status: 'draft',
   task_type: 'online_action',
   report_format: 'link',
-  deadline_at: new Date().toISOString(),
+  deadline_at: '',
 };
 
 export function NewTaskForm() {
@@ -165,22 +166,10 @@ export function NewTaskForm() {
             </Field>
 
             <Field label="Дедлайн">
-              <Input
-                type="datetime-local"
-                className="border-slate-200"
-                value={toDateTimeLocalValue(form.deadline_at)}
-                onChange={(event) => {
-                  if (!event.target.value) {
-                    setForm((current) => ({ ...current, deadline_at: '' }));
-                    return;
-                  }
-
-                  setForm((current) => ({
-                    ...current,
-                    deadline_at: new Date(event.target.value).toISOString(),
-                  }));
-                }}
-                required
+              <DateTimePicker
+                value={form.deadline_at}
+                onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
+                placeholder="Выберите дедлайн"
               />
             </Field>
           </div>
@@ -338,17 +327,4 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       {children}
     </div>
   );
-}
-
-function toDateTimeLocalValue(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  const offset = date.getTimezoneOffset();
-  const localDate = new Date(date.getTime() - offset * 60 * 1000);
-
-  return localDate.toISOString().slice(0, 16);
 }
