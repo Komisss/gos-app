@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListFilter, Plus } from 'lucide-react';
 
+import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import { getRegions } from '@/entities/region/api/regions';
 import {
   activateTask,
   archiveTask,
@@ -12,9 +14,11 @@ import {
   updateTask,
 } from '@/entities/task/api/tasks';
 import type { Task, TaskPayload } from '@/entities/task/model/types';
+import { getUsers } from '@/entities/user/api/users';
 import { Button } from '@/shared/ui/button';
 import { CardTitle } from '@/shared/ui/card';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { TaskDetailsDialog } from '@/widgets/taskDetails/ui/TaskDetailsDialog';
@@ -25,6 +29,7 @@ const emptyTaskFilters: TaskFilters = {
   created_by_user_id: '',
   created_from: '',
   created_to: '',
+  org_unit: '',
   region_id: '',
   scope: '',
   status: '',
@@ -43,6 +48,21 @@ export function TaskRegistry() {
   const tasksQuery = useQuery({
     queryKey: ['tasks', filters],
     queryFn: () => getTasks(filters),
+  });
+
+  const regionsQuery = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+  });
+
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units-tree'],
+    queryFn: getOrgUnitsTree,
+  });
+
+  const usersQuery = useQuery({
+    queryKey: ['users'],
+    queryFn: () => getUsers(),
   });
 
   const toggleArchiveMutation = useMutation({
@@ -99,10 +119,16 @@ export function TaskRegistry() {
         {filtersOpen && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FilterInput
-                label="Автор ID"
-                type="number"
+              <FilterSearchSelect
+                label="Автор"
                 value={filters.created_by_user_id}
+                placeholder="Все авторы"
+                searchPlaceholder="Поиск по ФИО или логину"
+                options={(usersQuery.data ?? []).map((user) => ({
+                  value: String(user.id),
+                  label: user.fullName,
+                  description: `@${user.username}`,
+                }))}
                 onChange={(created_by_user_id) => setFilters((current) => ({ ...current, created_by_user_id }))}
               />
               <FilterInput
@@ -117,16 +143,36 @@ export function TaskRegistry() {
                 value={filters.created_to}
                 onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
               />
-              <FilterInput
-                label="Регион ID"
-                type="number"
+              <FilterSearchSelect
+                label="Оргструктура"
+                value={filters.org_unit}
+                placeholder="Все оргструктуры"
+                searchPlaceholder="Поиск оргструктуры"
+                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
+                  value: String(orgUnit.id),
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                }))}
+                onChange={(org_unit) => setFilters((current) => ({ ...current, org_unit }))}
+              />
+              <FilterSearchSelect
+                label="Регион"
                 value={filters.region_id}
+                placeholder="Все регионы"
+                searchPlaceholder="Поиск региона"
+                options={(regionsQuery.data ?? []).map((region) => ({
+                  value: String(region.id),
+                  label: region.name,
+                }))}
                 onChange={(region_id) => setFilters((current) => ({ ...current, region_id }))}
               />
-              <FilterInput
+              <FilterSelect
                 label="Scope"
-                type="number"
                 value={filters.scope}
+                placeholder="Все"
+                options={[
+                  { value: '1', label: 'Региональный' },
+                  { value: '2', label: 'Федеральный' },
+                ]}
                 onChange={(scope) => setFilters((current) => ({ ...current, scope }))}
               />
               <div className="space-y-1">
@@ -245,6 +291,39 @@ function FilterInput({
           onChange={(event) => onChange(event.target.value)}
         />
       )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  label: string;
+  value?: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
+        <SelectTrigger className="w-full border-slate-200 bg-white">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectItem value="all">{placeholder}</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

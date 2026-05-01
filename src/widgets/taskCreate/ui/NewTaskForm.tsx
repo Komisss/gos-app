@@ -3,31 +3,32 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 
+import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import type { OrgUnit } from '@/entities/orgUnit/model/types';
+import { getRegions } from '@/entities/region/api/regions';
+import type { Region } from '@/entities/region/model/types';
 import { createTask } from '@/entities/task/api/tasks';
-import type { TaskPayload, TaskScope } from '@/entities/task/model/types';
+import type { TaskPayload, TaskScope, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
+import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
-import { cn } from '@/shared/lib/utils';
 
-type AssignmentTarget =
-  | {
-      kind: 'scope';
-      scope: Extract<TaskScope, 'federal' | 'regional'>;
-    }
-  | {
-      kind: 'user';
-      userId: number;
-    };
+type AssignmentKind = TaskTargetType;
+
+type AssignmentTarget = {
+  kind: AssignmentKind;
+  ids: number[];
+} | null;
 
 const initialForm: TaskPayload = {
   title: '',
-  scope: 'federal',
+  scope: 'regional',
   status: 'draft',
   task_type: 'online_action',
   report_format: 'link',
@@ -38,14 +39,21 @@ export function NewTaskForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<TaskPayload>(initialForm);
-  const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>({
-    kind: 'scope',
-    scope: 'federal',
-  });
+  const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
 
   const usersQuery = useQuery({
     queryKey: ['users'],
-    queryFn: getUsers,
+    queryFn: () => getUsers(),
+  });
+
+  const regionsQuery = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+  });
+
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units-tree'],
+    queryFn: getOrgUnitsTree,
   });
 
   const createMutation = useMutation({
@@ -61,22 +69,26 @@ export function NewTaskForm() {
     createMutation.mutate(form);
   }
 
-  function handleAssignmentChange(target: AssignmentTarget, user?: UserListItem) {
+  function handleAssignmentChange(target: AssignmentTarget, scope: TaskScope) {
     setAssignmentTarget(target);
 
-    if (target.kind === 'scope') {
+    if (!target) {
       setForm((current) => {
-        const { assigned_user_id: _assignedUserId, ...rest } = current;
-
-        return { ...rest, scope: target.scope };
+        const { targets: _targets, ...rest } = current;
+        return { ...rest, scope };
       });
       return;
     }
 
     setForm((current) => ({
       ...current,
-      scope: user?.region ? 'regional' : 'federal',
-      assigned_user_id: target.userId,
+      scope,
+      targets: [
+        {
+          target_type: target.kind,
+          target_id: target.ids,
+        },
+      ],
     }));
   }
 
@@ -107,7 +119,9 @@ export function NewTaskForm() {
           <Field label="Адресат задачи">
             <AssignmentCombobox
               users={usersQuery.data ?? []}
-              isLoading={usersQuery.isLoading}
+              regions={regionsQuery.data ?? []}
+              orgUnits={orgUnitsQuery.data ?? []}
+              isLoading={usersQuery.isLoading || regionsQuery.isLoading || orgUnitsQuery.isLoading}
               value={assignmentTarget}
               onChange={handleAssignmentChange}
             />
@@ -184,7 +198,10 @@ export function NewTaskForm() {
             <Button asChild variant="outline" className="border-slate-200">
               <Link to="/tasks">К списку задач</Link>
             </Button>
-            <Button className="bg-[#465cd3] text-white hover:bg-[#3c50bd]" disabled={createMutation.isPending}>
+            <Button
+              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+              disabled={createMutation.isPending || !assignmentTarget?.ids.length}
+            >
               {createMutation.isPending ? 'Создание...' : 'Создать задачу'}
             </Button>
           </div>
@@ -196,41 +213,36 @@ export function NewTaskForm() {
 
 function AssignmentCombobox({
   users,
+  regions,
+  orgUnits,
   isLoading,
   value,
   onChange,
 }: {
   users: UserListItem[];
+  regions: Region[];
+  orgUnits: OrgUnit[];
   isLoading: boolean;
   value: AssignmentTarget;
-  onChange: (target: AssignmentTarget, user?: UserListItem) => void;
+  onChange: (target: AssignmentTarget, scope: TaskScope) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<AssignmentKind>(value?.kind ?? 'region');
   const [query, setQuery] = useState('');
 
-  const selectedUser = value.kind === 'user' ? users.find((user) => user.id === value.userId) : null;
-  const selectedLabel =
-    value.kind === 'user'
-      ? selectedUser
-        ? `${selectedUser.fullName} (@${selectedUser.username})`
-        : `Пользователь #${value.userId}`
-      : value.scope === 'federal'
-        ? 'Федеральная задача'
-        : 'Региональная задача';
+  const data = { users, regions, orgUnits };
+  const selectedLabel = getAssignmentLabel(value, data);
+  const list = useAssignmentList(kind, query, data);
 
-  const filteredUsers = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+  function handleSelect(item: AssignmentOption) {
+    const currentIds = value?.kind === item.kind ? value.ids : [];
+    const nextIds = currentIds.includes(item.id)
+      ? currentIds.filter((id) => id !== item.id)
+      : [...currentIds, item.id];
+    const nextTarget = nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null;
 
-    if (!normalizedQuery) {
-      return users;
-    }
-
-    return users.filter((user) =>
-      `${user.fullName} ${user.username} ${user.role?.name ?? ''} ${user.region?.name ?? ''}`
-        .toLowerCase()
-        .includes(normalizedQuery),
-    );
-  }, [query, users]);
+    onChange(nextTarget, getSelectionScope(item.kind, nextIds, data));
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -244,70 +256,70 @@ function AssignmentCombobox({
           <ChevronsUpDown className="size-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] gap-4 p-4">
+      <PopoverContent align="start" className="w-[min(560px,calc(100vw-3rem))] gap-4 p-4">
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700">Тип адресата</p>
           <Select
-            value={value.kind === 'scope' ? value.scope : ''}
-            onValueChange={(scope) =>
-              onChange({ kind: 'scope', scope: scope as Extract<TaskScope, 'federal' | 'regional'> })
-            }
+            value={kind}
+            onValueChange={(nextKind) => {
+              const typedKind = nextKind as AssignmentKind;
+              setKind(typedKind);
+              setQuery('');
+              onChange(null, typedKind === 'region' ? 'regional' : 'federal');
+            }}
           >
             <SelectTrigger className="w-full border-slate-200 bg-white">
-              <SelectValue placeholder="Выберите уровень задачи" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent align="start">
-              <SelectItem value="regional">Региональный</SelectItem>
-              <SelectItem value="federal">Федеральный</SelectItem>
+              <SelectItem value="region">Региональная</SelectItem>
+              <SelectItem value="org_unit">Орг структура</SelectItem>
+              <SelectItem value="user">Пользователь</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">Или конкретный пользователь</p>
+          <p className="text-sm font-medium text-slate-700">{getSearchLabel(kind)}</p>
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
             <Input
               className="h-9 border-slate-200 pl-9"
-              placeholder="Поиск по ФИО, логину, роли или региону"
+              placeholder="Поиск по названию"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
 
-          <ScrollArea className="h-56 rounded-md border border-slate-200">
+          <ScrollArea className="h-64 rounded-md border border-slate-200">
             <div className="p-1">
               {isLoading ? (
                 <div className="px-3 py-8 text-center text-sm text-slate-500">
-                  Загружаем пользователей...
+                  Загружаем список...
                 </div>
-              ) : filteredUsers.length === 0 ? (
+              ) : list.length === 0 ? (
                 <div className="px-3 py-8 text-center text-sm text-slate-500">
-                  Пользователи не найдены.
+                  Ничего не найдено.
                 </div>
               ) : (
-                filteredUsers.map((user) => (
+                list.map((item) => (
                   <button
-                    key={user.id}
+                    key={`${item.kind}-${item.id}`}
                     type="button"
                     className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                    onClick={() => {
-                      onChange({ kind: 'user', userId: user.id }, user);
-                      setOpen(false);
-                    }}
+                    onClick={() => handleSelect(item)}
                   >
                     <Check
                       className={cn(
                         'mt-0.5 size-4 text-[#465cd3]',
-                        value.kind === 'user' && value.userId === user.id ? 'opacity-100' : 'opacity-0',
+                        value?.kind === item.kind && value.ids.includes(item.id) ? 'opacity-100' : 'opacity-0',
                       )}
                     />
                     <span className="min-w-0">
-                      <span className="block font-medium text-slate-900">{user.fullName}</span>
-                      <span className="block text-xs text-slate-500">
-                        @{user.username}
-                        {user.region?.name ? ` • ${user.region.name}` : ''}
-                      </span>
+                      <span className="block font-medium text-slate-900">{item.label}</span>
+                      {item.description && (
+                        <span className="block text-xs text-slate-500">{item.description}</span>
+                      )}
                     </span>
                   </button>
                 ))
@@ -318,6 +330,110 @@ function AssignmentCombobox({
       </PopoverContent>
     </Popover>
   );
+}
+
+type AssignmentOption = {
+  id: number;
+  kind: AssignmentKind;
+  label: string;
+  description?: string;
+  scope: TaskScope;
+};
+
+function useAssignmentList(
+  kind: AssignmentKind,
+  query: string,
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+) {
+  const normalizedQuery = query.trim().toLowerCase();
+
+  return useMemo(() => {
+    const items = getAssignmentOptions(kind, data);
+
+    if (!normalizedQuery) {
+      return items;
+    }
+
+    return items.filter((item) =>
+      `${item.label} ${item.description ?? ''}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [data, kind, normalizedQuery]);
+}
+
+function getAssignmentOptions(
+  kind: AssignmentKind,
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+): AssignmentOption[] {
+  if (kind === 'region') {
+    return data.regions.map((region) => ({
+      id: region.id,
+      kind: 'region',
+      label: region.name,
+      description: region.code,
+      scope: 'regional',
+    }));
+  }
+
+  if (kind === 'org_unit') {
+    return data.orgUnits.map((orgUnit) => ({
+      id: orgUnit.id,
+      kind: 'org_unit',
+      label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+      description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
+      scope: orgUnit.regionId ? 'regional' : 'federal',
+    }));
+  }
+
+  return data.users.map((user) => ({
+    id: user.id,
+    kind: 'user',
+    label: user.fullName,
+    description: `@${user.username}${user.region?.name ? ` • ${user.region.name}` : ''}`,
+    scope: user.region ? 'regional' : 'federal',
+  }));
+}
+
+function getAssignmentLabel(
+  value: AssignmentTarget,
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+) {
+  if (!value) {
+    return 'Выберите адресата задачи';
+  }
+
+  const options = getAssignmentOptions(value.kind, data).filter((item) => value.ids.includes(item.id));
+
+  if (options.length === 1) {
+    return options[0].label.trim();
+  }
+
+  if (options.length > 1) {
+    return `Выбрано: ${options.length}`;
+  }
+
+  return 'Выберите адресата задачи';
+}
+
+function getSelectionScope(
+  kind: AssignmentKind,
+  ids: number[],
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+): TaskScope {
+  const selectedOptions = getAssignmentOptions(kind, data).filter((item) => ids.includes(item.id));
+
+  return selectedOptions.some((item) => item.scope === 'regional') ? 'regional' : 'federal';
+}
+
+function getSearchLabel(kind: AssignmentKind) {
+  if (kind === 'region') {
+    return 'Регион';
+  }
+
+  if (kind === 'org_unit') {
+    return 'Орг структура';
+  }
+
+  return 'Пользователь';
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

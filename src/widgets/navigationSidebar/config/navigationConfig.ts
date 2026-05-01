@@ -1,27 +1,22 @@
-import {
-  BarChart,
-  ClipboardList,
-  Users,
-} from "lucide-react";
+import { BarChart, ClipboardList, UserPlus, Users } from 'lucide-react';
 
 export const sidebarSections = [
   {
-    title: "СТАТИСТИКА",
+    title: 'СТАТИСТИКА',
+    items: [{ label: 'Статистика', icon: BarChart, href: '/stats' }],
+  },
+  {
+    title: 'ЗАДАЧИ',
     items: [
-      { label: "Статистика", icon: BarChart, href: "/stats" },
+      { label: 'Новая задача', icon: ClipboardList, href: '/tasks/new' },
+      { label: 'Список задач', icon: ClipboardList, href: '/tasks' },
     ],
   },
   {
-    title: "ЗАДАЧИ",
+    title: 'ПОЛЬЗОВАТЕЛИ',
     items: [
-      { label: "Новая задача", icon: ClipboardList, href: "/tasks/new" },
-      { label: "Список задач", icon: ClipboardList, href: "/tasks" },
-    ],
-  },
-  {
-    title: "ПОЛЬЗОВАТЕЛИ",
-    items: [
-      { label: "Список пользователей", icon: Users, href: "/users" },
+      { label: 'Новый пользователь', icon: UserPlus, href: '/users/new' },
+      { label: 'Список пользователей', icon: Users, href: '/users' },
     ],
   },
 ];

@@ -8,6 +8,7 @@ export type TaskFilters = Partial<{
   created_by_user_id: string;
   created_from: string;
   created_to: string;
+  org_unit: string;
   region_id: string;
   scope: string;
   status: string;

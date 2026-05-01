@@ -3,7 +3,6 @@ import {
 } from "@/shared/ui/sidebar"
 import {PanelLeft} from "lucide-react";
 import {UserDropdown} from "./UserDropdown.tsx";
-import {Region} from "./Region"
 
 export default function Header({className = ''}: {className?: string}) {
 
@@ -13,9 +12,7 @@ export default function Header({className = ''}: {className?: string}) {
         <SidebarTrigger className="md:hidden h-8 w-8 shrink-0 text-white bg-black">
           <PanelLeft color="black" fill="black" />
         </SidebarTrigger>
-        <div className="flex items-center">
-          <Region/>
-        </div>
+        <div />
         <div>
           <UserDropdown/>
         </div>

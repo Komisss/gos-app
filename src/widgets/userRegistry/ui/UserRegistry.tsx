@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, ListFilter } from 'lucide-react';
+import { Download, ListFilter, UserPlus } from 'lucide-react';
 
+import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import { getRegions } from '@/entities/region/api/regions';
 import {
   activateUser,
   deactivateUser,
@@ -11,6 +14,7 @@ import {
 import type { UserListItem } from '@/entities/user/model/types';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { UserRegistryTable } from './UserRegistryTable';
@@ -34,6 +38,16 @@ export function UserRegistry() {
   const usersQuery = useQuery({
     queryKey: ['users', filters],
     queryFn: () => getUsers(filters),
+  });
+
+  const regionsQuery = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+  });
+
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units-tree'],
+    queryFn: getOrgUnitsTree,
   });
 
   const toggleActiveMutation = useMutation({
@@ -69,10 +83,16 @@ export function UserRegistry() {
               <ListFilter />
               Фильтры
             </Button>
-            <Button className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
+            <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
+              <Link to="/users/new">
+                <UserPlus />
+                Добавить пользователя
+              </Link>
+            </Button>
+            {/* <Button className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
               <Download />
               Скачать XLSX
-            </Button>
+            </Button> */}
           </div>
         </div>
 
@@ -100,22 +120,36 @@ export function UserRegistry() {
                 value={filters.created_to}
                 onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
               />
-              <FilterInput
+              <FilterSearchSelect
                 label="Оргструктура"
-                type="number"
                 value={filters.org_unit}
+                placeholder="Все оргструктуры"
+                searchPlaceholder="Поиск оргструктуры"
+                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
+                  value: String(orgUnit.id),
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                }))}
                 onChange={(org_unit) => setFilters((current) => ({ ...current, org_unit }))}
               />
-              <FilterInput
+              <FilterSearchSelect
                 label="Регион"
-                type="number"
                 value={filters.region}
+                placeholder="Все регионы"
+                searchPlaceholder="Поиск региона"
+                options={(regionsQuery.data ?? []).map((region) => ({
+                  value: String(region.id),
+                  label: region.name,
+                }))}
                 onChange={(region) => setFilters((current) => ({ ...current, region }))}
               />
-              <FilterInput
+              <FilterSelect
                 label="Роль"
-                type="number"
                 value={filters.role}
+                placeholder="Все"
+                options={[
+                  { value: '1', label: 'Региональный' },
+                  { value: '2', label: 'Федеральный' },
+                ]}
                 onChange={(role) => setFilters((current) => ({ ...current, role }))}
               />
               <div className="space-y-1 md:col-span-2">
@@ -190,6 +224,39 @@ function FilterInput({
           onChange={(event) => onChange(event.target.value)}
         />
       )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  label: string;
+  value?: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
+        <SelectTrigger className="w-full border-slate-200 bg-white">
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent align="start">
+          <SelectItem value="all">{placeholder}</SelectItem>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

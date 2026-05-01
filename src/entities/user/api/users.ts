@@ -5,10 +5,12 @@ import type {
   UserDetailsDto,
   UserListDto,
   UserListItem,
+  RegisterUserPayload,
   UserPatchPayload,
 } from '@/entities/user/model/types';
 
 const USERS_ENDPOINT = '/api/v1/users';
+const REGISTER_ENDPOINT = '/api/v1/auth/register';
 
 export type UserFilters = Partial<{
   created_from: string;
@@ -73,6 +75,13 @@ export async function updateUser(userId: number, payload: UserPatchPayload) {
   });
 
   return mapUserDetailsDto(response);
+}
+
+export async function registerUser(payload: RegisterUserPayload) {
+  return http<UserDetailsDto | UserListDto | unknown>(REGISTER_ENDPOINT, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function activateUser(userId: number) {

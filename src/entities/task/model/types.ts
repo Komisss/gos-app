@@ -6,6 +6,13 @@ export type TaskType = "online_action" | "street_action";
 
 export type TaskReportFormat = "link" | "image";
 
+export type TaskTargetType = 'region' | 'org_unit' | 'user';
+
+export type TaskTargetPayload = {
+  target_type: TaskTargetType;
+  target_id: number[];
+};
+
 export interface TaskDto {
   task_id: number;
   title: string;
@@ -21,7 +28,7 @@ export interface TaskDto {
 export type TaskPayload = {
   title: string;
   scope: TaskScope;
-  assigned_user_id?: number;
+  targets?: TaskTargetPayload[];
   status: TaskStatus;
   task_type: TaskType;
   report_format: TaskReportFormat;

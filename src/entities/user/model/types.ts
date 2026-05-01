@@ -94,3 +94,12 @@ export type UserPatchPayload = Partial<{
   groups: number[];
   user_permissions: number[];
 }>;
+
+export type RegisterUserPayload = {
+  username: string;
+  password: string;
+  full_name: string;
+  role: 1 | 2;
+  region: number | null;
+  org_unit: number | null;
+};

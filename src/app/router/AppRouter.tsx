@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@app/layouts/layout.tsx';
 import LoginPage from '@pages/login/ui/LoginPage';
 import NewTaskPage from '@pages/newTask/ui/NewTaskPage';
+import NewUserPage from '@pages/newUser/ui/NewUserPage';
 import ProfilePage from '@pages/profile/ui/ProfilePage';
 import StatsPage from '@pages/stats/ui/StatsPage';
 import TasksListPage from '@pages/tasks/ui/TasksListPage';
@@ -23,6 +24,7 @@ export const AppRouter = () => {
             <Route path="/tasks" element={<TasksListPage />} />
             <Route path="/tasks/new" element={<NewTaskPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/users/new" element={<NewUserPage />} />
             <Route path="/users/:userId" element={<UserProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<StatsPage />} />
