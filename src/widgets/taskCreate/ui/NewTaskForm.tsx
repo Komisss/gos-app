@@ -63,9 +63,9 @@ export function NewTaskForm() {
 
   const createMutation = useMutation({
     mutationFn: createTask,
-    onSuccess: async () => {
+    onSuccess: async (createdTask) => {
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      navigate('/tasks');
+      navigate(`/tasks/${createdTask.id}`);
     },
   });
 

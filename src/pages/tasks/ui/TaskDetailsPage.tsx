@@ -1,4 +1,4 @@
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { activateTask, archiveTask, getStatusLabel, getTaskById } from '@/entities/task/api/tasks';
@@ -7,6 +7,7 @@ import { TaskDetailsCard } from '@/widgets/taskDetails/ui/TaskDetailsCard';
 
 export default function TaskDetailsPage() {
   const { taskId } = useParams();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const numericTaskId = Number(taskId);
 
@@ -45,6 +46,7 @@ export default function TaskDetailsPage() {
             task={taskQuery.data}
             isTogglingArchive={toggleArchiveMutation.isPending}
             onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
+            onDeleted={() => navigate('/tasks')}
           />
         )}
       </div>

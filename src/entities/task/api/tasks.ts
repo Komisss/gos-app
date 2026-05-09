@@ -24,6 +24,11 @@ type TasksResponse =
       data?: TaskDto[];
     };
 
+type CreateTaskResponse = Partial<TaskDto> & {
+  id?: number | string;
+  task_id?: number | string;
+};
+
 export async function getTasks(filters: TaskFilters = {}) {
   const response = await http<TasksResponse>(`${TASKS_ENDPOINT}${buildQueryString(filters)}`);
 
@@ -63,12 +68,17 @@ function normalizeDateTimeFilter(key: string, value: string) {
 }
 
 export async function createTask(payload: TaskPayload) {
-  const response = await http<TaskDto>(TASKS_ENDPOINT, {
+  const response = await http<CreateTaskResponse>(TASKS_ENDPOINT, {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+  const createdTaskId = Number(response.id ?? response.task_id);
 
-  return mapTaskDtoToTask(response);
+  if (!Number.isFinite(createdTaskId)) {
+    throw new Error('Task create response does not contain task id.');
+  }
+
+  return { id: createdTaskId };
 }
 
 export async function updateTask(taskId: number, payload: Partial<TaskPayload>) {
@@ -89,6 +99,12 @@ export async function archiveTask(taskId: number) {
 export async function activateTask(taskId: number) {
   await http<void>(`${TASKS_ENDPOINT}/${taskId}/activate`, {
     method: 'POST',
+  });
+}
+
+export async function deleteTask(taskId: number) {
+  await http<void>(`${TASKS_ENDPOINT}/${taskId}`, {
+    method: 'DELETE',
   });
 }
 
@@ -126,6 +142,7 @@ export function mapTaskDtoToTask(task: TaskDto): Task {
     revisionLimit: task.revision_limit,
     commentForExecutor: task.comment_for_executor,
     targets: task.targets,
+    isMaterialized: task.is_materialized,
     answerFormat: `Формат отчета: ${getReportFormatLabel(task.report_format)}`,
   };
 }

@@ -12,21 +12,25 @@ import {
   TableRow,
 } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { Archive, ArchiveRestore, Pencil } from 'lucide-react';
+import { Archive, ArchiveRestore, Pencil, Trash2 } from 'lucide-react';
 
 type Props = {
   tasks: Task[];
   togglingTaskId?: number | null;
+  deletingTaskId?: number | null;
   onTaskClick?: (task: Task) => void;
   onToggleArchive?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
   onEdit?: (task: Task) => void;
 };
 
 export function TaskRegistryTable({
   tasks,
   togglingTaskId,
+  deletingTaskId,
   onTaskClick,
   onToggleArchive,
+  onDelete,
   onEdit,
 }: Props) {
   return (
@@ -42,6 +46,7 @@ export function TaskRegistryTable({
             <TableHead className="w-44">Дедлайн</TableHead>
             <TableHead className="w-44">Создана</TableHead>
             <TableHead className="w-32">Статус</TableHead>
+            <TableHead className="w-36">Исполнители</TableHead>
             <TableHead className="w-24 text-right" />
           </TableRow>
         </TableHeader>
@@ -49,7 +54,7 @@ export function TaskRegistryTable({
         <TableBody>
           {tasks.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={9} className="py-10 text-center text-sm text-slate-500">
+              <TableCell colSpan={10} className="py-10 text-center text-sm text-slate-500">
                 Задач пока нет.
               </TableCell>
             </TableRow>
@@ -91,6 +96,17 @@ export function TaskRegistryTable({
                     {task.statusLabel ?? getStatusLabel(task.status)}
                   </Badge>
                 </TableCell>
+                <TableCell className="align-top">
+                  <Badge
+                    className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
+                      task.isMaterialized
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}
+                  >
+                    {task.isMaterialized ? 'Назначены' : 'Не назначены'}
+                  </Badge>
+                </TableCell>
                 <TableCell className="pt-3 text-right align-top">
                   <div className="flex justify-end gap-1">
                     <TooltipProvider>
@@ -114,7 +130,7 @@ export function TaskRegistryTable({
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
-                                        <TooltipProvider>
+                    <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
@@ -141,6 +157,32 @@ export function TaskRegistryTable({
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{task.status === 'archived' ? 'Активировать' : 'Архивировать'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon-sm"
+                            variant="ghost"
+                            className="text-red-500 hover:bg-red-50 hover:text-red-700"
+                            disabled={task.isMaterialized || deletingTaskId === task.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDelete?.(task);
+                            }}
+                            aria-label={`Удалить задачу ${task.id}`}
+                          >
+                            <Trash2 size={15} />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {task.isMaterialized
+                              ? 'Нельзя удалить задачу с назначенными исполнителями'
+                              : 'Удалить'}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

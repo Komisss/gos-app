@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, ChevronsUpDown, Copy, ExternalLink, Pencil, UserCheck } from 'lucide-react';
+import { Archive, ArchiveRestore, ChevronsUpDown, Copy, ExternalLink, Pencil, Trash2, UserCheck } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
@@ -13,6 +13,7 @@ import {
   getScopeLabel,
   getStatusLabel,
   getTaskTypeLabel,
+  deleteTask,
   materializeTaskAssignments,
   updateTask,
 } from '@/entities/task/api/tasks';
@@ -40,6 +41,7 @@ type Props = {
   isTogglingArchive?: boolean;
   showOpenPageLink?: boolean;
   onToggleArchive?: (task: Task) => void;
+  onDeleted?: () => void;
 };
 
 export function TaskDetailsCard({
@@ -47,10 +49,12 @@ export function TaskDetailsCard({
   isTogglingArchive,
   showOpenPageLink = false,
   onToggleArchive,
+  onDeleted,
 }: Props) {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const hasTargets = Boolean(task.targets?.length);
   const canMaterializeAssignments =
@@ -101,6 +105,22 @@ export function TaskDetailsCard({
       setAssignConfirmOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => {
+      if (task.isMaterialized) {
+        throw new Error('Task cannot be deleted after assignments are materialized.');
+      }
+
+      return deleteTask(task.id);
+    },
+    onSuccess: async () => {
+      setDeleteConfirmOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
+      onDeleted?.();
     },
   });
 
@@ -158,6 +178,15 @@ export function TaskDetailsCard({
             <UserCheck />
             Назначить исполнителей
           </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={task.isMaterialized || deleteMutation.isPending}
+            onClick={() => setDeleteConfirmOpen(true)}
+          >
+            <Trash2 />
+            Удалить
+          </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
               <Link to={`/tasks/${task.id}`}>
@@ -187,6 +216,7 @@ export function TaskDetailsCard({
         <InfoItem label="Тип задачи" value={getTaskTypeLabel(task.taskType ?? task.type)} />
         <InfoItem label="Формат отчета" value={getReportFormatLabel(task.reportFormat ?? '')} />
         <InfoItem label="Лимит правок" value={task.revisionLimit ?? 'Не указан'} />
+        <InfoItem label="Исполнители" value={task.isMaterialized ? 'Назначены' : 'Не назначены'} />
         <InfoItem label="Дедлайн" value={formatDateTime(task.deadlineAt)} />
         <InfoItem label="Запланирована на" value={formatDateTime(task.scheduledAt)} />
         <InfoItem label="Создана" value={formatDateTime(task.createdAt)} />
@@ -247,6 +277,40 @@ export function TaskDetailsCard({
               disabled={materializeAssignmentsMutation.isPending}
             >
               {materializeAssignmentsMutation.isPending ? 'Запуск...' : 'Запустить'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Удалить задачу?</DialogTitle>
+            <DialogDescription>
+              Задача будет удалена без архивирования. Удаление доступно только пока исполнители не назначены.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteMutation.isError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              Не удалось удалить задачу.
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={task.isMaterialized || deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              {deleteMutation.isPending ? 'Удаление...' : 'Удалить'}
             </Button>
           </DialogFooter>
         </DialogContent>

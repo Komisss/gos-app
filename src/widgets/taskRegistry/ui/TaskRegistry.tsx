@@ -8,6 +8,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import {
   activateTask,
   archiveTask,
+  deleteTask,
   getStatusLabel,
   getTasks,
   type TaskFilters,
@@ -18,6 +19,14 @@ import { getUsers } from '@/entities/user/api/users';
 import { Button } from '@/shared/ui/button';
 import { CardTitle } from '@/shared/ui/card';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
@@ -41,7 +50,9 @@ export function TaskRegistry() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [deletingTask, setDeletingTask] = useState<Task | null>(null);
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
+  const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
   const [filters, setFilters] = useState<TaskFilters>(emptyTaskFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
@@ -88,6 +99,24 @@ export function TaskRegistry() {
       setEditingTask(null);
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (task: Task) => {
+      if (task.isMaterialized) {
+        throw new Error('Task cannot be deleted after assignments are materialized.');
+      }
+
+      return deleteTask(task.id);
+    },
+    onMutate: (task) => setDeletingTaskId(task.id),
+    onSuccess: async (_data, task) => {
+      setDeletingTask(null);
+      setSelectedTask((currentTask) => (currentTask?.id === task.id ? null : currentTask));
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
+    },
+    onSettled: () => setDeletingTaskId(null),
   });
 
   const tasks = tasksQuery.data ?? [];
@@ -234,9 +263,11 @@ export function TaskRegistry() {
           <TaskRegistryTable
             tasks={tasks}
             togglingTaskId={togglingTaskId}
+            deletingTaskId={deletingTaskId}
             onTaskClick={setSelectedTask}
             onEdit={setEditingTask}
             onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
+            onDelete={setDeletingTask}
           />
         )}
 
@@ -245,6 +276,7 @@ export function TaskRegistry() {
           task={selectedTask}
           isTogglingArchive={togglingTaskId === selectedTask?.id}
           onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
+          onDeleted={() => setSelectedTask(null)}
           onOpenChange={(open) => {
             if (!open) {
               setSelectedTask(null);
@@ -263,6 +295,40 @@ export function TaskRegistry() {
           }}
           onSubmit={(taskId, payload) => updateMutation.mutate({ taskId, payload })}
         />
+
+        <Dialog open={deletingTask !== null} onOpenChange={(open) => !open && setDeletingTask(null)}>
+          <DialogContent className="max-w-[460px]">
+            <DialogHeader>
+              <DialogTitle>Удалить задачу?</DialogTitle>
+              <DialogDescription>
+                Задача будет удалена без архивирования. Действие доступно только пока исполнители не назначены.
+              </DialogDescription>
+            </DialogHeader>
+            {deleteMutation.isError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                Не удалось удалить задачу.
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeletingTask(null)}
+                disabled={deleteMutation.isPending}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={Boolean(deletingTask?.isMaterialized) || deleteMutation.isPending}
+                onClick={() => deletingTask && deleteMutation.mutate(deletingTask)}
+              >
+                {deleteMutation.isPending ? 'Удаление...' : 'Удалить'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ type Props = {
   open: boolean;
   isTogglingArchive?: boolean;
   onToggleArchive?: (task: Task) => void;
+  onDeleted?: () => void;
   onOpenChange: (open: boolean) => void;
 };
 
@@ -19,6 +20,7 @@ export function TaskDetailsDialog({
   open,
   isTogglingArchive,
   onToggleArchive,
+  onDeleted,
   onOpenChange,
 }: Props) {
   const taskQuery = useQuery({
@@ -49,6 +51,7 @@ export function TaskDetailsDialog({
                 isTogglingArchive={isTogglingArchive}
                 showOpenPageLink
                 onToggleArchive={onToggleArchive}
+                onDeleted={onDeleted}
               />
             )}
           </div>

@@ -32,6 +32,7 @@ export interface TaskDto {
   revision_limit?: number;
   comment_for_executor?: string;
   targets?: TaskTargetDto[];
+  is_materialized: boolean;
   created_at: string;
   updated_at?: string;
   created_by_user_id: number;
@@ -83,6 +84,7 @@ export interface Task {
   revisionLimit?: number;
   commentForExecutor?: string;
   targets?: TaskTargetDto[];
+  isMaterialized: boolean;
   region: string;
   assignee: string;
   assigneeMeta?: string;
