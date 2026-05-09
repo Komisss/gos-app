@@ -30,6 +30,12 @@ export async function getTasks(filters: TaskFilters = {}) {
   return normalizeTasksResponse(response).map(mapTaskDtoToTask);
 }
 
+export async function getTaskById(taskId: number) {
+  const response = await http<TaskDto>(`${TASKS_ENDPOINT}/${taskId}`);
+
+  return mapTaskDtoToTask(response);
+}
+
 function buildQueryString(filters: TaskFilters) {
   const params = new URLSearchParams();
 
@@ -86,12 +92,21 @@ export async function activateTask(taskId: number) {
   });
 }
 
+export async function materializeTaskAssignments(taskId: number) {
+  await http<void>(`${TASKS_ENDPOINT}/${taskId}/assignments/materialize`, {
+    method: 'POST',
+  });
+}
+
 export function mapTaskDtoToTask(task: TaskDto): Task {
   return {
     id: task.task_id,
     taskId: task.task_id,
     title: task.title,
     subtitle: `Создана: ${formatDateTime(task.created_at)}`,
+    shortDescription: task.short_description,
+    fullDescription: task.full_description,
+    description: task.full_description ?? task.short_description,
     type: task.task_type,
     scope: task.scope,
     taskType: task.task_type,
@@ -104,8 +119,13 @@ export function mapTaskDtoToTask(task: TaskDto): Task {
     statusLabel: getStatusLabel(task.status),
     deadlineLabel: formatDateTime(task.deadline_at),
     deadlineAt: task.deadline_at,
+    scheduledAt: task.scheduled_at,
     createdAt: task.created_at,
+    updatedAt: task.updated_at,
     createdByUserId: task.created_by_user_id,
+    revisionLimit: task.revision_limit,
+    commentForExecutor: task.comment_for_executor,
+    targets: task.targets,
     answerFormat: `Формат отчета: ${getReportFormatLabel(task.report_format)}`,
   };
 }
@@ -131,6 +151,7 @@ export function getScopeLabel(scope: string) {
 export function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
     draft: 'Черновик',
+    scheduled: 'Запланирована',
     active: 'Активная',
     pending: 'В работе',
     completed: 'Завершена',

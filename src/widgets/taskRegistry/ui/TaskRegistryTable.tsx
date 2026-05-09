@@ -159,6 +159,8 @@ export function getStatusClassName(status: Task['status']) {
   switch (status) {
     case 'active':
       return 'bg-emerald-100 text-emerald-700';
+    case 'scheduled':
+      return 'bg-sky-100 text-sky-700';
     case 'pending':
     case 'draft':
       return 'bg-amber-100 text-amber-700';

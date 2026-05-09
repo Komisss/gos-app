@@ -76,6 +76,7 @@ export function TaskRegistry() {
           : currentTask,
       );
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
     },
     onSettled: () => setTogglingTaskId(null),
   });

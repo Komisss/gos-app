@@ -8,9 +8,10 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import type { Region } from '@/entities/region/model/types';
 import { createTask } from '@/entities/task/api/tasks';
-import type { TaskPayload, TaskScope, TaskTargetType } from '@/entities/task/model/types';
+import type { TaskPayload, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
+import { toApiDateTime } from '@/shared/lib/dateTime';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -28,11 +29,15 @@ type AssignmentTarget = {
 
 const initialForm: TaskPayload = {
   title: '',
+  short_description: null,
+  full_description: null,
+  revision_limit: null,
+  comment_for_executor: null,
   scope: 'regional',
   status: 'draft',
   task_type: 'online_action',
   report_format: 'link',
-  deadline_at: '',
+  deadline_at: null,
 };
 
 export function NewTaskForm() {
@@ -66,23 +71,22 @@ export function NewTaskForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate(form);
+    createMutation.mutate(normalizeTaskPayload(form));
   }
 
-  function handleAssignmentChange(target: AssignmentTarget, scope: TaskScope) {
+  function handleAssignmentChange(target: AssignmentTarget) {
     setAssignmentTarget(target);
 
     if (!target) {
       setForm((current) => {
         const { targets: _targets, ...rest } = current;
-        return { ...rest, scope };
+        return { ...rest, targets: null };
       });
       return;
     }
 
     setForm((current) => ({
       ...current,
-      scope,
       targets: [
         {
           target_type: target.kind,
@@ -116,6 +120,56 @@ export function NewTaskForm() {
             />
           </Field>
 
+          <Field label="Короткое описание">
+            <Input
+              placeholder="Введите короткое описание"
+              className="border-slate-200"
+              value={form.short_description ?? ''}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, short_description: event.target.value }))
+              }
+            />
+          </Field>
+
+          <Field label="Полное описание">
+            <textarea
+              className="min-h-32 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              placeholder="Введите полное описание"
+              value={form.full_description ?? ''}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, full_description: event.target.value }))
+              }
+            />
+          </Field>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field label="Количество правок задачи">
+              <Input
+                type="number"
+                min={0}
+                className="border-slate-200"
+                value={form.revision_limit ?? ''}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    revision_limit: event.target.value === '' ? null : Number(event.target.value),
+                  }))
+                }
+              />
+            </Field>
+
+            <Field label="Комментарий для исполнителя">
+              <Input
+                placeholder="Введите комментарий"
+                className="border-slate-200"
+                value={form.comment_for_executor ?? ''}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, comment_for_executor: event.target.value }))
+                }
+              />
+            </Field>
+          </div>
+
           <Field label="Адресат задачи">
             <AssignmentCombobox
               users={usersQuery.data ?? []}
@@ -128,19 +182,42 @@ export function NewTaskForm() {
           </Field>
 
           <div className="grid gap-5 md:grid-cols-2">
+            <Field label="Масштаб">
+              <Select
+                value={form.scope}
+                onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
+              >
+                <SelectTrigger className="w-full border-slate-200 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="start">
+                  <SelectItem value="federal">Федеральный</SelectItem>
+                  <SelectItem value="regional">Региональный</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+
             <Field label="Статус">
               <Select
                 value={form.status}
-                onValueChange={(status) => setForm((current) => ({ ...current, status }))}
+                onValueChange={(status) =>
+                  setForm((current) => ({
+                    ...current,
+                    status,
+                    scheduled_at:
+                      status === 'scheduled'
+                        ? current.scheduled_at || toApiDateTime(new Date())
+                        : undefined,
+                  }))
+                }
               >
                 <SelectTrigger className="w-full border-slate-200 bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
                   <SelectItem value="draft">Черновик</SelectItem>
+                  <SelectItem value="scheduled">Запланирована</SelectItem>
                   <SelectItem value="active">Активная</SelectItem>
-                  <SelectItem value="pending">В работе</SelectItem>
-                  <SelectItem value="completed">Завершена</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -181,12 +258,23 @@ export function NewTaskForm() {
 
             <Field label="Дедлайн">
               <DateTimePicker
-                value={form.deadline_at}
+                value={form.deadline_at ?? undefined}
                 onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
                 placeholder="Выберите дедлайн"
               />
             </Field>
           </div>
+
+          {form.status === 'scheduled' && (
+            <Field label="Время активации задачи">
+              <DateTimePicker
+                value={form.scheduled_at ?? undefined}
+                onChange={(scheduled_at) => setForm((current) => ({ ...current, scheduled_at }))}
+                placeholder="Выберите дату и время активации"
+                minDateTime={new Date()}
+              />
+            </Field>
+          )}
 
           {createMutation.isError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -200,7 +288,7 @@ export function NewTaskForm() {
             </Button>
             <Button
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={createMutation.isPending || !assignmentTarget?.ids.length}
+              disabled={createMutation.isPending}
             >
               {createMutation.isPending ? 'Создание...' : 'Создать задачу'}
             </Button>
@@ -209,6 +297,44 @@ export function NewTaskForm() {
       </div>
     </div>
   );
+}
+
+function normalizeTaskPayload(form: TaskPayload): TaskPayload {
+  const now = new Date();
+  const scheduledAt = form.scheduled_at ? new Date(form.scheduled_at) : now;
+  const normalized: TaskPayload = {
+    ...form,
+    short_description: normalizeOptionalString(form.short_description),
+    full_description: normalizeOptionalString(form.full_description),
+    comment_for_executor: normalizeOptionalString(form.comment_for_executor),
+    revision_limit: form.revision_limit ?? null,
+    deadline_at: form.deadline_at || null,
+    scheduled_at: null,
+  };
+  const payload = form.targets?.length ? normalized : omitTargets(normalized);
+
+  if (form.status !== 'scheduled') {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    scheduled_at: toApiDateTime(
+      Number.isNaN(scheduledAt.getTime()) || scheduledAt < now ? now : scheduledAt,
+    ),
+  };
+}
+
+function normalizeOptionalString(value: string | null) {
+  const normalized = value?.trim();
+
+  return normalized ? normalized : null;
+}
+
+function omitTargets(payload: TaskPayload): TaskPayload {
+  const { targets: _targets, ...rest } = payload;
+
+  return rest;
 }
 
 function AssignmentCombobox({
@@ -224,7 +350,7 @@ function AssignmentCombobox({
   orgUnits: OrgUnit[];
   isLoading: boolean;
   value: AssignmentTarget;
-  onChange: (target: AssignmentTarget, scope: TaskScope) => void;
+  onChange: (target: AssignmentTarget) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<AssignmentKind>(value?.kind ?? 'region');
@@ -241,7 +367,7 @@ function AssignmentCombobox({
       : [...currentIds, item.id];
     const nextTarget = nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null;
 
-    onChange(nextTarget, getSelectionScope(item.kind, nextIds, data));
+    onChange(nextTarget);
   }
 
   return (
@@ -265,7 +391,7 @@ function AssignmentCombobox({
               const typedKind = nextKind as AssignmentKind;
               setKind(typedKind);
               setQuery('');
-              onChange(null, typedKind === 'region' ? 'regional' : 'federal');
+              onChange(null);
             }}
           >
             <SelectTrigger className="w-full border-slate-200 bg-white">
@@ -337,7 +463,6 @@ type AssignmentOption = {
   kind: AssignmentKind;
   label: string;
   description?: string;
-  scope: TaskScope;
 };
 
 function useAssignmentList(
@@ -370,7 +495,6 @@ function getAssignmentOptions(
       kind: 'region',
       label: region.name,
       description: region.code,
-      scope: 'regional',
     }));
   }
 
@@ -380,7 +504,6 @@ function getAssignmentOptions(
       kind: 'org_unit',
       label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
       description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
-      scope: orgUnit.regionId ? 'regional' : 'federal',
     }));
   }
 
@@ -389,7 +512,6 @@ function getAssignmentOptions(
     kind: 'user',
     label: user.fullName,
     description: `@${user.username}${user.region?.name ? ` • ${user.region.name}` : ''}`,
-    scope: user.region ? 'regional' : 'federal',
   }));
 }
 
@@ -412,16 +534,6 @@ function getAssignmentLabel(
   }
 
   return 'Выберите адресата задачи';
-}
-
-function getSelectionScope(
-  kind: AssignmentKind,
-  ids: number[],
-  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
-): TaskScope {
-  const selectedOptions = getAssignmentOptions(kind, data).filter((item) => ids.includes(item.id));
-
-  return selectedOptions.some((item) => item.scope === 'regional') ? 'regional' : 'federal';
 }
 
 function getSearchLabel(kind: AssignmentKind) {

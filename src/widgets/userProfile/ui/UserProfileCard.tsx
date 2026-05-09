@@ -10,12 +10,16 @@ import {
   getUserStatusLabel,
   updateUser,
 } from '@/entities/user/api/users';
+import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import { getRegions } from '@/entities/region/api/regions';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
 import { DatePicker } from '@/shared/ui/date-picker';
+import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
 type UserFormState = {
   username: string;
@@ -27,6 +31,17 @@ type UserFormState = {
   org_unit: string;
 };
 
+const roleOptions = [
+  { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
+  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
+  { id: 3, code: 'executor', label: 'Исполнитель' },
+  { id: 4, code: 'main_manager', label: 'Главный менеджер' },
+  { id: 5, code: 'assistant', label: 'Помощник главного менеджера' },
+  { id: 6, code: 'unit_head', label: 'Руководитель управления' },
+  { id: 7, code: 'department_head', label: 'Руководитель отдела' },
+  { id: 8, code: 'employee', label: 'Сотрудник' },
+];
+
 export function UserProfileCard() {
   const { userId } = useParams();
   const parsedUserId = Number(userId);
@@ -37,6 +52,16 @@ export function UserProfileCard() {
     queryKey: ['users', parsedUserId],
     queryFn: () => getUserById(parsedUserId),
     enabled: Number.isFinite(parsedUserId),
+  });
+
+  const regionsQuery = useQuery({
+    queryKey: ['regions'],
+    queryFn: getRegions,
+  });
+
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units-tree'],
+    queryFn: getOrgUnitsTree,
   });
 
   useEffect(() => {
@@ -92,6 +117,18 @@ export function UserProfileCard() {
   }
 
   const user = userQuery.data;
+  const regions = regionsQuery.data ?? [];
+  const orgUnits = orgUnitsQuery.data ?? [];
+  const regionOptions = regions.map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const orgUnitOptions = orgUnits.map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+    description: orgUnit.regionId ? getRegionName(orgUnit.regionId, regions) : undefined,
+  }));
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -188,40 +225,42 @@ export function UserProfileCard() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-3">
-                <Field label="ID роли">
-                  <Input
-                    type="number"
-                    value={form.role}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, role: event.target.value }))
-                    }
-                  />
-                  <p className="text-xs text-slate-500">{user.role?.name ?? 'Роль не указана'}</p>
+                <Field label="Роль">
+                  <Select
+                    value={form.role || undefined}
+                    onValueChange={(role) => setForm((current) => ({ ...current, role }))}
+                  >
+                    <SelectTrigger className="h-9 w-full border-slate-200 bg-white">
+                      <SelectValue placeholder={user.role?.name ?? 'Роль не указана'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roleOptions.map((role) => (
+                        <SelectItem key={role.id} value={String(role.id)}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {user.role?.code && <p className="text-xs text-slate-500">{user.role.code}</p>}
                 </Field>
 
-                <Field label="ID региона">
-                  <Input
-                    type="number"
-                    value={form.region}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, region: event.target.value }))
-                    }
-                  />
-                  <p className="text-xs text-slate-500">{user.region?.name ?? 'Регион не указан'}</p>
-                </Field>
+                <FilterSearchSelect
+                  label="Регион"
+                  value={form.region}
+                  placeholder="Регион не указан"
+                  searchPlaceholder="Поиск региона"
+                  options={regionOptions}
+                  onChange={(region) => setForm((current) => ({ ...current, region }))}
+                />
 
-                <Field label="ID оргструктуры">
-                  <Input
-                    type="number"
-                    value={form.org_unit}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, org_unit: event.target.value }))
-                    }
-                  />
-                  <p className="text-xs text-slate-500">
-                    {user.orgUnit?.name ?? 'Оргструктура не указана'}
-                  </p>
-                </Field>
+                <FilterSearchSelect
+                  label="Оргструктура"
+                  value={form.org_unit}
+                  placeholder="Оргструктура не указана"
+                  searchPlaceholder="Поиск оргструктуры"
+                  options={orgUnitOptions}
+                  onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
+                />
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
@@ -319,6 +358,10 @@ function parseOptionalNumber(value: string) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getRegionName(regionId: number, regions: Array<{ id: number; name: string }>) {
+  return regions.find((region) => region.id === regionId)?.name ?? `Регион #${regionId}`;
 }
 
 function formatDateTime(value: string) {

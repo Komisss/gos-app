@@ -8,7 +8,7 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import type { Region } from '@/entities/region/model/types';
 import { registerUser } from '@/entities/user/api/users';
-import type { RegisterUserPayload } from '@/entities/user/model/types';
+import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -16,12 +16,23 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
+const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
+  { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
+  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
+  { id: 3, code: 'executor', label: 'Исполнитель' },
+  { id: 4, code: 'main_manager', label: 'Главный менеджер' },
+  { id: 5, code: 'assistant', label: 'Помощник главного менеджера' },
+  { id: 6, code: 'unit_head', label: 'Руководитель управления' },
+  { id: 7, code: 'department_head', label: 'Руководитель отдела' },
+  { id: 8, code: 'employee', label: 'Сотрудник' },
+];
+
 const initialForm: RegisterUserPayload = {
   username: '',
   password: '',
   full_name: '',
   role: 2,
-  region: 0,
+  region: null,
   org_unit: 0,
 };
 
@@ -50,7 +61,10 @@ export function NewUserForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate(form);
+    createMutation.mutate({
+      ...form,
+      region: form.role === 1 ? null : form.region,
+    });
   }
 
   return (
@@ -110,34 +124,45 @@ export function NewUserForm() {
             <Field label="Роль">
               <Select
                 value={String(form.role)}
-                onValueChange={(role) =>
-                  setForm((current) => ({ ...current, role: Number(role) as 1 | 2 }))
-                }
+                onValueChange={(role) => {
+                  const nextRole = Number(role) as RegisterUserRoleId;
+
+                  setForm((current) => ({
+                    ...current,
+                    role: nextRole,
+                    region: nextRole === 1 ? null : current.region,
+                  }));
+                }}
               >
                 <SelectTrigger className="w-full border-slate-200 bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
-                  <SelectItem value="1">Федеральный</SelectItem>
-                  <SelectItem value="2">Региональный</SelectItem>
+                  {roleOptions.map((role) => (
+                    <SelectItem key={role.id} value={String(role.id)}>
+                      {role.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Field>
 
-            <Field label="Регион">
-              <SearchSelect
-                placeholder="Выберите регион"
-                searchPlaceholder="Поиск региона"
-                loading={regionsQuery.isLoading}
-                value={form.region}
-                options={(regionsQuery.data ?? []).map((region) => ({
-                  id: region.id,
-                  label: region.name,
-                  description: region.code,
-                }))}
-                onChange={(region) => setForm((current) => ({ ...current, region }))}
-              />
-            </Field>
+            {form.role !== 1 && (
+              <Field label="Регион">
+                <SearchSelect
+                  placeholder="Выберите регион"
+                  searchPlaceholder="Поиск региона"
+                  loading={regionsQuery.isLoading}
+                  value={form.region}
+                  options={(regionsQuery.data ?? []).map((region) => ({
+                    id: region.id,
+                    label: region.name,
+                    description: region.code,
+                  }))}
+                  onChange={(region) => setForm((current) => ({ ...current, region }))}
+                />
+              </Field>
+            )}
           </div>
 
           <Field label="Оргструктура">
@@ -195,7 +220,7 @@ function SearchSelect({
   placeholder: string;
   searchPlaceholder: string;
   loading: boolean;
-  value: number;
+  value: number | null;
   options: SearchOption[];
   onChange: (value: number) => void;
 }) {

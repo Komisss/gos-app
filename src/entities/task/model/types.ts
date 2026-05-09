@@ -1,4 +1,4 @@
-export type TaskStatus = "draft" | "active" | "pending" | "completed" | "archived" | string;
+export type TaskStatus = "draft" | "scheduled" | "active" | "pending" | "completed" | "archived" | string;
 
 export type TaskScope = "federal" | "regional" | "municipal" | string;
 
@@ -13,26 +13,43 @@ export type TaskTargetPayload = {
   target_id: number[];
 };
 
+export type TaskTargetDto = {
+  target_type: TaskTargetType;
+  target_id: number;
+};
+
 export interface TaskDto {
   task_id: number;
   title: string;
   scope: TaskScope;
+  short_description?: string;
+  full_description?: string;
   status: TaskStatus;
   task_type: TaskType;
   report_format: TaskReportFormat;
+  scheduled_at?: string | null;
   deadline_at: string;
+  revision_limit?: number;
+  comment_for_executor?: string;
+  targets?: TaskTargetDto[];
   created_at: string;
+  updated_at?: string;
   created_by_user_id: number;
 }
 
 export type TaskPayload = {
   title: string;
+  short_description: string | null;
+  full_description: string | null;
+  revision_limit: number | null;
+  comment_for_executor: string | null;
   scope: TaskScope;
-  targets?: TaskTargetPayload[];
+  targets?: TaskTargetPayload[] | null;
   status: TaskStatus;
   task_type: TaskType;
   report_format: TaskReportFormat;
-  deadline_at: string;
+  deadline_at: string | null;
+  scheduled_at?: string | null;
 };
 
 export interface TaskReport {
@@ -57,8 +74,15 @@ export interface Task {
   taskType?: TaskType;
   reportFormat?: TaskReportFormat;
   createdAt?: string;
+  updatedAt?: string;
   deadlineAt?: string;
+  scheduledAt?: string | null;
   createdByUserId?: number;
+  shortDescription?: string;
+  fullDescription?: string;
+  revisionLimit?: number;
+  commentForExecutor?: string;
+  targets?: TaskTargetDto[];
   region: string;
   assignee: string;
   assigneeMeta?: string;
