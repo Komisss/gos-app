@@ -1,7 +1,7 @@
 export type ReportTaskType = 'online_action' | 'street_action';
 export type ReportTaskScope = 'federal' | 'regional';
 export type ReportType = 'link' | 'image';
-export type ReportStatus = 'under_review' | 'accepted' | 'revision_requested' | 'not_completed';
+export type ReportStatus = 'pending' | 'under_review' | 'accepted' | 'revision_requested' | 'not_completed';
 export type AssignmentStatus =
   | 'assigned'
   | 'in_progress'
@@ -75,6 +75,16 @@ export type CrmReportDto = {
   available_actions: string[];
 };
 
+export type ReportDetailsDto = CrmReportDto & {
+  is_current_version: boolean;
+  report_content: {
+    link_url: string | null;
+    file_id: number | null;
+    preview_url: string | null;
+    display_value: string | null;
+  } | null;
+};
+
 export type ReportsSummary = {
   total_reports: number;
   under_review_count: number;
@@ -122,4 +132,178 @@ export type CrmReport = {
   orgUnitName: string;
   availableActions: string[];
   raw: CrmReportDto;
+};
+
+export type ReportDetails = CrmReport & {
+  isCurrentVersion: boolean;
+  reportContent: {
+    linkUrl: string | null;
+    fileId: number | null;
+    previewUrl: string | null;
+    displayValue: string | null;
+  } | null;
+  linkValidation: unknown;
+  lastModeration: unknown;
+};
+
+export type ReportVersionsFilters = {
+  include_content: boolean;
+  include_link_validation: boolean;
+  include_moderation: boolean;
+  sort_direction: 'asc' | 'desc';
+};
+
+export type ReportVersionItem = {
+  report_id: number;
+  version_number: number;
+  is_current_version: boolean;
+  report_type: ReportType;
+  report_status: ReportStatus;
+  submitted_by_user_id: number;
+  submitted_at: string;
+  available_actions: string[];
+  content: ReportDetailsDto['report_content'];
+  link_validation: {
+    link_validation_result_id: number;
+    is_allowed_domain: boolean;
+    is_reachable: boolean;
+    http_status: number;
+    checked_at: string;
+    system_comment: string;
+  } | null;
+  last_moderation: unknown;
+};
+
+export type ReportVersionsResponse = {
+  task_assignment_id: number;
+  task_id: number;
+  task_title: string;
+  assignment_status: AssignmentStatus;
+  revision_used: number;
+  revision_limit: number;
+  current_report_id: number;
+  total_versions: number;
+  versions: ReportVersionItem[];
+};
+
+export type ModerationActionsFilters = {
+  action_types: string[];
+  include_moderator: boolean;
+  include_versions: boolean;
+  moderation_level: string;
+  page: number;
+  page_size: number;
+  sort_direction: 'asc' | 'desc';
+};
+
+export type ModerationActionItem = {
+  moderation_action_id: number;
+  report_id: number;
+  task_assignment_id: number;
+  action_type: string;
+  moderation_level: string;
+  moderator_user_id: number;
+  moderator_full_name: string;
+  moderator_role: string;
+  reason_id: number | null;
+  reason_name: string | null;
+  comment: string | null;
+  is_override: boolean;
+  bulk_operation_id: string | null;
+  created_at: string;
+};
+
+export type PaginatedResponse<T> = {
+  report_id: number;
+  task_assignment_id: number;
+  task_id: number;
+  items: T[];
+  total: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+};
+
+export type LinkValidationResponse = {
+  report_id: number;
+  report_type: ReportType;
+  link_url: string | null;
+  link_validation_result: {
+    link_validation_result_id: number;
+    url: string;
+    domain: string;
+    is_allowed_domain: boolean;
+    is_reachable: boolean;
+    http_status: number;
+    checked_at: string;
+    system_comment: string;
+    validation_status: string;
+  } | null;
+};
+
+export type AuditLogFilters = {
+  action_types: string[];
+  actor_user_ids: number[];
+  entity_types: string[];
+  from: string;
+  to: string;
+  include_payload: boolean;
+  page: number;
+  page_size: number;
+  sort_direction: 'asc' | 'desc';
+  sources: string;
+};
+
+export type AuditLogItem = {
+  audit_log_id: number;
+  actor_user_id: number;
+  actor_full_name: string;
+  actor_role: string;
+  region_id: number | null;
+  entity_type: string;
+  entity_id: number;
+  action_type: string;
+  old_value: string | null;
+  new_value: string | null;
+  details: string | null;
+  source: string;
+  correlation_id: string;
+  created_at: string;
+};
+
+export type ReportHistoryFilters = {
+  event_types: string;
+  from: string;
+  to: string;
+  include_audit: boolean;
+  include_link_validation: boolean;
+  include_versions: boolean;
+  page: number;
+  page_size: number;
+};
+
+export type ReportHistoryItem = {
+  event_id: string;
+  event_type: string;
+  event_title: string;
+  event_description: string;
+  event_at: string;
+  actor: {
+    user_id: number;
+    full_name: string;
+    role: string;
+    is_system: boolean;
+  } | null;
+  report_id: number;
+  version_number: number | null;
+  source_entity_type: string;
+  source_entity_id: string;
+  old_value: string | null;
+  new_value: string | null;
+  details: string | null;
+};
+
+export type ReportHistoryResponse = PaginatedResponse<ReportHistoryItem> & {
+  current_report_status: string;
+  current_assignment_status: string;
 };

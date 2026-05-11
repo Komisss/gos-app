@@ -2,12 +2,25 @@ import { http } from '@/shared/api/http';
 import type {
   CrmReport,
   CrmReportDto,
+  AuditLogFilters,
+  AuditLogItem,
+  LinkValidationResponse,
+  ModerationActionItem,
+  ModerationActionsFilters,
+  PaginatedResponse,
+  ReportDetails,
+  ReportDetailsDto,
+  ReportHistoryFilters,
+  ReportHistoryResponse,
   ReportSearchPayload,
+  ReportVersionsFilters,
+  ReportVersionsResponse,
   ReportsSearchResult,
   ReportsSummary,
 } from '@/entities/report/model/types';
 
 const REPORTS_SEARCH_ENDPOINT = '/api/v1/crm/reports/search';
+const REPORTS_ENDPOINT = '/api/v1/crm/reports';
 
 type ReportsSearchResponse =
   | CrmReportDto[]
@@ -50,6 +63,40 @@ export async function searchReports(payload: ReportSearchPayload): Promise<Repor
   };
 }
 
+export async function getReportSummary(reportId: number): Promise<ReportDetails> {
+  const response = await http<ReportDetailsDto>(
+    `${REPORTS_ENDPOINT}/${reportId}/summary?include_available_actions=true&include_last_moderation=true&include_link_validation=true`,
+  );
+
+  return mapReportDetailsDto(response);
+}
+
+export async function getReportVersions(taskAssignmentId: number, filters: ReportVersionsFilters) {
+  return http<ReportVersionsResponse>(
+    `/api/v1/crm/task-assignments/${taskAssignmentId}/reports/versions${buildQueryString(filters)}`,
+  );
+}
+
+export async function getModerationActions(reportId: number, filters: ModerationActionsFilters) {
+  return http<PaginatedResponse<ModerationActionItem>>(
+    `${REPORTS_ENDPOINT}/${reportId}/moderation-actions${buildQueryString(filters)}`,
+  );
+}
+
+export async function getReportLinkValidation(reportId: number) {
+  return http<LinkValidationResponse>(`${REPORTS_ENDPOINT}/${reportId}/link-validation`);
+}
+
+export async function getReportAuditLog(reportId: number, filters: AuditLogFilters) {
+  return http<PaginatedResponse<AuditLogItem>>(
+    `${REPORTS_ENDPOINT}/${reportId}/audit-log${buildQueryString(filters)}`,
+  );
+}
+
+export async function getReportHistory(reportId: number, filters: ReportHistoryFilters) {
+  return http<ReportHistoryResponse>(`${REPORTS_ENDPOINT}/${reportId}/history${buildQueryString(filters)}`);
+}
+
 function normalizeReportsResponse(response: ReportsSearchResponse) {
   if (Array.isArray(response)) {
     return response;
@@ -89,4 +136,42 @@ function mapReportDto(report: CrmReportDto): CrmReport {
     availableActions: report.available_actions,
     raw: report,
   };
+}
+
+function mapReportDetailsDto(report: ReportDetailsDto): ReportDetails {
+  return {
+    ...mapReportDto(report),
+    isCurrentVersion: report.is_current_version,
+    reportContent: report.report_content
+      ? {
+          linkUrl: report.report_content.link_url,
+          fileId: report.report_content.file_id,
+          previewUrl: report.report_content.preview_url,
+          displayValue: report.report_content.display_value,
+        }
+      : null,
+    linkValidation: report.link_validation,
+    lastModeration: report.last_moderation,
+  };
+}
+
+function buildQueryString(filters: Record<string, unknown>) {
+  const params = new URLSearchParams();
+
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => params.append(key, String(item)));
+      return;
+    }
+
+    params.set(key, String(value));
+  });
+
+  const query = params.toString();
+
+  return query ? `?${query}` : '';
 }

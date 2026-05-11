@@ -5,6 +5,9 @@ import NewOrgUnitPage from '@pages/newOrgUnit/ui/NewOrgUnitPage';
 import NewTaskPage from '@pages/newTask/ui/NewTaskPage';
 import NewUserPage from '@pages/newUser/ui/NewUserPage';
 import ProfilePage from '@pages/profile/ui/ProfilePage';
+import ReportDetailsPage from '@pages/reports/ui/ReportDetailsPage';
+import ReportsPage from '@pages/reports/ui/ReportsPage';
+import ReportStatisticsPage from '@pages/stats/ui/ReportStatisticsPage';
 import StatsPage from '@pages/stats/ui/StatsPage';
 import TaskDetailsPage from '@pages/tasks/ui/TaskDetailsPage';
 import TasksListPage from '@pages/tasks/ui/TasksListPage';
@@ -23,6 +26,9 @@ export const AppRouter = () => {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/stats" element={<StatsPage />} />
+            <Route path="/stats/dashboard" element={<ReportsPage />} />
+            <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
+            <Route path="/reports/:reportId" element={<ReportDetailsPage />} />
             <Route path="/tasks" element={<TasksListPage />} />
             <Route path="/tasks/new" element={<NewTaskPage />} />
             <Route path="/tasks/:taskId" element={<TaskDetailsPage />} />

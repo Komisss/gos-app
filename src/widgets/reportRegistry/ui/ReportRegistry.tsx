@@ -26,6 +26,7 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
 
 type ReportFilters = {
   search: string;
@@ -103,37 +104,10 @@ const assignmentStatusOptions: Array<{ value: AssignmentStatus; label: string }>
   { value: 'not_completed', label: 'Не выполнено' },
 ];
 
-const initialFilters: ReportFilters = {
-  search: '',
-  region_ids: [],
-  task_ids: [],
-  user_ids: [],
-  org_unit_ids: [],
-  role_ids: [],
-  task_types: [],
-  task_scope: [],
-  report_types: [],
-  report_statuses: [],
-  assignment_statuses: [],
-  submitted_from: '',
-  submitted_to: '',
-  deadline_from: '',
-  deadline_to: '',
-  created_from: '',
-  created_to: '',
-  is_overdue: false,
-  has_report: false,
-  only_current_version: true,
-  include_removed: false,
-  page: 1,
-  page_size: 50,
-  sort_by: 'submitted_at',
-  sort_direction: 'desc',
-};
-
 export function ReportRegistry() {
-  const [filters, setFilters] = useState<ReportFilters>(initialFilters);
+  const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters());
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(null);
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({
@@ -158,7 +132,7 @@ export function ReportRegistry() {
 
   const reportsQuery = useQuery({
     queryKey: ['crm-reports', appliedFilters],
-    queryFn: () => searchReports(toReportPayload(appliedFilters ?? initialFilters)),
+    queryFn: () => searchReports(toReportPayload(appliedFilters ?? createInitialFilters())),
     enabled: appliedFilters !== null,
   });
 
@@ -171,7 +145,7 @@ export function ReportRegistry() {
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold !text-slate-900">Статистика</h1>
+            <h1 className="text-3xl font-semibold !text-slate-900">Отчеты</h1>
             <p className="text-sm text-slate-500">Реестр отчетов по задачам, пользователям, регионам и оргструктурам.</p>
           </div>
 
@@ -327,25 +301,43 @@ export function ReportRegistry() {
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-500">Размер страницы</span>
-                <Select
-                  value={String(filters.page_size)}
-                  onValueChange={(page_size) => setFilters((current) => ({ ...current, page_size: Number(page_size), page: 1 }))}
-                >
-                  <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-500">Страница</span>
+                  <Input
+                    className="h-9 w-24 border-slate-200 bg-white text-sm"
+                    min={1}
+                    type="number"
+                    value={filters.page}
+                    onChange={(event) =>
+                      setFilters((current) => ({
+                        ...current,
+                        page: Math.max(1, Number(event.target.value) || 1),
+                      }))
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-slate-500">Размер страницы</span>
+                  <Select
+                    value={String(filters.page_size)}
+                    onValueChange={(page_size) => setFilters((current) => ({ ...current, page_size: Number(page_size), page: 1 }))}
+                  >
+                    <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent align="start">
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => setFilters(initialFilters)}>
+                <Button type="button" variant="outline" onClick={() => setFilters(createInitialFilters())}>
                   Сбросить фильтры
                 </Button>
                 <Button
@@ -424,7 +416,8 @@ export function ReportRegistry() {
                   reports.map((report, index) => (
                     <TableRow
                       key={`${report.id}-${index}`}
-                      className={`align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
+                      className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
+                      onClick={() => setSelectedReportId(getReportOpenId(report))}
                     >
                       <TableCell className="font-medium text-slate-700">#{report.assignmentId}</TableCell>
                       <TableCell className="min-w-[300px]">
@@ -478,6 +471,16 @@ export function ReportRegistry() {
             </Table>
           </TableScrollArea>
         )}
+
+        <ReportDetailsDialog
+          reportId={selectedReportId}
+          open={selectedReportId !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedReportId(null);
+            }
+          }}
+        />
       </div>
     </div>
   );
@@ -493,6 +496,43 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
     created_from: filters.created_from || null,
     created_to: filters.created_to || null,
   };
+}
+
+function createInitialFilters(): ReportFilters {
+  const dateFrom = new Date('2025-01-01T00:00:00');
+  const dateTo = new Date('2030-01-01T00:00:00');
+
+  return {
+    search: '',
+    region_ids: [],
+    task_ids: [],
+    user_ids: [],
+    org_unit_ids: [],
+    role_ids: [],
+    task_types: [],
+    task_scope: [],
+    report_types: [],
+    report_statuses: [],
+    assignment_statuses: [],
+    submitted_from: toApiDateTimeValue(dateFrom),
+    submitted_to: toApiDateTimeValue(dateTo),
+    deadline_from: toApiDateTimeValue(dateFrom),
+    deadline_to: toApiDateTimeValue(dateTo),
+    created_from: toApiDateTimeValue(dateFrom),
+    created_to: toApiDateTimeValue(dateTo),
+    is_overdue: false,
+    has_report: true,
+    only_current_version: true,
+    include_removed: false,
+    page: 1,
+    page_size: 50,
+    sort_by: 'submitted_at',
+    sort_direction: 'desc',
+  };
+}
+
+function toApiDateTimeValue(value: Date) {
+  return value.toISOString();
 }
 
 function MultiSearchSelect({
@@ -696,6 +736,10 @@ function StatusBadge({ value, label }: { value: string; label: string }) {
 
 function toNumbers(values: string[]) {
   return values.map(Number).filter((value) => Number.isFinite(value));
+}
+
+function getReportOpenId(report: { reportId: number | null; reportIds: number[]; assignmentId: number }) {
+  return report.reportId ?? report.reportIds[0] ?? report.assignmentId;
 }
 
 function getAssignmentStatusLabel(status: string) {
