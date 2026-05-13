@@ -22,8 +22,8 @@ export function ReportDetailsDialog({ reportId, open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] min-w-0 max-w-[1100px] gap-0 overflow-hidden p-0">
         <DialogTitle className="sr-only">Карточка отчета</DialogTitle>
-        <ScrollArea className="max-h-[90vh] w-full">
-          <div className="p-4 sm:p-6">
+        <ScrollArea className="max-h-[90vh] w-full min-w-0 max-w-full">
+          <div className="min-w-0 max-w-full overflow-hidden p-4 sm:p-6">
             {reportQuery.isLoading ? (
               <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
                 Загружаем отчет...

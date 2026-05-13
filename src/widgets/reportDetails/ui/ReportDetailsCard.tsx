@@ -28,7 +28,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
   }
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+    <article className="min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -85,8 +85,8 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
         <InfoItem label="Просрочен" value={report.isOverdue ? 'Да' : 'Нет'} />
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="space-y-3">
+      <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section className="min-w-0 space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Содержание отчета</h2>
           {report.reportContent?.displayValue ? (
             <a
@@ -102,7 +102,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
           )}
         </section>
 
-        <aside className="rounded-md border border-slate-200 bg-slate-50 p-4">
+        <aside className="min-w-0 rounded-md border border-slate-200 bg-slate-50 p-4">
           <h2 className="text-base font-semibold text-slate-900">Доступные действия</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {report.availableActions.length ? (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Download, ListFilter, UserPlus } from 'lucide-react';
+import { ListFilter, UserPlus } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
@@ -17,6 +17,8 @@ import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { useUserExport } from '../model/useUserExport';
+import { UserExportPopover } from './UserExportPopover';
 import { UserRegistryTable } from './UserRegistryTable';
 
 const emptyUserFilters: UserFilters = {
@@ -34,6 +36,7 @@ export function UserRegistry() {
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
   const [filters, setFilters] = useState<UserFilters>(emptyUserFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const userExport = useUserExport();
 
   const usersQuery = useQuery({
     queryKey: ['users', filters],
@@ -89,10 +92,18 @@ export function UserRegistry() {
                 Добавить пользователя
               </Link>
             </Button>
-            {/* <Button className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
-              <Download />
-              Скачать XLSX
-            </Button> */}
+            <UserExportPopover
+              filters={filters}
+              exportFilters={userExport.exportFilters}
+              exportPending={userExport.exportPending}
+              exportError={userExport.exportError}
+              open={userExport.exportOpen}
+              orgUnits={orgUnitsQuery.data ?? []}
+              regions={regionsQuery.data ?? []}
+              onDownload={userExport.runExport}
+              onExportFiltersChange={userExport.setExportFilters}
+              onOpenChange={userExport.setExportOpen}
+            />
           </div>
         </div>
 

@@ -10,6 +10,7 @@ import type {
 } from '@/entities/user/model/types';
 
 const USERS_ENDPOINT = '/api/v1/users';
+const USERS_EXPORT_ENDPOINT = '/api/v1/users/export';
 const REGISTER_ENDPOINT = '/api/v1/auth/register';
 
 export type UserFilters = Partial<{
@@ -34,6 +35,13 @@ export async function getUsers(filters: UserFilters = {}) {
   const response = await http<UsersResponse>(`${USERS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeUsersResponse(response).map(mapUserListDto);
+}
+
+export async function downloadUsersExcel(filters: UserFilters = {}) {
+  return http<Blob>(`${USERS_EXPORT_ENDPOINT}${buildQueryString(filters)}`, {
+    method: 'GET',
+    responseType: 'blob',
+  });
 }
 
 function buildQueryString(filters: UserFilters) {

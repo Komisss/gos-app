@@ -3,6 +3,7 @@ import { makeApiUrl, refreshAccessToken } from '@/shared/api/auth';
 
 type HttpOptions = RequestInit & {
   auth?: boolean;
+  responseType?: 'json' | 'blob';
 };
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {
@@ -13,18 +14,18 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       await refreshAccessToken();
       const retryResponse = await requestWithCookies(url, options);
 
-      return parseResponse<T>(retryResponse);
+      return parseResponse<T>(retryResponse, options.responseType);
     } catch (error) {
       clearSession();
       throw error;
     }
   }
 
-  return parseResponse<T>(response);
+  return parseResponse<T>(response, options.responseType);
 }
 
 async function requestWithCookies(url: string, options: HttpOptions) {
-  const { auth: _auth, headers, ...requestOptions } = options;
+  const { auth: _auth, responseType: _responseType, headers, ...requestOptions } = options;
   const requestHeaders = new Headers(headers);
 
   if (!requestHeaders.has('Content-Type') && requestOptions.body) {
@@ -38,13 +39,17 @@ async function requestWithCookies(url: string, options: HttpOptions) {
   });
 }
 
-async function parseResponse<T>(response: Response): Promise<T> {
+async function parseResponse<T>(response: Response, responseType: HttpOptions['responseType'] = 'json'): Promise<T> {
   if (!response.ok) {
     throw new Error(`Request failed with status ${response.status}`);
   }
 
   if (response.status === 204) {
     return undefined as T;
+  }
+
+  if (responseType === 'blob' || response.headers.get('Content-Type')?.includes('application/vnd.openxmlformats-officedocument')) {
+    return response.blob() as Promise<T>;
   }
 
   const contentLength = response.headers.get('Content-Length');
