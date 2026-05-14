@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
 import { getReportsByUser } from '@/entities/analytics/api/dashboard';
 import type {
@@ -58,6 +58,7 @@ const tableColumns: Array<{ key: keyof ReportsByUserItem; label: string; kind?: 
 
 export function ReportsByUserStatistics() {
   const [filters, setFilters] = useState<ReportsByUserPayload>(() => createInitialFilters());
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const usersQuery = useQuery({ queryKey: ['users', 'reports-by-user-filter'], queryFn: () => getUsers() });
@@ -80,6 +81,19 @@ export function ReportsByUserStatistics() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit border-slate-200 bg-white"
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <ListFilter />
+          Фильтры
+        </Button>
+      </div>
+
+      {filtersOpen && (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
@@ -125,6 +139,7 @@ export function ReportsByUserStatistics() {
           </Button>
         </div>
       </section>
+      )}
 
       {reportsMutation.isError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">

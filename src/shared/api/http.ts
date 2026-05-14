@@ -1,5 +1,7 @@
 import { clearSession } from '@/features/auth/model/tokenStorage';
 import { makeApiUrl, refreshAccessToken } from '@/shared/api/auth';
+import { ApiError, extractApiErrorMessage } from '@/shared/lib/apiError';
+import { showErrorToast } from '@/shared/lib/showErrorToast';
 
 type HttpOptions = RequestInit & {
   auth?: boolean;
@@ -7,7 +9,14 @@ type HttpOptions = RequestInit & {
 };
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {
-  const response = await requestWithCookies(url, options);
+  let response: Response;
+
+  try {
+    response = await requestWithCookies(url, options);
+  } catch (error) {
+    showErrorToast(error);
+    throw error;
+  }
 
   if (response.status === 401 && options.auth !== false) {
     try {
@@ -17,11 +26,17 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       return parseResponse<T>(retryResponse, options.responseType);
     } catch (error) {
       clearSession();
+      showErrorToast(error);
       throw error;
     }
   }
 
-  return parseResponse<T>(response, options.responseType);
+  try {
+    return await parseResponse<T>(response, options.responseType);
+  } catch (error) {
+    showErrorToast(error);
+    throw error;
+  }
 }
 
 async function requestWithCookies(url: string, options: HttpOptions) {
@@ -41,7 +56,12 @@ async function requestWithCookies(url: string, options: HttpOptions) {
 
 async function parseResponse<T>(response: Response, responseType: HttpOptions['responseType'] = 'json'): Promise<T> {
   if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status}`);
+    const details = await parseErrorResponse(response);
+    throw new ApiError({
+      status: response.status,
+      message: extractApiErrorMessage(details, response.statusText || 'Request failed'),
+      details,
+    });
   }
 
   if (response.status === 204) {
@@ -60,4 +80,22 @@ async function parseResponse<T>(response: Response, responseType: HttpOptions['r
   }
 
   return response.json() as Promise<T>;
+}
+
+async function parseErrorResponse(response: Response) {
+  const contentType = response.headers.get('Content-Type');
+
+  if (contentType?.includes('application/json')) {
+    try {
+      return await response.json();
+    } catch {
+      return undefined;
+    }
+  }
+
+  try {
+    return await response.text();
+  } catch {
+    return undefined;
+  }
 }

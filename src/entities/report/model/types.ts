@@ -1,7 +1,7 @@
 export type ReportTaskType = 'online_action' | 'street_action';
 export type ReportTaskScope = 'federal' | 'regional';
 export type ReportType = 'link' | 'image';
-export type ReportStatus = 'pending' | 'under_review' | 'accepted' | 'revision_requested' | 'not_completed';
+export type ReportStatus = 'pending' | 'accepted' | 'revision_requested' | 'not_completed';
 export type AssignmentStatus =
   | 'assigned'
   | 'in_progress'
@@ -36,6 +36,23 @@ export type ReportSearchPayload = {
   page_size: number;
   sort_by: string;
   sort_direction: 'asc' | 'desc';
+};
+
+export type ReportsExportPayload = {
+  exportType: 'analytics_overdue_not_completed';
+  format: 'xlsx';
+  filters: ReportSearchPayload;
+  columns: string[];
+  asyncMode: true;
+};
+
+export type ReportsExportResponse = {
+  exportId: string;
+  status: 'created' | 'processing' | 'ready' | 'failed';
+  message: string;
+  fileName: string;
+  downloadUrl: string;
+  createdAt: string;
 };
 
 export type CrmReportDto = {
@@ -306,4 +323,36 @@ export type ReportHistoryItem = {
 export type ReportHistoryResponse = PaginatedResponse<ReportHistoryItem> & {
   current_report_status: string;
   current_assignment_status: string;
+};
+
+export type ReportReturnReason = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+export type AcceptReportPayload = {
+  comment: string;
+  expected_status: string | null;
+};
+
+export type RequestReportRevisionPayload = {
+  reason_id: number;
+  comment: string;
+  expected_status: string | null;
+};
+
+export type BulkAcceptReportsPayload = {
+  report_ids: number[];
+  comment: string;
+  expected_status: string | null;
+  skip_invalid: boolean;
+};
+
+export type BulkRequestReportRevisionPayload = {
+  report_ids: number[];
+  reason_id: number;
+  comment: string;
+  expected_status: string | null;
+  skip_invalid: boolean;
 };

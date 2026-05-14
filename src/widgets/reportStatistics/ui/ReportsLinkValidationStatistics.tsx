@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
 import { getReportsLinkValidation } from '@/entities/analytics/api/dashboard';
 import type {
@@ -11,6 +11,7 @@ import type {
   ReportsLinkValidationResponse,
   SortDirection,
 } from '@/entities/analytics/model/types';
+import type { ExportCreateResponse } from '@/entities/export/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -26,6 +27,8 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
+import { ReportsLinkValidationExportPopover } from './ReportsLinkValidationExportPopover';
 
 type SelectOption = { value: string; label: string; description?: string };
 
@@ -34,6 +37,11 @@ const periodTypeOptions: Array<{ value: DashboardPeriodType; label: string }> = 
   { value: 'deadline', label: 'Дедлайн' },
   { value: 'report_submitted', label: 'Отправка отчета' },
   { value: 'moderation_action', label: 'Действие модерации' },
+];
+
+const exportPeriodTypeOptions: Array<{ value: DashboardPeriodType | 'link_checked'; label: string }> = [
+  ...periodTypeOptions,
+  { value: 'link_checked', label: 'Проверка ссылки' },
 ];
 
 const roleOptions = [
@@ -52,7 +60,7 @@ const taskScopeOptions: Array<{ value: ReportTaskScope; label: string }> = [
 ];
 
 const reportStatusOptions: Array<{ value: LinkValidationReportStatus; label: string }> = [
-  { value: 'under_review', label: 'На проверке' },
+  { value: 'pending', label: 'На проверке' },
   { value: 'accepted', label: 'Принято' },
   { value: 'revision_requested', label: 'Запрошена редакция' },
   { value: 'not_completed', label: 'Не выполнено' },
@@ -119,6 +127,8 @@ const labelByKey: Record<string, string> = {
 
 export function ReportsLinkValidationStatistics() {
   const [filters, setFilters] = useState<ReportsLinkValidationPayload>(() => createInitialFilters());
+  const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const orgUnitsQuery = useQuery({ queryKey: ['org-units-tree'], queryFn: getOrgUnitsTree });
@@ -126,6 +136,25 @@ export function ReportsLinkValidationStatistics() {
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-link-validation-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsLinkValidation });
   const result = reportsMutation.data;
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+  }));
+  const userOptions = (usersQuery.data ?? []).map((user) => ({
+    value: String(user.id),
+    label: user.fullName,
+    description: `@${user.username}`,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
 
   function updateFilters(patch: Partial<ReportsLinkValidationPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
@@ -143,6 +172,32 @@ export function ReportsLinkValidationStatistics() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ReportsLinkValidationExportPopover
+          tableFilters={filters}
+          regionOptions={regionOptions}
+          orgUnitOptions={orgUnitOptions}
+          userOptions={userOptions}
+          taskOptions={taskOptions}
+          periodTypeOptions={exportPeriodTypeOptions}
+          taskTypeOptions={taskTypeOptions}
+          taskScopeOptions={taskScopeOptions}
+          reportStatusOptions={reportStatusOptions}
+          groupByOptions={groupByOptions}
+          onExportStarted={setExportJob}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit border-slate-200 bg-white"
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <ListFilter />
+          Фильтры
+        </Button>
+      </div>
+
+      {filtersOpen && (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
@@ -180,9 +235,16 @@ export function ReportsLinkValidationStatistics() {
           </Button>
         </div>
       </section>
+      )}
 
       {reportsMutation.isError && <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Не удалось загрузить статистику по ссылочным отчетам.</div>}
       {result ? <ReportsLinkValidationResult result={result} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
+      <AnalyticsExportStatusToast
+        exportJob={exportJob}
+        title="Экспорт статистики по ссылочным отчетам"
+        defaultFileName="analytics-link-validation.xlsx"
+        onClose={() => setExportJob(null)}
+      />
     </div>
   );
 }

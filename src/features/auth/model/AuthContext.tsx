@@ -20,9 +20,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionSnapshot | null>(() => readSession());
 
   const login = useCallback(async ({ username, password }: LoginPayload) => {
-    await requestAuthTokens({ username, password });
-    saveSession(username);
-    setSession({ username });
+    const authUser = await requestAuthTokens({ username, password });
+    const nextSession: SessionSnapshot = {
+      userId: authUser.user_id,
+      username: authUser.username,
+      fullName: authUser.full_name || authUser.username,
+      role: authUser.role,
+    };
+
+    saveSession(nextSession);
+    setSession(nextSession);
   }, []);
 
   const logout = useCallback(() => {

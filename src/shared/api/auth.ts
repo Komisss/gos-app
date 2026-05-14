@@ -5,6 +5,20 @@ export type AuthTokenRequest = {
   password: string;
 };
 
+export type AuthUserRole = {
+  id: number;
+  code: string;
+  name: string;
+};
+
+export type AuthTokenResponse = {
+  detail: string;
+  user_id: number;
+  username: string;
+  full_name: string;
+  role: AuthUserRole | null;
+};
+
 const TOKEN_ENDPOINT = '/api/token';
 const REFRESH_ENDPOINT = '/api/token/refresh';
 
@@ -16,7 +30,7 @@ export function makeApiUrl(path: string) {
   return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
-export async function requestAuthTokens(payload: AuthTokenRequest): Promise<void> {
+export async function requestAuthTokens(payload: AuthTokenRequest): Promise<AuthTokenResponse> {
   const response = await fetch(makeApiUrl(TOKEN_ENDPOINT), {
     method: 'POST',
     credentials: 'include',
@@ -29,6 +43,8 @@ export async function requestAuthTokens(payload: AuthTokenRequest): Promise<void
   if (!response.ok) {
     throw new Error(getAuthErrorMessage(response.status));
   }
+
+  return response.json();
 }
 
 export async function refreshAccessToken(): Promise<void> {

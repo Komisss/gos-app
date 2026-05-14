@@ -6,6 +6,7 @@ import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { searchReports } from '@/entities/report/api/reports';
 import type {
   AssignmentStatus,
+  CrmReport,
   ReportSearchPayload,
   ReportStatus,
   ReportTaskScope,
@@ -27,6 +28,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
 import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
+import { ReportBulkActions } from '@/widgets/reportRegistry/ui/ReportBulkActions';
+import { ReportExportPopover } from '@/widgets/reportRegistry/ui/ReportExportPopover';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
 
 type ReportFilters = {
   search: string;
@@ -89,7 +93,7 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 ];
 
 const reportStatusOptions: Array<{ value: ReportStatus; label: string }> = [
-  { value: 'under_review', label: 'На проверке' },
+  { value: 'pending', label: 'На проверке' },
   { value: 'accepted', label: 'Принят' },
   { value: 'revision_requested', label: 'Нужна доработка' },
   { value: 'not_completed', label: 'Не выполнен' },
@@ -108,7 +112,16 @@ export function ReportRegistry() {
   const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters());
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(null);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [selectedReportIds, setSelectedReportIds] = useState<Set<number>>(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [exportJob, setExportJob] = useState<{
+    exportId: string;
+    status: 'created' | 'processing' | 'ready' | 'failed';
+    message: string;
+    fileName: string;
+    downloadUrl: string;
+    createdAt: string;
+  } | null>(null);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -138,7 +151,95 @@ export function ReportRegistry() {
 
   const reports = reportsQuery.data?.items ?? [];
   const summary = reportsQuery.data?.summary;
+  const selectedReportIdsList = useMemo(() => Array.from(selectedReportIds), [selectedReportIds]);
+  const currentPageReportIds = useMemo(() => getSelectableReportIds(reports), [reports]);
+  const isCurrentPageSelected =
+    currentPageReportIds.length > 0 &&
+    currentPageReportIds.every((reportId) => selectedReportIds.has(reportId));
+  const isCurrentPagePartiallySelected =
+    !isCurrentPageSelected &&
+    currentPageReportIds.some((reportId) => selectedReportIds.has(reportId));
   const hasRequestedReports = appliedFilters !== null;
+  const totalReports = reportsQuery.data?.total ?? reports.length;
+  const currentPage = appliedFilters?.page ?? filters.page;
+  const currentPageSize = appliedFilters?.page_size ?? filters.page_size;
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalReports / currentPageSize),
+    reportsQuery.data?.hasMore ? currentPage + 1 : currentPage,
+  );
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
+  const userOptions = (usersQuery.data ?? []).map((user) => ({
+    value: String(user.id),
+    label: user.fullName,
+    description: `@${user.username}`,
+  }));
+  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+  }));
+
+  function applyFilters(nextFilters: ReportFilters) {
+    setFilters(nextFilters);
+    setAppliedFilters(nextFilters);
+  }
+
+  function handleGetReports() {
+    handleClearSelection();
+    applyFilters({ ...filters, page: 1 });
+  }
+
+  function handlePageChange(page: number) {
+    const nextPage = Math.min(Math.max(1, page), totalPages);
+    applyFilters({ ...filters, page: nextPage, page_size: currentPageSize });
+  }
+
+  function handlePageSizeChange(pageSize: number) {
+    applyFilters({ ...filters, page: 1, page_size: pageSize });
+  }
+
+  function handleToggleReport(reportId: number, checked: boolean) {
+    setSelectedReportIds((current) => {
+      const next = new Set(current);
+
+      if (checked) {
+        next.add(reportId);
+      } else {
+        next.delete(reportId);
+      }
+
+      return next;
+    });
+  }
+
+  function handleToggleCurrentPage(checked: boolean) {
+    setSelectedReportIds((current) => {
+      const next = new Set(current);
+
+      currentPageReportIds.forEach((reportId) => {
+        if (checked) {
+          next.add(reportId);
+        } else {
+          next.delete(reportId);
+        }
+      });
+
+      return next;
+    });
+  }
+
+  function handleClearSelection() {
+    setSelectedReportIds(new Set());
+  }
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -146,18 +247,36 @@ export function ReportRegistry() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <h1 className="text-3xl font-semibold !text-slate-900">Отчеты</h1>
-            <p className="text-sm text-slate-500">Реестр отчетов по задачам, пользователям, регионам и оргструктурам.</p>
+            <p className="text-sm text-slate-500">
+              Реестр отчетов по задачам, пользователям, регионам и оргструктурам.
+            </p>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="w-fit border-slate-200 bg-white"
-            onClick={() => setFiltersOpen((current) => !current)}
-          >
-            <ListFilter />
-            Фильтры
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <ReportExportPopover
+              reportFilters={toReportPayload(appliedFilters ?? filters)}
+              regionOptions={regionOptions}
+              taskOptions={taskOptions}
+              userOptions={userOptions}
+              orgUnitOptions={orgUnitOptions}
+              roleOptions={roleOptions}
+              taskTypeOptions={taskTypeOptions}
+              taskScopeOptions={taskScopeOptions}
+              reportTypeOptions={reportTypeOptions}
+              reportStatusOptions={reportStatusOptions}
+              assignmentStatusOptions={assignmentStatusOptions}
+              onExportStarted={setExportJob}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="w-fit border-slate-200 bg-white"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <ListFilter />
+              Фильтры
+            </Button>
+          </div>
         </div>
 
         {filtersOpen && (
@@ -179,7 +298,13 @@ export function ReportRegistry() {
                   label: region.name,
                   description: region.code,
                 }))}
-                onChange={(region_ids) => setFilters((current) => ({ ...current, region_ids: toNumbers(region_ids), page: 1 }))}
+                onChange={(region_ids) =>
+                  setFilters((current) => ({
+                    ...current,
+                    region_ids: toNumbers(region_ids),
+                    page: 1,
+                  }))
+                }
               />
               <MultiSearchSelect
                 label="Задачи"
@@ -191,7 +316,9 @@ export function ReportRegistry() {
                   label: `#${task.id} ${task.title}`,
                   description: task.statusLabel,
                 }))}
-                onChange={(task_ids) => setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids), page: 1 }))}
+                onChange={(task_ids) =>
+                  setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids), page: 1 }))
+                }
               />
               <MultiSearchSelect
                 label="Пользователи"
@@ -203,7 +330,9 @@ export function ReportRegistry() {
                   label: user.fullName,
                   description: `@${user.username}`,
                 }))}
-                onChange={(user_ids) => setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids), page: 1 }))}
+                onChange={(user_ids) =>
+                  setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids), page: 1 }))
+                }
               />
               <MultiSearchSelect
                 label="Оргструктуры"
@@ -214,42 +343,74 @@ export function ReportRegistry() {
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                 }))}
-                onChange={(org_unit_ids) => setFilters((current) => ({ ...current, org_unit_ids: toNumbers(org_unit_ids), page: 1 }))}
+                onChange={(org_unit_ids) =>
+                  setFilters((current) => ({
+                    ...current,
+                    org_unit_ids: toNumbers(org_unit_ids),
+                    page: 1,
+                  }))
+                }
               />
               <MultiSelect
                 label="Роли"
                 values={filters.role_ids.map(String)}
                 placeholder="Все роли"
                 options={roleOptions}
-                onChange={(role_ids) => setFilters((current) => ({ ...current, role_ids: toNumbers(role_ids), page: 1 }))}
+                onChange={(role_ids) =>
+                  setFilters((current) => ({ ...current, role_ids: toNumbers(role_ids), page: 1 }))
+                }
               />
               <MultiSelect
                 label="Тип задачи"
                 values={filters.task_types}
                 placeholder="Все типы"
                 options={taskTypeOptions}
-                onChange={(task_types) => setFilters((current) => ({ ...current, task_types: task_types as ReportTaskType[], page: 1 }))}
+                onChange={(task_types) =>
+                  setFilters((current) => ({
+                    ...current,
+                    task_types: task_types as ReportTaskType[],
+                    page: 1,
+                  }))
+                }
               />
               <MultiSelect
                 label="Масштаб задачи"
                 values={filters.task_scope}
                 placeholder="Любой масштаб"
                 options={taskScopeOptions}
-                onChange={(task_scope) => setFilters((current) => ({ ...current, task_scope: task_scope as ReportTaskScope[], page: 1 }))}
+                onChange={(task_scope) =>
+                  setFilters((current) => ({
+                    ...current,
+                    task_scope: task_scope as ReportTaskScope[],
+                    page: 1,
+                  }))
+                }
               />
               <MultiSelect
                 label="Тип отчета"
                 values={filters.report_types}
                 placeholder="Все типы отчетов"
                 options={reportTypeOptions}
-                onChange={(report_types) => setFilters((current) => ({ ...current, report_types: report_types as ReportType[], page: 1 }))}
+                onChange={(report_types) =>
+                  setFilters((current) => ({
+                    ...current,
+                    report_types: report_types as ReportType[],
+                    page: 1,
+                  }))
+                }
               />
               <MultiSelect
                 label="Статус отчета"
                 values={filters.report_statuses}
                 placeholder="Все статусы отчетов"
                 options={reportStatusOptions}
-                onChange={(report_statuses) => setFilters((current) => ({ ...current, report_statuses: report_statuses as ReportStatus[], page: 1 }))}
+                onChange={(report_statuses) =>
+                  setFilters((current) => ({
+                    ...current,
+                    report_statuses: report_statuses as ReportStatus[],
+                    page: 1,
+                  }))
+                }
               />
               <MultiSelect
                 label="Статус назначения"
@@ -264,12 +425,48 @@ export function ReportRegistry() {
                   }))
                 }
               />
-              <DateFilter label="Отправлен от" value={filters.submitted_from} onChange={(submitted_from) => setFilters((current) => ({ ...current, submitted_from, page: 1 }))} />
-              <DateFilter label="Отправлен до" value={filters.submitted_to} onChange={(submitted_to) => setFilters((current) => ({ ...current, submitted_to, page: 1 }))} />
-              <DateFilter label="Дедлайн от" value={filters.deadline_from} onChange={(deadline_from) => setFilters((current) => ({ ...current, deadline_from, page: 1 }))} />
-              <DateFilter label="Дедлайн до" value={filters.deadline_to} onChange={(deadline_to) => setFilters((current) => ({ ...current, deadline_to, page: 1 }))} />
-              <DateFilter label="Создан от" value={filters.created_from} onChange={(created_from) => setFilters((current) => ({ ...current, created_from, page: 1 }))} />
-              <DateFilter label="Создан до" value={filters.created_to} onChange={(created_to) => setFilters((current) => ({ ...current, created_to, page: 1 }))} />
+              <DateFilter
+                label="Отправлен от"
+                value={filters.submitted_from}
+                onChange={(submitted_from) =>
+                  setFilters((current) => ({ ...current, submitted_from, page: 1 }))
+                }
+              />
+              <DateFilter
+                label="Отправлен до"
+                value={filters.submitted_to}
+                onChange={(submitted_to) =>
+                  setFilters((current) => ({ ...current, submitted_to, page: 1 }))
+                }
+              />
+              <DateFilter
+                label="Дедлайн от"
+                value={filters.deadline_from}
+                onChange={(deadline_from) =>
+                  setFilters((current) => ({ ...current, deadline_from, page: 1 }))
+                }
+              />
+              <DateFilter
+                label="Дедлайн до"
+                value={filters.deadline_to}
+                onChange={(deadline_to) =>
+                  setFilters((current) => ({ ...current, deadline_to, page: 1 }))
+                }
+              />
+              <DateFilter
+                label="Создан от"
+                value={filters.created_from}
+                onChange={(created_from) =>
+                  setFilters((current) => ({ ...current, created_from, page: 1 }))
+                }
+              />
+              <DateFilter
+                label="Создан до"
+                value={filters.created_to}
+                onChange={(created_to) =>
+                  setFilters((current) => ({ ...current, created_to, page: 1 }))
+                }
+              />
               <FilterSelect
                 label="Сортировка"
                 value={filters.sort_by}
@@ -288,78 +485,93 @@ export function ReportRegistry() {
                   { value: 'asc', label: 'По возрастанию' },
                 ]}
                 onChange={(sort_direction) =>
-                  setFilters((current) => ({ ...current, sort_direction: sort_direction as 'asc' | 'desc' }))
+                  setFilters((current) => ({
+                    ...current,
+                    sort_direction: sort_direction as 'asc' | 'desc',
+                  }))
                 }
               />
             </div>
 
             <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-              <BooleanFilter label="Просрочен" checked={filters.is_overdue} onChange={(is_overdue) => setFilters((current) => ({ ...current, is_overdue, page: 1 }))} />
-              <BooleanFilter label="Есть отчет" checked={filters.has_report} onChange={(has_report) => setFilters((current) => ({ ...current, has_report, page: 1 }))} />
-              <BooleanFilter label="Только текущая версия" checked={filters.only_current_version} onChange={(only_current_version) => setFilters((current) => ({ ...current, only_current_version, page: 1 }))} />
-              <BooleanFilter label="Включая удаленные" checked={filters.include_removed} onChange={(include_removed) => setFilters((current) => ({ ...current, include_removed, page: 1 }))} />
+              <BooleanFilter
+                label="Просрочен"
+                checked={filters.is_overdue}
+                onChange={(is_overdue) =>
+                  setFilters((current) => ({ ...current, is_overdue, page: 1 }))
+                }
+              />
+              <BooleanFilter
+                label="Есть отчет"
+                checked={filters.has_report}
+                onChange={(has_report) =>
+                  setFilters((current) => ({ ...current, has_report, page: 1 }))
+                }
+              />
+              <BooleanFilter
+                label="Только текущая версия"
+                checked={filters.only_current_version}
+                onChange={(only_current_version) =>
+                  setFilters((current) => ({ ...current, only_current_version, page: 1 }))
+                }
+              />
+              <BooleanFilter
+                label="Включая удаленные"
+                checked={filters.include_removed}
+                onChange={(include_removed) =>
+                  setFilters((current) => ({ ...current, include_removed, page: 1 }))
+                }
+              />
             </div>
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-slate-500">Страница</span>
-                  <Input
-                    className="h-9 w-24 border-slate-200 bg-white text-sm"
-                    min={1}
-                    type="number"
-                    value={filters.page}
-                    onChange={(event) =>
-                      setFilters((current) => ({
-                        ...current,
-                        page: Math.max(1, Number(event.target.value) || 1),
-                      }))
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-slate-500">Размер страницы</span>
-                  <Select
-                    value={String(filters.page_size)}
-                    onValueChange={(page_size) => setFilters((current) => ({ ...current, page_size: Number(page_size), page: 1 }))}
-                  >
-                    <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent align="start">
-                      <SelectItem value="25">25</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                      <SelectItem value="100">100</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={() => setFilters(createInitialFilters())}>
-                  Сбросить фильтры
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-                  disabled={reportsQuery.isFetching}
-                  onClick={() => setAppliedFilters(filters)}
-                >
-                  {reportsQuery.isFetching ? 'Загрузка...' : 'Получить отчеты'}
-                </Button>
-              </div>
+            <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  handleClearSelection();
+                  setFilters(createInitialFilters());
+                }}
+              >
+                Сбросить фильтры
+              </Button>
+              <Button
+                type="button"
+                className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+                disabled={reportsQuery.isFetching}
+                onClick={handleGetReports}
+              >
+                {reportsQuery.isFetching ? 'Загрузка...' : 'Получить отчеты'}
+              </Button>
             </div>
           </div>
         )}
 
         {hasRequestedReports && (
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <p className="text-sm text-slate-500">
-              Найдено: {reportsQuery.data?.total ?? reports.length}
-              {reportsQuery.data ? `, страница ${reportsQuery.data.page}` : ''}
+              Найдено: {totalReports}
+              {reportsQuery.data ? `, страница ${reportsQuery.data.page} из ${totalPages}` : ''}
             </p>
+            <ReportPagination
+              page={currentPage}
+              pageSize={currentPageSize}
+              totalPages={totalPages}
+              hasMore={reportsQuery.data?.hasMore ?? false}
+              disabled={reportsQuery.isFetching}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           </div>
+        )}
+
+        {selectedReportIdsList.length > 0 && (
+          <ReportBulkActions
+            reportIds={selectedReportIdsList}
+            disabled={reportsQuery.isFetching}
+            onCompleted={handleClearSelection}
+            onClearSelection={handleClearSelection}
+          />
         )}
 
         {summary && (
@@ -386,90 +598,147 @@ export function ReportRegistry() {
             Не удалось загрузить отчеты.
           </div>
         ) : (
-          <TableScrollArea headerHeight="3rem" height="70vh">
-            <Table className="min-w-[1500px] whitespace-nowrap">
-              <TableHeader>
-                <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
-                  <TableHead className="w-28">Назначение</TableHead>
-                  <TableHead className="min-w-[300px]">Задача</TableHead>
-                  <TableHead className="min-w-[240px]">Исполнитель</TableHead>
-                  <TableHead className="min-w-[220px]">Регион</TableHead>
-                  <TableHead className="min-w-[220px]">Оргструктура</TableHead>
-                  <TableHead className="w-40">Тип задачи</TableHead>
-                  <TableHead className="w-40">Формат отчета</TableHead>
-                  <TableHead className="w-40">Отчет</TableHead>
-                  <TableHead className="w-44">Статус назначения</TableHead>
-                  <TableHead className="w-32">Правки</TableHead>
-                  <TableHead className="w-44">Отправлен</TableHead>
-                  <TableHead className="w-44">Дедлайн</TableHead>
-                  <TableHead className="w-32">Просрочен</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reports.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={13} className="py-10 text-center text-sm text-slate-500">
-                      Отчетов пока нет.
-                    </TableCell>
+          <div className="space-y-3">
+            <TableScrollArea headerHeight="3rem" height="70vh">
+              <Table className="min-w-[1500px] whitespace-nowrap">
+                <TableHeader>
+                  <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={
+                          isCurrentPagePartiallySelected ? 'indeterminate' : isCurrentPageSelected
+                        }
+                        disabled={currentPageReportIds.length === 0}
+                        onCheckedChange={(checked) => handleToggleCurrentPage(checked === true)}
+                      />
+                    </TableHead>
+                    <TableHead className="w-28">Назначение</TableHead>
+                    <TableHead className="min-w-[300px]">Задача</TableHead>
+                    <TableHead className="min-w-[240px]">Исполнитель</TableHead>
+                    <TableHead className="min-w-[220px]">Регион</TableHead>
+                    <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+                    <TableHead className="w-40">Тип задачи</TableHead>
+                    <TableHead className="w-40">Формат отчета</TableHead>
+                    <TableHead className="w-40">Отчет</TableHead>
+                    <TableHead className="w-44">Статус назначения</TableHead>
+                    <TableHead className="w-32">Правки</TableHead>
+                    <TableHead className="w-44">Отправлен</TableHead>
+                    <TableHead className="w-44">Дедлайн</TableHead>
+                    <TableHead className="w-32">Просрочен</TableHead>
                   </TableRow>
-                ) : (
-                  reports.map((report, index) => (
-                    <TableRow
-                      key={`${report.id}-${index}`}
-                      className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
-                      onClick={() => setSelectedReportId(getReportOpenId(report))}
-                    >
-                      <TableCell className="font-medium text-slate-700">#{report.assignmentId}</TableCell>
-                      <TableCell className="min-w-[300px]">
-                        <div className="space-y-1 whitespace-normal">
-                          <div className="font-medium text-slate-900">{report.taskTitle}</div>
-                          <div className="text-xs text-slate-500">
-                            ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium text-slate-900">{report.executorName}</div>
-                          <div className="text-xs text-slate-500">
-                            ID: {report.executorId ?? 'n/a'} • {report.executorRole}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-slate-700">{report.regionName}</TableCell>
-                      <TableCell className="text-slate-700">{report.orgUnitName}</TableCell>
-                      <TableCell>{getTaskTypeLabel(report.taskType)}</TableCell>
-                      <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
-                      <TableCell>
-                        {report.reportStatus ? (
-                          <StatusBadge value={report.reportStatus} label={getReportStatusLabel(report.reportStatus)} />
-                        ) : (
-                          <span className="text-sm text-slate-500">Нет отчета</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge value={report.assignmentStatus} label={getAssignmentStatusLabel(report.assignmentStatus)} />
-                      </TableCell>
-                      <TableCell className="text-slate-700">
-                        {report.revisionUsed} / {report.revisionLimit}
-                      </TableCell>
-                      <TableCell className="text-slate-700">{formatDateTime(report.submittedAt)}</TableCell>
-                      <TableCell className="text-slate-700">{formatDateTime(report.deadlineAt)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
-                            report.isOverdue ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
-                          }`}
-                        >
-                          {report.isOverdue ? 'Да' : 'Нет'}
-                        </Badge>
+                </TableHeader>
+                <TableBody>
+                  {reports.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={14} className="py-10 text-center text-sm text-slate-500">
+                        Отчетов пока нет.
                       </TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableScrollArea>
+                  ) : (
+                    reports.map((report, index) => {
+                      const selectableReportId = getSelectableReportId(report);
+
+                      return (
+                        <TableRow
+                          key={`${report.id}-${index}`}
+                          className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
+                          onClick={() => setSelectedReportId(getReportOpenId(report))}
+                        >
+                          <TableCell onClick={(event) => event.stopPropagation()}>
+                            <Checkbox
+                              checked={
+                                selectableReportId
+                                  ? selectedReportIds.has(selectableReportId)
+                                  : false
+                              }
+                              disabled={!selectableReportId}
+                              onCheckedChange={(checked) => {
+                                if (selectableReportId) {
+                                  handleToggleReport(selectableReportId, checked === true);
+                                }
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-700">
+                            #{report.assignmentId}
+                          </TableCell>
+                          <TableCell className="min-w-[300px]">
+                            <div className="space-y-1 whitespace-normal">
+                              <div className="font-medium text-slate-900">{report.taskTitle}</div>
+                              <div className="text-xs text-slate-500">
+                                ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="space-y-1">
+                              <div className="font-medium text-slate-900">
+                                {report.executorName}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                ID: {report.executorId ?? 'n/a'} • {report.executorRole}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-700">{report.regionName}</TableCell>
+                          <TableCell className="text-slate-700">{report.orgUnitName}</TableCell>
+                          <TableCell>{getTaskTypeLabel(report.taskType)}</TableCell>
+                          <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
+                          <TableCell>
+                            {report.reportStatus ? (
+                              <StatusBadge
+                                value={report.reportStatus}
+                                label={getReportStatusLabel(report.reportStatus)}
+                              />
+                            ) : (
+                              <span className="text-sm text-slate-500">Нет отчета</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge
+                              value={report.assignmentStatus}
+                              label={getAssignmentStatusLabel(report.assignmentStatus)}
+                            />
+                          </TableCell>
+                          <TableCell className="text-slate-700">
+                            {report.revisionUsed} / {report.revisionLimit}
+                          </TableCell>
+                          <TableCell className="text-slate-700">
+                            {formatDateTime(report.submittedAt)}
+                          </TableCell>
+                          <TableCell className="text-slate-700">
+                            {formatDateTime(report.deadlineAt)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
+                                report.isOverdue
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-emerald-100 text-emerald-700'
+                              }`}
+                            >
+                              {report.isOverdue ? 'Да' : 'Нет'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </TableScrollArea>
+            <div className="flex justify-end rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <ReportPagination
+                page={currentPage}
+                pageSize={currentPageSize}
+                totalPages={totalPages}
+                hasMore={reportsQuery.data?.hasMore ?? false}
+                disabled={reportsQuery.isFetching}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
+              />
+            </div>
+          </div>
         )}
 
         <ReportDetailsDialog
@@ -480,6 +749,12 @@ export function ReportRegistry() {
               setSelectedReportId(null);
             }
           }}
+        />
+        <AnalyticsExportStatusToast
+          exportJob={exportJob}
+          title="Экспорт отчетов"
+          defaultFileName="reports-export.xlsx"
+          onClose={() => setExportJob(null)}
         />
       </div>
     </div>
@@ -574,18 +849,34 @@ function MultiSearchSelect({
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal">
-            <span className="min-w-0 truncate">{selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}</span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}
+            </span>
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] p-4">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-            <Input className="h-9 border-slate-200 pl-9 text-sm" placeholder={searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </div>
           <div className="mt-3 flex justify-between gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => onChange(options.map((option) => option.value))}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(options.map((option) => option.value))}
+            >
               Выбрать все
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
@@ -595,7 +886,9 @@ function MultiSearchSelect({
           <ScrollArea className="mt-3 h-64 rounded-md border border-slate-200">
             <div className="p-1">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-slate-500">Ничего не найдено.</div>
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
               ) : (
                 filteredOptions.map((option) => (
                   <button
@@ -604,10 +897,17 @@ function MultiSearchSelect({
                     className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
                     onClick={() => toggleValue(option.value)}
                   >
-                    <Check className={cn('mt-0.5 size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-900">{option.label}</span>
-                      {option.description && <span className="block text-xs text-slate-500">{option.description}</span>}
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
                     </span>
                   </button>
                 ))
@@ -638,8 +938,14 @@ function MultiSelect({
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
       <Popover>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal">
-            <span className="min-w-0 truncate">{values.length ? `Выбрано: ${values.length}` : placeholder}</span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {values.length ? `Выбрано: ${values.length}` : placeholder}
+            </span>
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -650,9 +956,20 @@ function MultiSelect({
                 key={option.value}
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                onClick={() => onChange(values.includes(option.value) ? values.filter((value) => value !== option.value) : [...values, option.value])}
+                onClick={() =>
+                  onChange(
+                    values.includes(option.value)
+                      ? values.filter((value) => value !== option.value)
+                      : [...values, option.value],
+                  )
+                }
               >
-                <Check className={cn('size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                <Check
+                  className={cn(
+                    'size-4 text-[#465cd3]',
+                    values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
                 <span className="font-medium text-slate-900">{option.label}</span>
               </button>
             ))}
@@ -663,16 +980,39 @@ function MultiSelect({
   );
 }
 
-function FilterText({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (value: string) => void }) {
+function FilterText({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <Input className="h-9 border-slate-200 text-sm" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
+      <Input
+        className="h-9 border-slate-200 text-sm"
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }
 
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
@@ -681,7 +1021,17 @@ function DateFilter({ label, value, onChange }: { label: string; value: string; 
   );
 }
 
-function FilterSelect({ label, value, options, onChange }: { label: string; value: string; options: Array<{ value: string; label: string }>; onChange: (value: string) => void }) {
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
@@ -701,7 +1051,15 @@ function FilterSelect({ label, value, options, onChange }: { label: string; valu
   );
 }
 
-function BooleanFilter({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+function BooleanFilter({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
   return (
     <label className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
       <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} />
@@ -710,13 +1068,108 @@ function BooleanFilter({ label, checked, onChange }: { label: string; checked: b
   );
 }
 
-function SummaryItem({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'danger' }) {
+function SummaryItem({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: number;
+  tone?: 'default' | 'danger';
+}) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <p className="text-xs font-medium text-slate-500">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${tone === 'danger' ? 'text-red-700' : 'text-slate-900'}`}>
+      <p
+        className={`mt-1 text-2xl font-semibold ${tone === 'danger' ? 'text-red-700' : 'text-slate-900'}`}
+      >
         {value}
       </p>
+    </div>
+  );
+}
+
+function ReportPagination({
+  page,
+  pageSize,
+  totalPages,
+  hasMore,
+  disabled,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+  disabled: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled || page <= 1}
+        onClick={() => onPageChange(1)}
+      >
+        Первая
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled || page <= 1}
+        onClick={() => onPageChange(page - 1)}
+      >
+        Назад
+      </Button>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-slate-500">Страница</span>
+        <Input
+          className="h-9 w-20 border-slate-200 bg-white text-sm"
+          min={1}
+          max={totalPages}
+          type="number"
+          value={page}
+          disabled={disabled}
+          onChange={(event) => onPageChange(Number(event.target.value) || 1)}
+        />
+        <span className="text-sm text-slate-500">из {totalPages}</span>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled || (!hasMore && page >= totalPages)}
+        onClick={() => onPageChange(page + 1)}
+      >
+        Вперед
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled || page >= totalPages}
+        onClick={() => onPageChange(totalPages)}
+      >
+        Последняя
+      </Button>
+      <div className="ml-2 flex items-center gap-2">
+        <span className="text-sm text-slate-500">На странице</span>
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="start">
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
@@ -727,19 +1180,41 @@ function StatusBadge({ value, label }: { value: string; label: string }) {
       ? 'bg-emerald-100 text-emerald-700'
       : value === 'revision_requested' || value === 'not_completed'
         ? 'bg-red-100 text-red-700'
-        : value === 'under_review'
+        : value === 'pending'
           ? 'bg-sky-100 text-sky-700'
           : 'bg-slate-200 text-slate-700';
 
-  return <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${className}`}>{label}</Badge>;
+  return (
+    <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${className}`}>
+      {label}
+    </Badge>
+  );
 }
 
 function toNumbers(values: string[]) {
   return values.map(Number).filter((value) => Number.isFinite(value));
 }
 
-function getReportOpenId(report: { reportId: number | null; reportIds: number[]; assignmentId: number }) {
+function getReportOpenId(report: {
+  reportId: number | null;
+  reportIds: number[];
+  assignmentId: number;
+}) {
   return report.reportId ?? report.reportIds[0] ?? report.assignmentId;
+}
+
+function getSelectableReportId(report: Pick<CrmReport, 'reportId' | 'reportIds'>) {
+  return report.reportId ?? report.reportIds[0] ?? null;
+}
+
+function getSelectableReportIds(reports: CrmReport[]) {
+  return Array.from(
+    new Set(
+      reports
+        .map(getSelectableReportId)
+        .filter((reportId): reportId is number => reportId !== null),
+    ),
+  );
 }
 
 function getAssignmentStatusLabel(status: string) {

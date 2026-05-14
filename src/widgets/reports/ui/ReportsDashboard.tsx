@@ -1,6 +1,16 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { BarChart3, Check, ChevronsUpDown, Clock3, FileCheck2, Link2, ListChecks, Search } from 'lucide-react';
+import {
+  BarChart3,
+  Check,
+  ChevronsUpDown,
+  Clock3,
+  FileCheck2,
+  Link2,
+  ListFilter,
+  ListChecks,
+  Search,
+} from 'lucide-react';
 
 import { getAnalyticsDashboard } from '@/entities/analytics/api/dashboard';
 import type {
@@ -8,6 +18,7 @@ import type {
   AnalyticsDashboardResponse,
   DashboardPeriodType,
 } from '@/entities/analytics/model/types';
+import type { ExportCreateResponse } from '@/entities/export/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -21,6 +32,8 @@ import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { AnalyticsDashboardExportPopover } from '@/widgets/reports/ui/AnalyticsDashboardExportPopover';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
 
 type DashboardFilters = AnalyticsDashboardPayload;
 
@@ -54,6 +67,8 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 
 export function ReportsDashboard() {
   const [filters, setFilters] = useState<DashboardFilters>(() => createInitialFilters());
+  const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -83,16 +98,62 @@ export function ReportsDashboard() {
     dashboardMutation.mutate(filters);
   }
 
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
+  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+  }));
+  const userOptions = (usersQuery.data ?? []).map((user) => ({
+    value: String(user.id),
+    label: user.fullName,
+    description: `@${user.username}`,
+  }));
+
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-semibold !text-slate-900">Дашборд</h1>
-          <p className="text-sm text-slate-500">
-            Сводная статистика по отчетам, назначениям, срокам и модерации.
-          </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-semibold !text-slate-900">Дашборд</h1>
+            <p className="text-sm text-slate-500">
+              Сводная статистика по отчетам, назначениям, срокам и модерации.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <AnalyticsDashboardExportPopover
+              dashboardFilters={filters}
+              regionOptions={regionOptions}
+              taskOptions={taskOptions}
+              orgUnitOptions={orgUnitOptions}
+              userOptions={userOptions}
+              periodTypeOptions={periodTypeOptions}
+              taskTypeOptions={taskTypeOptions}
+              taskScopeOptions={taskScopeOptions}
+              reportTypeOptions={reportTypeOptions}
+              onExportStarted={setExportJob}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="w-fit border-slate-200 bg-white"
+              onClick={() => setFiltersOpen((current) => !current)}
+            >
+              <ListFilter />
+              Фильтры
+            </Button>
+          </div>
         </div>
 
+        {filtersOpen && (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <DateFilter
@@ -110,7 +171,10 @@ export function ReportsDashboard() {
               value={filters.period_type}
               options={periodTypeOptions}
               onChange={(period_type) =>
-                setFilters((current) => ({ ...current, period_type: period_type as DashboardPeriodType }))
+                setFilters((current) => ({
+                  ...current,
+                  period_type: period_type as DashboardPeriodType,
+                }))
               }
             />
             <MultiSearchSelect
@@ -118,34 +182,27 @@ export function ReportsDashboard() {
               values={filters.region_ids.map(String)}
               placeholder="Все регионы"
               searchPlaceholder="Поиск региона"
-              options={(regionsQuery.data ?? []).map((region) => ({
-                value: String(region.id),
-                label: region.name,
-                description: region.code,
-              }))}
-              onChange={(region_ids) => setFilters((current) => ({ ...current, region_ids: toNumbers(region_ids) }))}
+              options={regionOptions}
+              onChange={(region_ids) =>
+                setFilters((current) => ({ ...current, region_ids: toNumbers(region_ids) }))
+              }
             />
             <MultiSearchSelect
               label="Задачи"
               values={filters.task_ids.map(String)}
               placeholder="Все задачи"
               searchPlaceholder="Поиск по id или названию"
-              options={(tasksQuery.data ?? []).map((task) => ({
-                value: String(task.id),
-                label: `#${task.id} ${task.title}`,
-                description: task.statusLabel,
-              }))}
-              onChange={(task_ids) => setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids) }))}
+              options={taskOptions}
+              onChange={(task_ids) =>
+                setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids) }))
+              }
             />
             <MultiSearchSelect
               label="Оргструктуры"
               values={filters.org_unit_ids.map(String)}
               placeholder="Все оргструктуры"
               searchPlaceholder="Поиск оргструктуры"
-              options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-                value: String(orgUnit.id),
-                label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-              }))}
+              options={orgUnitOptions}
               onChange={(org_unit_ids) =>
                 setFilters((current) => ({ ...current, org_unit_ids: toNumbers(org_unit_ids) }))
               }
@@ -155,12 +212,10 @@ export function ReportsDashboard() {
               values={filters.user_ids.map(String)}
               placeholder="Все пользователи"
               searchPlaceholder="Поиск по ФИО или username"
-              options={(usersQuery.data ?? []).map((user) => ({
-                value: String(user.id),
-                label: user.fullName,
-                description: `@${user.username}`,
-              }))}
-              onChange={(user_ids) => setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids) }))}
+              options={userOptions}
+              onChange={(user_ids) =>
+                setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids) }))
+              }
             />
             <MultiSelect
               label="Тип задачи"
@@ -168,7 +223,10 @@ export function ReportsDashboard() {
               placeholder="Все типы"
               options={taskTypeOptions}
               onChange={(task_types) =>
-                setFilters((current) => ({ ...current, task_types: task_types as ReportTaskType[] }))
+                setFilters((current) => ({
+                  ...current,
+                  task_types: task_types as ReportTaskType[],
+                }))
               }
             />
             <MultiSelect
@@ -177,7 +235,10 @@ export function ReportsDashboard() {
               placeholder="Любой масштаб"
               options={taskScopeOptions}
               onChange={(task_scope) =>
-                setFilters((current) => ({ ...current, task_scope: task_scope as ReportTaskScope[] }))
+                setFilters((current) => ({
+                  ...current,
+                  task_scope: task_scope as ReportTaskScope[],
+                }))
               }
             />
             <MultiSelect
@@ -186,7 +247,10 @@ export function ReportsDashboard() {
               placeholder="Все типы отчетов"
               options={reportTypeOptions}
               onChange={(report_types) =>
-                setFilters((current) => ({ ...current, report_types: report_types as ReportType[] }))
+                setFilters((current) => ({
+                  ...current,
+                  report_types: report_types as ReportType[],
+                }))
               }
             />
           </div>
@@ -216,7 +280,11 @@ export function ReportsDashboard() {
           </div>
 
           <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
-            <Button type="button" variant="outline" onClick={() => setFilters(createInitialFilters())}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFilters(createInitialFilters())}
+            >
               Сбросить фильтры
             </Button>
             <Button
@@ -229,6 +297,7 @@ export function ReportsDashboard() {
             </Button>
           </div>
         </section>
+        )}
 
         {dashboardMutation.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
@@ -244,6 +313,7 @@ export function ReportsDashboard() {
           </div>
         )}
       </div>
+      <AnalyticsExportStatusToast exportJob={exportJob} onClose={() => setExportJob(null)} />
     </div>
   );
 }
@@ -338,7 +408,8 @@ function DashboardResult({ data }: { data: AnalyticsDashboardResponse }) {
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-        Обновлено: <span className="font-medium text-slate-900">{formatDateTime(data.updated_at)}</span>
+        Обновлено:{' '}
+        <span className="font-medium text-slate-900">{formatDateTime(data.updated_at)}</span>
       </div>
     </section>
   );
@@ -373,7 +444,13 @@ function DashboardCard({
   );
 }
 
-function InfoPanel({ title, items }: { title: string; items: Array<{ label: string; value: React.ReactNode }> }) {
+function InfoPanel({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ label: string; value: React.ReactNode }>;
+}) {
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
@@ -474,7 +551,12 @@ function MultiSearchSelect({
             />
           </div>
           <div className="mt-3 flex justify-between gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => onChange(options.map((option) => option.value))}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(options.map((option) => option.value))}
+            >
               Выбрать все
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
@@ -484,7 +566,9 @@ function MultiSearchSelect({
           <ScrollArea className="mt-3 h-64 rounded-md border border-slate-200">
             <div className="p-1">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-slate-500">Ничего не найдено.</div>
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
               ) : (
                 filteredOptions.map((option) => (
                   <button
@@ -493,10 +577,17 @@ function MultiSearchSelect({
                     className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
                     onClick={() => toggleValue(option.value)}
                   >
-                    <Check className={cn('mt-0.5 size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-900">{option.label}</span>
-                      {option.description && <span className="block text-xs text-slate-500">{option.description}</span>}
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
                     </span>
                   </button>
                 ))
@@ -527,8 +618,14 @@ function MultiSelect({
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
       <Popover>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal">
-            <span className="min-w-0 truncate">{values.length ? `Выбрано: ${values.length}` : placeholder}</span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {values.length ? `Выбрано: ${values.length}` : placeholder}
+            </span>
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -539,9 +636,20 @@ function MultiSelect({
                 key={option.value}
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                onClick={() => onChange(values.includes(option.value) ? values.filter((value) => value !== option.value) : [...values, option.value])}
+                onClick={() =>
+                  onChange(
+                    values.includes(option.value)
+                      ? values.filter((value) => value !== option.value)
+                      : [...values, option.value],
+                  )
+                }
               >
-                <Check className={cn('size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                <Check
+                  className={cn(
+                    'size-4 text-[#465cd3]',
+                    values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
                 <span className="font-medium text-slate-900">{option.label}</span>
               </button>
             ))}
@@ -552,7 +660,15 @@ function MultiSelect({
   );
 }
 
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
@@ -591,7 +707,15 @@ function FilterSelect({
   );
 }
 
-function BooleanFilter({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+function BooleanFilter({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
   return (
     <label className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
       <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} />

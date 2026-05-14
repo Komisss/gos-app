@@ -12,6 +12,7 @@ import type {
   AuditLogFilters,
   ModerationActionsFilters,
   ReportHistoryFilters,
+  ReportType,
   ReportVersionsFilters,
 } from '@/entities/report/model/types';
 import { Button } from '@/shared/ui/button';
@@ -26,10 +27,19 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shar
 const actionTypeOptions = ['accept', 'request_revision', 'reject', 'approve', 'return'];
 const entityTypeOptions = ['report', 'task_assignment', 'moderation_action', 'link_validation_result', 'bulk_operation'];
 
-export function ReportHistory({ reportId, taskAssignmentId }: { reportId: number; taskAssignmentId: number }) {
+export function ReportHistory({
+  reportId,
+  reportType,
+  taskAssignmentId,
+}: {
+  reportId: number;
+  reportType: ReportType | null;
+  taskAssignmentId: number;
+}) {
+  const shouldShowLinkValidation = reportType === 'link';
   const [versionsFilters, setVersionsFilters] = useState<ReportVersionsFilters>({
     include_content: true,
-    include_link_validation: true,
+    include_link_validation: shouldShowLinkValidation,
     include_moderation: true,
     sort_direction: 'asc',
   });
@@ -59,7 +69,7 @@ export function ReportHistory({ reportId, taskAssignmentId }: { reportId: number
     from: '',
     to: '',
     include_audit: true,
-    include_link_validation: true,
+    include_link_validation: shouldShowLinkValidation,
     include_versions: true,
     page: 1,
     page_size: 50,
@@ -88,6 +98,7 @@ export function ReportHistory({ reportId, taskAssignmentId }: { reportId: number
   const linkValidationQuery = useQuery({
     queryKey: ['report-link-validation', reportId],
     queryFn: () => getReportLinkValidation(reportId),
+    enabled: shouldShowLinkValidation,
   });
 
   return (
@@ -179,6 +190,7 @@ export function ReportHistory({ reportId, taskAssignmentId }: { reportId: number
           </TableScrollArea>
         </HistoryBlock>
 
+        {shouldShowLinkValidation && (
         <HistoryBlock title="Результат проверки ссылки">
           {linkValidationQuery.isLoading ? (
             <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
@@ -217,6 +229,7 @@ export function ReportHistory({ reportId, taskAssignmentId }: { reportId: number
           )}
         </HistoryBlock>
 
+        )}
         <HistoryBlock title="Аудит отчета">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5 items-end">
             <MultiSelect label="Типы действий" values={auditFilters.action_types} options={actionTypeOptions} onChange={(action_types) => setAuditFilters((current) => ({ ...current, action_types, page: 1 }))} />

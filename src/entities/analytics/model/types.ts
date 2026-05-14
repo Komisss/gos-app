@@ -263,7 +263,7 @@ export type ReportsReturnedForRevisionPayload = {
 export type LinkValidationGroupBy = 'region' | 'task' | 'org_unit' | 'user' | 'domain' | 'status' | 'day' | 'month';
 
 export type LinkValidationReportStatus =
-  | 'under_review'
+  | 'pending'
   | 'accepted'
   | 'revision_requested'
   | 'not_completed';

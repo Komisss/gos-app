@@ -23,7 +23,7 @@ export function UserDropdown() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="flex items-center text-[12px] sm:text-[14px]">
-          <span>{session?.username ?? 'Пользователь'}</span>
+          <span>{session?.fullName ?? session?.username ?? 'Пользователь'}</span>
           <ChevronDown />
         </Button>
       </DropdownMenuTrigger>

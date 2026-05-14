@@ -8,6 +8,7 @@ import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Separator } from '@/shared/ui/separator';
 import { ReportHistory } from './ReportHistory';
+import { ReportModerationActions } from './ReportModerationActions';
 
 type Props = {
   report: ReportDetails;
@@ -17,6 +18,9 @@ type Props = {
 export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const reportPageLink = `/reports/${report.id}`;
+  const moderationReportId = report.reportId ?? Number(report.id);
+  // report.reportStatus - under_review для обратной совместимости. В будущем, когда under_review не будет, убрать его
+  const canModerateReport = report.reportStatus === 'pending' || report.reportStatus === 'under_review' && Number.isFinite(moderationReportId);
 
   async function handleCopyReportLink() {
     try {
@@ -49,6 +53,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {canModerateReport && <ReportModerationActions reportId={moderationReportId} />}
           <Button
             type="button"
             size="icon"
@@ -118,7 +123,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
         </aside>
       </div>
 
-      <ReportHistory reportId={Number(report.id)} taskAssignmentId={report.assignmentId} />
+      <ReportHistory reportId={Number(report.id)} reportType={report.reportType} taskAssignmentId={report.assignmentId} />
     </article>
   );
 }

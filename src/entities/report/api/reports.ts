@@ -3,7 +3,10 @@ import type {
   CrmReport,
   CrmReportDto,
   AuditLogFilters,
+  AcceptReportPayload,
   AuditLogItem,
+  BulkAcceptReportsPayload,
+  BulkRequestReportRevisionPayload,
   LinkValidationResponse,
   ModerationActionItem,
   ModerationActionsFilters,
@@ -12,9 +15,13 @@ import type {
   ReportDetailsDto,
   ReportHistoryFilters,
   ReportHistoryResponse,
+  ReportReturnReason,
   ReportSearchPayload,
+  ReportsExportPayload,
+  ReportsExportResponse,
   ReportVersionsFilters,
   ReportVersionsResponse,
+  RequestReportRevisionPayload,
   ReportsSearchResult,
   ReportsSummary,
 } from '@/entities/report/model/types';
@@ -63,12 +70,54 @@ export async function searchReports(payload: ReportSearchPayload): Promise<Repor
   };
 }
 
+export async function exportReports(payload: ReportsExportPayload) {
+  return http<ReportsExportResponse>(`${REPORTS_ENDPOINT}/export`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function getReportSummary(reportId: number): Promise<ReportDetails> {
   const response = await http<ReportDetailsDto>(
     `${REPORTS_ENDPOINT}/${reportId}/summary?include_available_actions=true&include_last_moderation=true&include_link_validation=true`,
   );
 
   return mapReportDetailsDto(response);
+}
+
+export async function acceptReport(reportId: number, payload: AcceptReportPayload) {
+  return http<ReportDetailsDto>(`${REPORTS_ENDPOINT}/${reportId}/accept`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function requestReportRevision(
+  reportId: number,
+  payload: RequestReportRevisionPayload,
+) {
+  return http<ReportDetailsDto>(`${REPORTS_ENDPOINT}/${reportId}/request-revision`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function bulkAcceptReports(payload: BulkAcceptReportsPayload) {
+  return http<unknown>(`${REPORTS_ENDPOINT}/bulk-accept`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function bulkRequestReportRevision(payload: BulkRequestReportRevisionPayload) {
+  return http<unknown>(`${REPORTS_ENDPOINT}/bulk-request-revision`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getReportReturnReasons() {
+  return http<ReportReturnReason[]>(`${REPORTS_ENDPOINT}/report-return-reasons`);
 }
 
 export async function getReportVersions(taskAssignmentId: number, filters: ReportVersionsFilters) {
@@ -94,7 +143,9 @@ export async function getReportAuditLog(reportId: number, filters: AuditLogFilte
 }
 
 export async function getReportHistory(reportId: number, filters: ReportHistoryFilters) {
-  return http<ReportHistoryResponse>(`${REPORTS_ENDPOINT}/${reportId}/history${buildQueryString(filters)}`);
+  return http<ReportHistoryResponse>(
+    `${REPORTS_ENDPOINT}/${reportId}/history${buildQueryString(filters)}`,
+  );
 }
 
 function normalizeReportsResponse(response: ReportsSearchResponse) {
@@ -159,7 +210,12 @@ function buildQueryString(filters: Record<string, unknown>) {
   const params = new URLSearchParams();
 
   Object.entries(filters).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+    if (
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (Array.isArray(value) && value.length === 0)
+    ) {
       return;
     }
 

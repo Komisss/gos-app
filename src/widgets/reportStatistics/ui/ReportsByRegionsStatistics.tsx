@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
 import { getReportsByRegions } from '@/entities/analytics/api/dashboard';
 import type {
@@ -11,6 +11,7 @@ import type {
   ReportsByRegionsResponse,
   SortDirection,
 } from '@/entities/analytics/model/types';
+import type { ExportCreateResponse } from '@/entities/export/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -25,6 +26,8 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
+import { ReportsByRegionsExportPopover } from '@/widgets/reportStatistics/ui/ReportsByRegionsExportPopover';
 
 type SelectOption = {
   value: string;
@@ -63,7 +66,11 @@ const assignmentStatusOptions: Array<{ value: ReportAnalyticsAssignmentStatus; l
   { value: 'not_completed', label: 'Не выполнено' },
 ];
 
-const tableColumns: Array<{ key: keyof ReportsByRegionsItem; label: string; kind?: 'percent' | 'number' }> = [
+const tableColumns: Array<{
+  key: keyof ReportsByRegionsItem;
+  label: string;
+  kind?: 'percent' | 'number';
+}> = [
   { key: 'region_name', label: 'Регион' },
   { key: 'total_assignments', label: 'Назначения', kind: 'number' },
   { key: 'assignments_with_reports', label: 'С отчетами', kind: 'number' },
@@ -82,6 +89,8 @@ const tableColumns: Array<{ key: keyof ReportsByRegionsItem; label: string; kind
 
 export function ReportsByRegionsStatistics() {
   const [filters, setFilters] = useState<ReportsByRegionsPayload>(() => createInitialFilters());
+  const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -103,6 +112,20 @@ export function ReportsByRegionsStatistics() {
   });
 
   const result = reportsMutation.data;
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
 
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);
@@ -120,26 +143,55 @@ export function ReportsByRegionsStatistics() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ReportsByRegionsExportPopover
+          tableFilters={filters}
+          regionOptions={regionOptions}
+          orgUnitOptions={orgUnitOptions}
+          taskOptions={taskOptions}
+          periodTypeOptions={periodTypeOptions}
+          taskTypeOptions={taskTypeOptions}
+          taskScopeOptions={taskScopeOptions}
+          reportTypeOptions={reportTypeOptions}
+          onExportStarted={setExportJob}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit border-slate-200 bg-white"
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <ListFilter />
+          Фильтры
+        </Button>
+      </div>
+      {filtersOpen && (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
-          <DateFilter label="Дата по" value={filters.date_to} onChange={(date_to) => updateFilters({ date_to })} />
+          <DateFilter
+            label="Дата с"
+            value={filters.date_from}
+            onChange={(date_from) => updateFilters({ date_from })}
+          />
+          <DateFilter
+            label="Дата по"
+            value={filters.date_to}
+            onChange={(date_to) => updateFilters({ date_to })}
+          />
           <FilterSelect
             label="Тип периода"
             value={filters.period_type}
             options={periodTypeOptions}
-            onChange={(period_type) => updateFilters({ period_type: period_type as DashboardPeriodType })}
+            onChange={(period_type) =>
+              updateFilters({ period_type: period_type as DashboardPeriodType })
+            }
           />
           <MultiSearchSelect
             label="Регионы"
             values={filters.region_ids.map(String)}
             placeholder="Все регионы"
             searchPlaceholder="Поиск региона"
-            options={(regionsQuery.data ?? []).map((region) => ({
-              value: String(region.id),
-              label: region.name,
-              description: region.code,
-            }))}
+            options={regionOptions}
             onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })}
           />
           <MultiSearchSelect
@@ -147,22 +199,17 @@ export function ReportsByRegionsStatistics() {
             values={filters.org_unit_ids.map(String)}
             placeholder="Все оргструктуры"
             searchPlaceholder="Поиск оргструктуры"
-            options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-              value: String(orgUnit.id),
-              label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-            }))}
-            onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })}
+            options={orgUnitOptions}
+            onChange={(org_unit_ids) =>
+              updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
+            }
           />
           <MultiSearchSelect
             label="Задачи"
             values={filters.task_ids.map(String)}
             placeholder="Все задачи"
             searchPlaceholder="Поиск по id или названию"
-            options={(tasksQuery.data ?? []).map((task) => ({
-              value: String(task.id),
-              label: `#${task.id} ${task.title}`,
-              description: task.statusLabel,
-            }))}
+            options={taskOptions}
             onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids), page: 1 })}
           />
           <MultiSelect
@@ -170,21 +217,27 @@ export function ReportsByRegionsStatistics() {
             values={filters.task_types}
             placeholder="Все типы"
             options={taskTypeOptions}
-            onChange={(task_types) => updateFilters({ task_types: task_types as ReportTaskType[], page: 1 })}
+            onChange={(task_types) =>
+              updateFilters({ task_types: task_types as ReportTaskType[], page: 1 })
+            }
           />
           <MultiSelect
             label="Масштаб задачи"
             values={filters.task_scope}
             placeholder="Любой масштаб"
             options={taskScopeOptions}
-            onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })}
+            onChange={(task_scope) =>
+              updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })
+            }
           />
           <MultiSelect
             label="Тип отчета"
             values={filters.report_types}
             placeholder="Все типы отчетов"
             options={reportTypeOptions}
-            onChange={(report_types) => updateFilters({ report_types: report_types as ReportType[], page: 1 })}
+            onChange={(report_types) =>
+              updateFilters({ report_types: report_types as ReportType[], page: 1 })
+            }
           />
           <MultiSelect
             label="Статус назначения"
@@ -216,9 +269,16 @@ export function ReportsByRegionsStatistics() {
               { value: 'desc', label: 'По убыванию' },
               { value: 'asc', label: 'По возрастанию' },
             ]}
-            onChange={(sort_direction) => updateFilters({ sort_direction: sort_direction as SortDirection })}
+            onChange={(sort_direction) =>
+              updateFilters({ sort_direction: sort_direction as SortDirection })
+            }
           />
-          <NumberFilter label="Страница" value={filters.page} min={1} onChange={(page) => updateFilters({ page })} />
+          <NumberFilter
+            label="Страница"
+            value={filters.page}
+            min={1}
+            onChange={(page) => updateFilters({ page })}
+          />
           <FilterSelect
             label="Размер страницы"
             value={String(filters.page_size)}
@@ -227,7 +287,9 @@ export function ReportsByRegionsStatistics() {
               { value: '50', label: '50' },
               { value: '100', label: '100' },
             ]}
-            onChange={(pageSize) => updateFilters({ page_size: Math.min(Number(pageSize), 100), page: 1 })}
+            onChange={(pageSize) =>
+              updateFilters({ page_size: Math.min(Number(pageSize), 100), page: 1 })
+            }
           />
         </div>
 
@@ -235,22 +297,32 @@ export function ReportsByRegionsStatistics() {
           <BooleanFilter
             label="Включать архивные задачи"
             checked={filters.include_archived_tasks}
-            onChange={(include_archived_tasks) => updateFilters({ include_archived_tasks, page: 1 })}
+            onChange={(include_archived_tasks) =>
+              updateFilters({ include_archived_tasks, page: 1 })
+            }
           />
           <BooleanFilter
             label="Включать удаленные назначения"
             checked={filters.include_removed_assignments}
-            onChange={(include_removed_assignments) => updateFilters({ include_removed_assignments, page: 1 })}
+            onChange={(include_removed_assignments) =>
+              updateFilters({ include_removed_assignments, page: 1 })
+            }
           />
           <BooleanFilter
             label="Только текущая версия отчета"
             checked={filters.only_current_report_version}
-            onChange={(only_current_report_version) => updateFilters({ only_current_report_version, page: 1 })}
+            onChange={(only_current_report_version) =>
+              updateFilters({ only_current_report_version, page: 1 })
+            }
           />
         </div>
 
         <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
-          <Button type="button" variant="outline" onClick={() => setFilters(createInitialFilters())}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFilters(createInitialFilters())}
+          >
             Сбросить фильтры
           </Button>
           <Button
@@ -263,6 +335,7 @@ export function ReportsByRegionsStatistics() {
           </Button>
         </div>
       </section>
+      )}
 
       {reportsMutation.isError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
@@ -277,6 +350,12 @@ export function ReportsByRegionsStatistics() {
           Настройте фильтры и нажмите «Получить статистику».
         </div>
       )}
+      <AnalyticsExportStatusToast
+        exportJob={exportJob}
+        title="Экспорт статистики по регионам"
+        defaultFileName="analytics-by-regions.xlsx"
+        onClose={() => setExportJob(null)}
+      />
     </div>
   );
 }
@@ -298,7 +377,10 @@ function ReportsByRegionsResult({
             { label: 'Дата по', value: formatDateTime(result.period.date_to) },
           ]}
         />
-        <InfoPanel title="Примененные фильтры" items={formatAppliedFilters(result.filters_applied)} />
+        <InfoPanel
+          title="Примененные фильтры"
+          items={formatAppliedFilters(result.filters_applied)}
+        />
       </div>
 
       <TotalsGrid totals={result.totals} />
@@ -322,7 +404,10 @@ function ReportsByRegionsResult({
           <TableBody>
             {result.items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={tableColumns.length} className="py-10 text-center text-sm text-slate-500">
+                <TableCell
+                  colSpan={tableColumns.length}
+                  className="py-10 text-center text-sm text-slate-500"
+                >
                   Нет данных.
                 </TableCell>
               </TableRow>
@@ -345,13 +430,23 @@ function ReportsByRegionsResult({
       </TableScrollArea>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
-        <Button type="button" variant="outline" disabled={result.page <= 1} onClick={() => onPageChange(result.page - 1)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={result.page <= 1}
+          onClick={() => onPageChange(result.page - 1)}
+        >
           Назад
         </Button>
         <span className="text-sm text-slate-500">
           Страница {result.page}, размер {result.page_size}
         </span>
-        <Button type="button" variant="outline" disabled={!result.has_more} onClick={() => onPageChange(result.page + 1)}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!result.has_more}
+          onClick={() => onPageChange(result.page + 1)}
+        >
           Вперед
         </Button>
       </div>
@@ -426,18 +521,34 @@ function MultiSearchSelect({
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal">
-            <span className="min-w-0 truncate">{selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}</span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}
+            </span>
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] p-4">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
-            <Input className="h-9 border-slate-200 pl-9 text-sm" placeholder={searchPlaceholder} value={query} onChange={(event) => setQuery(event.target.value)} />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
           </div>
           <div className="mt-3 flex justify-between gap-2">
-            <Button type="button" size="sm" variant="outline" onClick={() => onChange(options.map((option) => option.value))}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(options.map((option) => option.value))}
+            >
               Выбрать все
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
@@ -447,7 +558,9 @@ function MultiSearchSelect({
           <ScrollArea className="mt-3 h-64 rounded-md border border-slate-200">
             <div className="p-1">
               {filteredOptions.length === 0 ? (
-                <div className="px-3 py-8 text-center text-sm text-slate-500">Ничего не найдено.</div>
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
               ) : (
                 filteredOptions.map((option) => (
                   <button
@@ -456,10 +569,17 @@ function MultiSearchSelect({
                     className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
                     onClick={() => toggleValue(option.value)}
                   >
-                    <Check className={cn('mt-0.5 size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
                     <span className="min-w-0">
                       <span className="block font-medium text-slate-900">{option.label}</span>
-                      {option.description && <span className="block text-xs text-slate-500">{option.description}</span>}
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
                     </span>
                   </button>
                 ))
@@ -490,8 +610,14 @@ function MultiSelect({
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
       <Popover>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline" className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal">
-            <span className="min-w-0 truncate">{values.length ? `Выбрано: ${values.length}` : placeholder}</span>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {values.length ? `Выбрано: ${values.length}` : placeholder}
+            </span>
             <ChevronsUpDown className="size-4 opacity-50" />
           </Button>
         </PopoverTrigger>
@@ -502,9 +628,20 @@ function MultiSelect({
                 key={option.value}
                 type="button"
                 className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
-                onClick={() => onChange(values.includes(option.value) ? values.filter((value) => value !== option.value) : [...values, option.value])}
+                onClick={() =>
+                  onChange(
+                    values.includes(option.value)
+                      ? values.filter((value) => value !== option.value)
+                      : [...values, option.value],
+                  )
+                }
               >
-                <Check className={cn('size-4 text-[#465cd3]', values.includes(option.value) ? 'opacity-100' : 'opacity-0')} />
+                <Check
+                  className={cn(
+                    'size-4 text-[#465cd3]',
+                    values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
                 <span className="font-medium text-slate-900">{option.label}</span>
               </button>
             ))}
@@ -515,7 +652,15 @@ function MultiSelect({
   );
 }
 
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function DateFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
@@ -579,7 +724,15 @@ function NumberFilter({
   );
 }
 
-function BooleanFilter({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+function BooleanFilter({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
   return (
     <label className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
       <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} />
@@ -611,7 +764,10 @@ function TotalsGrid({ totals }: { totals: ReportsByRegionsResponse['totals'] }) 
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
       {items.map((item) => (
-        <div key={item.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div
+          key={item.label}
+          className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm"
+        >
           <div className="text-xs font-medium text-slate-500">{item.label}</div>
           <div className="mt-1 text-xl font-semibold text-slate-900">{item.value}</div>
         </div>
@@ -620,7 +776,13 @@ function TotalsGrid({ totals }: { totals: ReportsByRegionsResponse['totals'] }) 
   );
 }
 
-function InfoPanel({ title, items }: { title: string; items: Array<{ label: string; value: React.ReactNode }> }) {
+function InfoPanel({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ label: string; value: React.ReactNode }>;
+}) {
   return (
     <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
@@ -663,7 +825,10 @@ function formatAppliedFilters(filters: ReportsByRegionsResponse['filters_applied
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },
     { label: 'Масштаб', value: formatOptions(taskScopeOptions, filters.task_scope) },
     { label: 'Типы отчетов', value: formatOptions(reportTypeOptions, filters.report_types) },
-    { label: 'Статусы назначений', value: formatOptions(assignmentStatusOptions, filters.assignment_statuses ?? []) },
+    {
+      label: 'Статусы назначений',
+      value: formatOptions(assignmentStatusOptions, filters.assignment_statuses ?? []),
+    },
     { label: 'Архивные задачи', value: filters.include_archived_tasks ? 'Да' : 'Нет' },
     { label: 'Удаленные назначения', value: filters.include_removed_assignments ? 'Да' : 'Нет' },
     { label: 'Только текущая версия', value: filters.only_current_report_version ? 'Да' : 'Нет' },

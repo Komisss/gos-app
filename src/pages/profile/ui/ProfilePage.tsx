@@ -1,5 +1,8 @@
-import { ProfileForm } from "@/widgets/profile/ui/ProfileForm";
+import { useAuth } from '@/features/auth/model/AuthContext';
+import { ProfileForm } from '@/widgets/profile/ui/ProfileForm';
 
 export default function ProfilePage() {
-  return <ProfileForm />;
+  const { session } = useAuth();
+
+  return <ProfileForm user={session} />;
 }

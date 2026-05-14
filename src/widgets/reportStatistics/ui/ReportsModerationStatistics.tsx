@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
 import { getReportsModeration } from '@/entities/analytics/api/dashboard';
 import type {
@@ -9,6 +9,7 @@ import type {
   ReportsModerationPayload,
   ReportsModerationResponse,
 } from '@/entities/analytics/model/types';
+import type { ExportCreateResponse } from '@/entities/export/model/types';
 import type { ReportTaskScope, ReportType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
@@ -22,6 +23,8 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
+import { ReportsModerationExportPopover } from './ReportsModerationExportPopover';
 
 type SelectOption = { value: string; label: string; description?: string };
 
@@ -60,10 +63,22 @@ const tableColumns: Array<{ key: keyof ReportsModerationItem; label: string; kin
 
 export function ReportsModerationStatistics() {
   const [filters, setFilters] = useState<ReportsModerationPayload>(() => createInitialFilters());
+  const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-moderation-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsModeration });
   const result = reportsMutation.data;
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
 
   function updateFilters(patch: Partial<ReportsModerationPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
@@ -81,6 +96,28 @@ export function ReportsModerationStatistics() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ReportsModerationExportPopover
+          tableFilters={filters}
+          regionOptions={regionOptions}
+          taskOptions={taskOptions}
+          periodTypeOptions={periodTypeOptions}
+          taskScopeOptions={taskScopeOptions}
+          reportTypeOptions={reportTypeOptions}
+          onExportStarted={setExportJob}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit border-slate-200 bg-white"
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <ListFilter />
+          Фильтры
+        </Button>
+      </div>
+
+      {filtersOpen && (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
@@ -107,9 +144,16 @@ export function ReportsModerationStatistics() {
           </Button>
         </div>
       </section>
+      )}
 
       {reportsMutation.isError && <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Не удалось загрузить статистику по модерации.</div>}
       {result ? <ReportsModerationResult result={result} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
+      <AnalyticsExportStatusToast
+        exportJob={exportJob}
+        title="Экспорт статистики по модерации"
+        defaultFileName="analytics-moderation.xlsx"
+        onClose={() => setExportJob(null)}
+      />
     </div>
   );
 }

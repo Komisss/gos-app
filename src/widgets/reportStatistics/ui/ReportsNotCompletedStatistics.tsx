@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
 import { getReportsNotCompleted } from '@/entities/analytics/api/dashboard';
 import type {
@@ -12,6 +12,7 @@ import type {
   ReportsNotCompletedResponse,
   SortDirection,
 } from '@/entities/analytics/model/types';
+import type { ExportCreateResponse } from '@/entities/export/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -27,6 +28,8 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
+import { ReportsNotCompletedExportPopover } from './ReportsNotCompletedExportPopover';
 
 type SelectOption = { value: string; label: string; description?: string };
 
@@ -54,6 +57,14 @@ const assignmentStatusOptions: Array<{ value: ReportAnalyticsAssignmentStatus; l
   { value: 'revision_requested', label: 'Запрошена редакция' },
   { value: 'accepted', label: 'Принято' },
   { value: 'not_completed', label: 'Не выполнено' },
+];
+
+const exportAssignmentStatusOptions: Array<{
+  value: ReportAnalyticsAssignmentStatus | 'deactivated_not_completed';
+  label: string;
+}> = [
+  ...assignmentStatusOptions,
+  { value: 'deactivated_not_completed', label: 'Не выполнено деактивированным' },
 ];
 
 const groupByOptions: Array<{ value: NotCompletedGroupBy; label: string }> = [
@@ -84,6 +95,8 @@ const tableColumns: Array<{ key: keyof ReportsNotCompletedItem; label: string; k
 
 export function ReportsNotCompletedStatistics() {
   const [filters, setFilters] = useState<ReportsNotCompletedPayload>(() => createInitialFilters());
+  const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const orgUnitsQuery = useQuery({ queryKey: ['org-units-tree'], queryFn: getOrgUnitsTree });
@@ -91,6 +104,25 @@ export function ReportsNotCompletedStatistics() {
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-not-completed-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsNotCompleted });
   const result = reportsMutation.data;
+  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
+    value: String(region.id),
+    label: region.name,
+    description: region.code,
+  }));
+  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+    value: String(orgUnit.id),
+    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+  }));
+  const userOptions = (usersQuery.data ?? []).map((user) => ({
+    value: String(user.id),
+    label: user.fullName,
+    description: `@${user.username}`,
+  }));
+  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
+    value: String(task.id),
+    label: `#${task.id} ${task.title}`,
+    description: task.statusLabel,
+  }));
 
   function updateFilters(patch: Partial<ReportsNotCompletedPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
@@ -108,6 +140,32 @@ export function ReportsNotCompletedStatistics() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ReportsNotCompletedExportPopover
+          tableFilters={filters}
+          regionOptions={regionOptions}
+          orgUnitOptions={orgUnitOptions}
+          userOptions={userOptions}
+          taskOptions={taskOptions}
+          periodTypeOptions={periodTypeOptions}
+          taskTypeOptions={taskTypeOptions}
+          taskScopeOptions={taskScopeOptions}
+          assignmentStatusOptions={exportAssignmentStatusOptions}
+          groupByOptions={groupByOptions}
+          onExportStarted={setExportJob}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          className="w-fit border-slate-200 bg-white"
+          onClick={() => setFiltersOpen((current) => !current)}
+        >
+          <ListFilter />
+          Фильтры
+        </Button>
+      </div>
+
+      {filtersOpen && (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
@@ -142,9 +200,16 @@ export function ReportsNotCompletedStatistics() {
           </Button>
         </div>
       </section>
+      )}
 
       {reportsMutation.isError && <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Не удалось загрузить статистику по невыполненным назначениям.</div>}
       {result ? <ReportsNotCompletedResult result={result} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
+      <AnalyticsExportStatusToast
+        exportJob={exportJob}
+        title="Экспорт статистики по невыполненным назначениям"
+        defaultFileName="analytics-overdue-not-completed.xlsx"
+        onClose={() => setExportJob(null)}
+      />
     </div>
   );
 }
