@@ -10,7 +10,7 @@ import {
   archiveTask,
   deleteTask,
   getStatusLabel,
-  getTasks,
+  getTasksPage,
   type TaskFilters,
   updateTask,
 } from '@/entities/task/api/tasks';
@@ -53,10 +53,12 @@ export function TaskRegistry() {
   const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
   const [filters, setFilters] = useState<TaskFilters>(emptyTaskFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [page, setPage] = useState(1);
+  const [size, setSize] = useState(25);
 
   const tasksQuery = useQuery({
-    queryKey: ['tasks', filters],
-    queryFn: () => getTasks(filters),
+    queryKey: ['tasks', filters, page, size],
+    queryFn: () => getTasksPage(filters, page, size),
   });
 
   const regionsQuery = useQuery({
@@ -117,7 +119,20 @@ export function TaskRegistry() {
     onSettled: () => setDeletingTaskId(null),
   });
 
-  const tasks = tasksQuery.data ?? [];
+  const tasksPage = tasksQuery.data;
+  const tasks = tasksPage?.items ?? [];
+  const totalElements = tasksPage?.totalElements ?? 0;
+  const totalPages = tasksPage?.totalPages ?? 1;
+
+  function updateFilters(patch: TaskFilters) {
+    setPage(1);
+    setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function changeSize(nextSize: number) {
+    setPage(1);
+    setSize(nextSize);
+  }
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -157,19 +172,19 @@ export function TaskRegistry() {
                   label: user.fullName,
                   description: `@${user.username}`,
                 }))}
-                onChange={(created_by_user_id) => setFilters((current) => ({ ...current, created_by_user_id }))}
+                onChange={(created_by_user_id) => updateFilters({ created_by_user_id })}
               />
               <FilterInput
                 label="Создана от"
                 type="datetime"
                 value={filters.created_from}
-                onChange={(created_from) => setFilters((current) => ({ ...current, created_from }))}
+                onChange={(created_from) => updateFilters({ created_from })}
               />
               <FilterInput
                 label="Создана до"
                 type="datetime"
                 value={filters.created_to}
-                onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
+                onChange={(created_to) => updateFilters({ created_to })}
               />
               <FilterSearchSelect
                 label="Оргструктура"
@@ -180,7 +195,7 @@ export function TaskRegistry() {
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                 }))}
-                onChange={(org_unit) => setFilters((current) => ({ ...current, org_unit }))}
+                onChange={(org_unit) => updateFilters({ org_unit })}
               />
               <FilterSearchSelect
                 label="Регион"
@@ -191,7 +206,7 @@ export function TaskRegistry() {
                   value: String(region.id),
                   label: region.name,
                 }))}
-                onChange={(region_id) => setFilters((current) => ({ ...current, region_id }))}
+                onChange={(region_id) => updateFilters({ region_id })}
               />
               <FilterSelect
                 label="Уровень"
@@ -201,14 +216,14 @@ export function TaskRegistry() {
                   { value: '1', label: 'Региональный' },
                   { value: '2', label: 'Федеральный' },
                 ]}
-                onChange={(scope) => setFilters((current) => ({ ...current, scope }))}
+                onChange={(scope) => updateFilters({ scope })}
               />
               <div className="space-y-1">
                 <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
                 <Select
                   value={filters.status || 'all'}
                   onValueChange={(status) =>
-                    setFilters((current) => ({ ...current, status: status === 'all' ? '' : status }))
+                    updateFilters({ status: status === 'all' ? '' : status })
                   }
                 >
                   <SelectTrigger className="w-full border-slate-200 bg-white">
@@ -226,7 +241,14 @@ export function TaskRegistry() {
               </div>
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
-              <Button type="button" variant="outline" onClick={() => setFilters(emptyTaskFilters)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPage(1);
+                  setFilters(emptyTaskFilters);
+                }}
+              >
                 Сбросить фильтры
               </Button>
             </div>
@@ -242,15 +264,25 @@ export function TaskRegistry() {
             Не удалось загрузить список задач.
           </div>
         ) : (
-          <TaskRegistryTable
-            tasks={tasks}
-            togglingTaskId={togglingTaskId}
-            deletingTaskId={deletingTaskId}
-            onTaskClick={setSelectedTask}
-            onEdit={setEditingTask}
-            onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
-            onDelete={setDeletingTask}
-          />
+          <>
+            <TaskRegistryTable
+              tasks={tasks}
+              togglingTaskId={togglingTaskId}
+              deletingTaskId={deletingTaskId}
+              onTaskClick={setSelectedTask}
+              onEdit={setEditingTask}
+              onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
+              onDelete={setDeletingTask}
+            />
+            <TaskPagination
+              page={page}
+              size={size}
+              totalElements={totalElements}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              onSizeChange={changeSize}
+            />
+          </>
         )}
 
         <TaskDetailsDialog
@@ -311,6 +343,66 @@ export function TaskRegistry() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      </div>
+    </div>
+  );
+}
+
+function TaskPagination({
+  page,
+  size,
+  totalElements,
+  totalPages,
+  onPageChange,
+  onSizeChange,
+}: {
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onSizeChange: (size: number) => void;
+}) {
+  const safeTotalPages = Math.max(totalPages, 1);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Назад
+        </Button>
+        <span className="text-sm text-slate-500">
+          Страница {page} из {safeTotalPages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={page >= safeTotalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Вперед
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-slate-500">Всего: {totalElements}</span>
+        <Select value={String(size)} onValueChange={(value) => onSizeChange(Number(value))}>
+          <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectItem value="5">5</SelectItem>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

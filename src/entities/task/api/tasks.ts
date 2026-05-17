@@ -12,7 +12,17 @@ export type TaskFilters = Partial<{
   region_id: string;
   scope: string;
   status: string;
+  page: string;
+  size: string;
 }>;
+
+export type TasksPage = {
+  items: Task[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
 
 type TasksResponse =
   | TaskDto[]
@@ -21,6 +31,14 @@ type TasksResponse =
       items?: TaskDto[];
       data?: TaskDto[];
     };
+
+type TasksPageResponse = {
+  items?: TaskDto[];
+  page?: number;
+  size?: number;
+  total_elements?: number;
+  total_pages?: number;
+};
 
 type CreateTaskResponse = Partial<TaskDto> & {
   id?: number | string;
@@ -31,6 +49,22 @@ export async function getTasks(filters: TaskFilters = {}) {
   const response = await http<TasksResponse>(`${TASKS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeTasksResponse(response).map(mapTaskDtoToTask);
+}
+
+export async function getTasksPage(filters: TaskFilters = {}, page = 1, size = 25): Promise<TasksPage> {
+  const response = await http<TasksPageResponse>(
+    `${TASKS_ENDPOINT}${buildQueryString({ ...filters, page: String(page), size: String(size) })}`,
+  );
+
+  const items = (response.items ?? []).map(mapTaskDtoToTask);
+
+  return {
+    items,
+    page: response.page ?? page,
+    size: response.size ?? size,
+    totalElements: response.total_elements ?? items.length,
+    totalPages: response.total_pages ?? 1,
+  };
 }
 
 export async function getTaskById(taskId: number) {
