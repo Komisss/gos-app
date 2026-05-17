@@ -8,7 +8,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import {
   activateUser,
   deactivateUser,
-  getUsers,
+  getUsersPage,
   type UserFilters,
 } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
@@ -36,11 +36,13 @@ export function UserRegistry() {
   const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
   const [filters, setFilters] = useState<UserFilters>(emptyUserFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const userExport = useUserExport();
 
   const usersQuery = useQuery({
-    queryKey: ['users', filters],
-    queryFn: () => getUsers(filters),
+    queryKey: ['users', filters, page, pageSize],
+    queryFn: () => getUsersPage(filters, page, pageSize),
   });
 
   const regionsQuery = useQuery({
@@ -62,7 +64,21 @@ export function UserRegistry() {
     onSettled: () => setTogglingUserId(null),
   });
 
-  const users = usersQuery.data ?? [];
+  const usersPage = usersQuery.data;
+  const users = usersPage?.items ?? [];
+  const total = usersPage?.total ?? 0;
+  const hasMore = usersPage?.hasMore ?? false;
+  const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+
+  function updateFilters(patch: UserFilters) {
+    setPage(1);
+    setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function changePageSize(nextPageSize: number) {
+    setPage(1);
+    setPageSize(nextPageSize);
+  }
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -72,7 +88,7 @@ export function UserRegistry() {
             <h1 className="text-3xl font-semibold !text-slate-900">Список пользователей</h1>
             <div className="space-y-1 text-sm text-slate-500">
               <p>Итого</p>
-              <p className="text-base font-semibold text-slate-900">{users.length}</p>
+              <p className="text-base font-semibold text-slate-900">{total}</p>
             </div>
           </div>
 
@@ -116,20 +132,20 @@ export function UserRegistry() {
                   className="h-9 border-slate-200 text-sm"
                   placeholder="ФИО, логин"
                   value={filters.search ?? ''}
-                  onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+                  onChange={(event) => updateFilters({ search: event.target.value })}
                 />
               </div>
               <FilterInput
                 label="Создан от"
                 type="datetime"
                 value={filters.created_from}
-                onChange={(created_from) => setFilters((current) => ({ ...current, created_from }))}
+                onChange={(created_from) => updateFilters({ created_from })}
               />
               <FilterInput
                 label="Создан до"
                 type="datetime"
                 value={filters.created_to}
-                onChange={(created_to) => setFilters((current) => ({ ...current, created_to }))}
+                onChange={(created_to) => updateFilters({ created_to })}
               />
               <FilterSearchSelect
                 label="Оргструктура"
@@ -140,7 +156,7 @@ export function UserRegistry() {
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                 }))}
-                onChange={(org_unit) => setFilters((current) => ({ ...current, org_unit }))}
+                onChange={(org_unit) => updateFilters({ org_unit })}
               />
               <FilterSearchSelect
                 label="Регион"
@@ -151,7 +167,7 @@ export function UserRegistry() {
                   value: String(region.id),
                   label: region.name,
                 }))}
-                onChange={(region) => setFilters((current) => ({ ...current, region }))}
+                onChange={(region) => updateFilters({ region })}
               />
               <FilterSelect
                 label="Роль"
@@ -161,14 +177,14 @@ export function UserRegistry() {
                   { value: '1', label: 'Региональный' },
                   { value: '2', label: 'Федеральный' },
                 ]}
-                onChange={(role) => setFilters((current) => ({ ...current, role }))}
+                onChange={(role) => updateFilters({ role })}
               />
               <div className="space-y-1 md:col-span-2">
                 <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
                 <Select
                   value={filters.status || 'all'}
                   onValueChange={(status) =>
-                    setFilters((current) => ({ ...current, status: status === 'all' ? '' : status }))
+                    updateFilters({ status: status === 'all' ? '' : status })
                   }
                 >
                   <SelectTrigger className="w-full border-slate-200 bg-white">
@@ -184,7 +200,14 @@ export function UserRegistry() {
               </div>
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
-              <Button type="button" variant="outline" onClick={() => setFilters(emptyUserFilters)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setPage(1);
+                  setFilters(emptyUserFilters);
+                }}
+              >
                 Сбросить фильтры
               </Button>
             </div>
@@ -200,12 +223,83 @@ export function UserRegistry() {
             Не удалось загрузить список пользователей.
           </div>
         ) : (
-          <UserRegistryTable
-            users={users}
-            togglingUserId={togglingUserId}
-            onToggleActive={(user) => toggleActiveMutation.mutate(user)}
-          />
+          <>
+            <UserRegistryTable
+              users={users}
+              togglingUserId={togglingUserId}
+              onToggleActive={(user) => toggleActiveMutation.mutate(user)}
+            />
+            <UserPagination
+              page={page}
+              pageSize={pageSize}
+              total={total}
+              totalPages={totalPages}
+              hasMore={hasMore}
+              onPageChange={setPage}
+              onPageSizeChange={changePageSize}
+            />
+          </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function UserPagination({
+  page,
+  pageSize,
+  total,
+  totalPages,
+  hasMore,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Назад
+        </Button>
+        <span className="text-sm text-slate-500">
+          Страница {page} из {totalPages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!hasMore}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Вперед
+        </Button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-slate-500">Всего: {total}</span>
+        <Select value={String(pageSize)} onValueChange={(value) => onPageSizeChange(Number(value))}>
+          <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectItem value="5">5</SelectItem>
+            <SelectItem value="10">10</SelectItem>
+            <SelectItem value="25">25</SelectItem>
+            <SelectItem value="50">50</SelectItem>
+            <SelectItem value="100">100</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { UserBulkImportDropzone } from './UserBulkImportDropzone';
 
 const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
   { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
@@ -77,6 +78,8 @@ export function NewUserForm() {
             Заполните данные учетной записи и привязку к региону или оргструктуре.
           </p>
         </div>
+
+        <UserBulkImportDropzone />
 
         <form
           className="space-y-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"

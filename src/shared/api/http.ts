@@ -43,7 +43,7 @@ async function requestWithCookies(url: string, options: HttpOptions) {
   const { auth: _auth, responseType: _responseType, headers, ...requestOptions } = options;
   const requestHeaders = new Headers(headers);
 
-  if (!requestHeaders.has('Content-Type') && requestOptions.body) {
+  if (!requestHeaders.has('Content-Type') && requestOptions.body && !(requestOptions.body instanceof FormData)) {
     requestHeaders.set('Content-Type', 'application/json');
   }
 

@@ -11,6 +11,7 @@ import type {
 
 const USERS_ENDPOINT = '/api/v1/users';
 const USERS_EXPORT_ENDPOINT = '/api/v1/users/export';
+const USERS_IMPORT_ENDPOINT = '/api/v1/users/import';
 const REGISTER_ENDPOINT = '/api/v1/auth/register';
 
 export type UserFilters = Partial<{
@@ -21,7 +22,26 @@ export type UserFilters = Partial<{
   role: string;
   search: string;
   status: string;
+  page: string;
+  page_size: string;
 }>;
+
+export type UsersPage = {
+  items: UserListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  hasMore: boolean;
+};
+
+export type UsersImportResult = {
+  created: number;
+  updated: number;
+  errors: Array<{
+    row: number;
+    error: string;
+  }>;
+};
 
 type UsersResponse =
   | UserListDto[]
@@ -31,16 +51,49 @@ type UsersResponse =
       data?: UserListDto[];
     };
 
+type UsersPageResponse = {
+  items?: UserListDto[];
+  total?: number;
+  page?: number;
+  page_size?: number;
+  has_more?: boolean;
+};
+
 export async function getUsers(filters: UserFilters = {}) {
   const response = await http<UsersResponse>(`${USERS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeUsersResponse(response).map(mapUserListDto);
 }
 
+export async function getUsersPage(filters: UserFilters = {}, page = 1, pageSize = 25): Promise<UsersPage> {
+  const response = await http<UsersPageResponse>(
+    `${USERS_ENDPOINT}${buildQueryString({ ...filters, page: String(page), page_size: String(pageSize) })}`,
+  );
+  const items = (response.items ?? []).map(mapUserListDto);
+
+  return {
+    items,
+    total: response.total ?? items.length,
+    page: response.page ?? page,
+    pageSize: response.page_size ?? pageSize,
+    hasMore: response.has_more ?? false,
+  };
+}
+
 export async function downloadUsersExcel(filters: UserFilters = {}) {
   return http<Blob>(`${USERS_EXPORT_ENDPOINT}${buildQueryString(filters)}`, {
     method: 'GET',
     responseType: 'blob',
+  });
+}
+
+export async function importUsersExcel(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return http<UsersImportResult>(USERS_IMPORT_ENDPOINT, {
+    method: 'POST',
+    body: formData,
   });
 }
 
