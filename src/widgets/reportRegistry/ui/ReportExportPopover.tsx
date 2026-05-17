@@ -15,7 +15,6 @@ import type {
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
-import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
@@ -25,6 +24,17 @@ type SelectOption = {
   value: string;
   label: string;
   description?: string;
+};
+
+type ExportReportStatus = 'accepted' | 'revision_requested' | 'under_review';
+
+type ExportFilters = {
+  region_ids: number[];
+  report_statuses: ReportStatus[];
+  only_current_version: boolean;
+  include_removed: boolean;
+  sort_by: string;
+  sort_direction: 'asc' | 'desc';
 };
 
 type Props = {
@@ -43,45 +53,61 @@ type Props = {
 };
 
 const reportExportColumns = [
-  'group_key',
-  'group_name',
-  'total_assignments',
-  'overdue_assignments',
-  'not_completed_assignments',
-  'deactivated_not_completed_assignments',
-  'not_completed_without_report',
-  'not_completed_after_revision',
-  'assignments_under_review_after_deadline',
-  'overdue_rate',
-  'not_completed_rate',
-  'avg_days_overdue',
-  'max_days_overdue',
+  'report_id',
+  'task_assignment_id',
+  'task_id',
+  'task_title',
+  'task_scope',
+  'task_type',
+  'report_type',
+  'required_report_format',
+  'report_status',
+  'assignment_status',
+  'version_number',
+  'submitted_at',
+  'deadline_at',
+  'is_overdue',
+  'revision_used',
+  'revision_limit',
+  'executor_full_name',
+  'executor_role',
+  'executor_status',
+  'region_name',
+  'org_unit_name',
+  'is_allowed_domain',
+  'is_reachable',
+  'http_status',
+  'link_checked_at',
+  'last_moderation_action',
+  'last_moderation_level',
+  'last_moderation_created_at',
 ];
 
 export function ReportExportPopover({
   reportFilters,
   regionOptions,
-  taskOptions,
-  userOptions,
-  orgUnitOptions,
-  roleOptions,
-  taskTypeOptions,
-  taskScopeOptions,
-  reportTypeOptions,
   reportStatusOptions,
-  assignmentStatusOptions,
   onExportStarted,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [filters, setFilters] = useState<ReportSearchPayload>(() => createEmptyExportFilters());
+  const [filters, setFilters] = useState<ExportFilters>(() => createEmptyExportFilters());
 
   const exportMutation = useMutation({
     mutationFn: () =>
       exportReports({
-        exportType: 'analytics_overdue_not_completed',
+        exportType: 'reports_registry',
         format: 'xlsx',
-        filters,
+        filters: {
+          region_ids: filters.region_ids,
+          report_statuses: toExportReportStatuses(filters.report_statuses),
+          only_current_version: filters.only_current_version,
+          include_removed: filters.include_removed,
+        },
         columns: reportExportColumns,
+        sortBy: filters.sort_by,
+        sortDirection: filters.sort_direction,
+        includeTechnicalFields: true,
+        includeHistory: false,
         asyncMode: true,
       }),
     onSuccess: (job) => {
@@ -90,8 +116,19 @@ export function ReportExportPopover({
     },
   });
 
-  function updateFilters(patch: Partial<ReportSearchPayload>) {
+  function updateFilters(patch: Partial<ExportFilters>) {
     setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function copyTableFilters() {
+    setFilters({
+      region_ids: reportFilters.region_ids,
+      report_statuses: reportFilters.report_statuses,
+      only_current_version: reportFilters.only_current_version,
+      include_removed: reportFilters.include_removed,
+      sort_by: reportFilters.sort_by,
+      sort_direction: reportFilters.sort_direction,
+    });
   }
 
   return (
@@ -102,23 +139,16 @@ export function ReportExportPopover({
           Экспорт XLSX
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[min(920px,calc(100vw-3rem))] p-4">
+      <PopoverContent align="end" className="w-[min(680px,calc(100vw-3rem))] p-4">
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">Экспорт отчетов</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Фильтры экспорта открываются пустыми. Можно заполнить их вручную или перенести
-              текущие фильтры таблицы.
+              Экспорт поддерживает фильтры по регионам, статусам отчета, текущей версии и удаленным отчетам.
             </p>
           </div>
 
-          <div className="grid max-h-[62vh] gap-4 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-4">
-            <FilterText
-              label="Поиск"
-              value={filters.search}
-              placeholder="Поиск по отчетам"
-              onChange={(search) => updateFilters({ search })}
-            />
+          <div className="grid gap-4 md:grid-cols-2">
             <MultiSearchSelect
               label="Регионы"
               values={filters.region_ids.map(String)}
@@ -126,58 +156,6 @@ export function ReportExportPopover({
               searchPlaceholder="Поиск региона"
               options={regionOptions}
               onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids) })}
-            />
-            <MultiSearchSelect
-              label="Задачи"
-              values={filters.task_ids.map(String)}
-              placeholder="Все задачи"
-              searchPlaceholder="Поиск по id или названию"
-              options={taskOptions}
-              onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids) })}
-            />
-            <MultiSearchSelect
-              label="Пользователи"
-              values={filters.user_ids.map(String)}
-              placeholder="Все пользователи"
-              searchPlaceholder="Поиск по ФИО или username"
-              options={userOptions}
-              onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids) })}
-            />
-            <MultiSearchSelect
-              label="Оргструктуры"
-              values={filters.org_unit_ids.map(String)}
-              placeholder="Все оргструктуры"
-              searchPlaceholder="Поиск оргструктуры"
-              options={orgUnitOptions}
-              onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids) })}
-            />
-            <MultiSelect
-              label="Роли"
-              values={filters.role_ids.map(String)}
-              placeholder="Все роли"
-              options={roleOptions}
-              onChange={(role_ids) => updateFilters({ role_ids: toNumbers(role_ids) })}
-            />
-            <MultiSelect
-              label="Тип задачи"
-              values={filters.task_types}
-              placeholder="Все типы"
-              options={taskTypeOptions}
-              onChange={(task_types) => updateFilters({ task_types: task_types as ReportTaskType[] })}
-            />
-            <MultiSelect
-              label="Масштаб задачи"
-              values={filters.task_scope}
-              placeholder="Любой масштаб"
-              options={taskScopeOptions}
-              onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[] })}
-            />
-            <MultiSelect
-              label="Тип отчета"
-              values={filters.report_types}
-              placeholder="Все типы отчетов"
-              options={reportTypeOptions}
-              onChange={(report_types) => updateFilters({ report_types: report_types as ReportType[] })}
             />
             <MultiSelect
               label="Статус отчета"
@@ -187,45 +165,6 @@ export function ReportExportPopover({
               onChange={(report_statuses) =>
                 updateFilters({ report_statuses: report_statuses as ReportStatus[] })
               }
-            />
-            <MultiSelect
-              label="Статус назначения"
-              values={filters.assignment_statuses}
-              placeholder="Все статусы назначений"
-              options={assignmentStatusOptions}
-              onChange={(assignment_statuses) =>
-                updateFilters({ assignment_statuses: assignment_statuses as AssignmentStatus[] })
-              }
-            />
-            <DateFilter
-              label="Отправлен от"
-              value={filters.submitted_from ?? ''}
-              onChange={(submitted_from) => updateFilters({ submitted_from: submitted_from || null })}
-            />
-            <DateFilter
-              label="Отправлен до"
-              value={filters.submitted_to ?? ''}
-              onChange={(submitted_to) => updateFilters({ submitted_to: submitted_to || null })}
-            />
-            <DateFilter
-              label="Дедлайн от"
-              value={filters.deadline_from ?? ''}
-              onChange={(deadline_from) => updateFilters({ deadline_from: deadline_from || null })}
-            />
-            <DateFilter
-              label="Дедлайн до"
-              value={filters.deadline_to ?? ''}
-              onChange={(deadline_to) => updateFilters({ deadline_to: deadline_to || null })}
-            />
-            <DateFilter
-              label="Создан от"
-              value={filters.created_from ?? ''}
-              onChange={(created_from) => updateFilters({ created_from: created_from || null })}
-            />
-            <DateFilter
-              label="Создан до"
-              value={filters.created_to ?? ''}
-              onChange={(created_to) => updateFilters({ created_to: created_to || null })}
             />
             <FilterSelect
               label="Сортировка"
@@ -250,17 +189,7 @@ export function ReportExportPopover({
             />
           </div>
 
-          <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 xl:grid-cols-4">
-            <NullableBooleanFilter
-              label="Просрочен"
-              checked={filters.is_overdue}
-              onChange={(is_overdue) => updateFilters({ is_overdue })}
-            />
-            <NullableBooleanFilter
-              label="Есть отчет"
-              checked={filters.has_report}
-              onChange={(has_report) => updateFilters({ has_report })}
-            />
+          <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
             <BooleanFilter
               label="Только текущая версия"
               checked={filters.only_current_version}
@@ -284,7 +213,7 @@ export function ReportExportPopover({
               Сбросить
             </Button>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => setFilters(reportFilters)}>
+              <Button type="button" variant="outline" onClick={copyTableFilters}>
                 Перенести фильтры таблицы
               </Button>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -306,34 +235,24 @@ export function ReportExportPopover({
   );
 }
 
-function createEmptyExportFilters(): ReportSearchPayload {
+function createEmptyExportFilters(): ExportFilters {
   return {
-    search: '',
     region_ids: [],
-    task_ids: [],
-    user_ids: [],
-    org_unit_ids: [],
-    role_ids: [],
-    task_types: [],
-    task_scope: [],
-    report_types: [],
     report_statuses: [],
-    assignment_statuses: [],
-    submitted_from: null,
-    submitted_to: null,
-    deadline_from: null,
-    deadline_to: null,
-    created_from: null,
-    created_to: null,
-    is_overdue: null,
-    has_report: null,
     only_current_version: true,
     include_removed: false,
-    page: 1,
-    page_size: 50,
     sort_by: 'submitted_at',
     sort_direction: 'desc',
   };
+}
+
+function toExportReportStatuses(statuses: ReportStatus[]): ExportReportStatus[] {
+  return statuses
+    .map((status) => (status === 'pending' ? 'under_review' : status))
+    .filter(
+      (status): status is ExportReportStatus =>
+        status === 'accepted' || status === 'revision_requested' || status === 'under_review',
+    );
 }
 
 function MultiSearchSelect({
@@ -464,34 +383,6 @@ function MultiSelect({
   );
 }
 
-function FilterText({
-  label,
-  value,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <Input className="h-9 border-slate-200 text-sm" value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} />
-    </div>
-  );
-}
-
-function DateFilter({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <DateTimePicker value={value} onChange={onChange} placeholder="Выберите дату и время" />
-    </div>
-  );
-}
-
 function FilterSelect({
   label,
   value,
@@ -528,23 +419,6 @@ function BooleanFilter({ label, checked, onChange }: { label: string; checked: b
       <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} />
       {label}
     </label>
-  );
-}
-
-function NullableBooleanFilter({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean | null;
-  onChange: (checked: boolean | null) => void;
-}) {
-  return (
-    <div className="flex h-9 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700">
-      <Checkbox checked={checked === true} onCheckedChange={(value) => onChange(value === true ? true : null)} />
-      {label}
-    </div>
   );
 }
 

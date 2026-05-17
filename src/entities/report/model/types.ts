@@ -39,10 +39,19 @@ export type ReportSearchPayload = {
 };
 
 export type ReportsExportPayload = {
-  exportType: 'analytics_overdue_not_completed';
+  exportType: 'reports_registry';
   format: 'xlsx';
-  filters: ReportSearchPayload;
+  filters: {
+    region_ids: number[];
+    report_statuses: Array<'accepted' | 'revision_requested' | 'under_review'>;
+    only_current_version: boolean;
+    include_removed: boolean;
+  };
   columns: string[];
+  sortBy: string;
+  sortDirection: 'asc' | 'desc';
+  includeTechnicalFields: boolean;
+  includeHistory: boolean;
   asyncMode: true;
 };
 

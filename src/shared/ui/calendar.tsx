@@ -1,17 +1,24 @@
 import * as React from 'react';
+import { ru } from 'date-fns/locale';
 import { DayPicker, getDefaultClassNames, type DayButton, type Locale } from 'react-day-picker';
 
 import { cn } from '@/shared/lib/utils';
 import { Button, buttonVariants } from '@/shared/ui/button';
 import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon } from 'lucide-react';
 
+const defaultStartMonth = new Date(1900, 0);
+const defaultEndMonth = new Date(new Date().getFullYear() + 20, 11);
+
 function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = 'label',
+  captionLayout = 'dropdown',
   buttonVariant = 'ghost',
-  locale,
+  locale = ru,
+  weekStartsOn = 1,
+  startMonth = defaultStartMonth,
+  endMonth = defaultEndMonth,
   formatters,
   components,
   ...props
@@ -31,8 +38,14 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       locale={locale}
+      weekStartsOn={weekStartsOn}
+      startMonth={startMonth}
+      endMonth={endMonth}
       formatters={{
-        formatMonthDropdown: (date) => date.toLocaleString(locale?.code, { month: 'short' }),
+        formatCaption: (date) =>
+          date.toLocaleString(locale?.code ?? 'ru-RU', { month: 'long', year: 'numeric' }),
+        formatMonthDropdown: (date) =>
+          date.toLocaleString(locale?.code ?? 'ru-RU', { month: 'long' }),
         ...formatters,
       }}
       classNames={{

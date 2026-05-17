@@ -27,7 +27,7 @@ export function DatePicker({ value, onChange, placeholder }: Props) {
             !value && "text-muted-foreground"
           )}
         >
-          {value ? format(value, "dd.MM.yyyy") : placeholder || "Pick date"}
+          {value ? format(value, "dd.MM.yyyy") : placeholder || "Выберите дату"}
           <CalendarIcon className="ml-2 h-4 w-4 opacity-50" />
         </Button>
       </PopoverTrigger>
