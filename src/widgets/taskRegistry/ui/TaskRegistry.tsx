@@ -42,8 +42,6 @@ const emptyTaskFilters: TaskFilters = {
   region_id: '',
   scope: '',
   status: '',
-  target_id: '',
-  target_type: '',
 };
 
 export function TaskRegistry() {
@@ -196,7 +194,7 @@ export function TaskRegistry() {
                 onChange={(region_id) => setFilters((current) => ({ ...current, region_id }))}
               />
               <FilterSelect
-                label="Scope"
+                label="Уровень"
                 value={filters.scope}
                 placeholder="Все"
                 options={[
@@ -225,22 +223,6 @@ export function TaskRegistry() {
                     <SelectItem value="archived">В архиве</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
-              <FilterInput
-                label="Target ID"
-                type="number"
-                value={filters.target_id}
-                onChange={(target_id) => setFilters((current) => ({ ...current, target_id }))}
-              />
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-500 !mb-1">Target type</p>
-                <Input
-                  className="h-9 border-slate-200 text-sm"
-                  value={filters.target_type ?? ''}
-                  onChange={(event) =>
-                    setFilters((current) => ({ ...current, target_type: event.target.value }))
-                  }
-                />
               </div>
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">

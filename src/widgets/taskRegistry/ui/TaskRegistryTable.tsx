@@ -1,5 +1,5 @@
 ﻿import type { Task } from '@/entities/task/model/types';
-import { getReportFormatLabel, getScopeLabel, getStatusLabel } from '@/entities/task/api/tasks';
+import { getReportFormatLabel, getScopeLabel, getStatusLabel, getTaskTypeLabel } from '@/entities/task/api/tasks';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/shared/ui/tooltip';
@@ -81,7 +81,7 @@ export function TaskRegistryTable({
                 <TableCell className="align-top text-slate-700">
                   {getScopeLabel(task.scope ?? task.region)}
                 </TableCell>
-                <TableCell className="align-top text-slate-700">{task.taskType ?? task.type}</TableCell>
+                <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
                 <TableCell className="align-top text-slate-700">
                   {getReportFormatLabel(task.reportFormat ?? '')}
                 </TableCell>

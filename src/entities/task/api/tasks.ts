@@ -12,8 +12,6 @@ export type TaskFilters = Partial<{
   region_id: string;
   scope: string;
   status: string;
-  target_id: string;
-  target_type: string;
 }>;
 
 type TasksResponse =
@@ -180,8 +178,8 @@ export function getStatusLabel(status: string) {
 
 export function getTaskTypeLabel(type: string) {
   const labels: Record<string, string> = {
-    online_action: 'Онлайн',
-    street_action: 'Уличная',
+    online_action: 'Онлайн-акция',
+    street_action: 'Уличная акция',
   };
 
   return labels[type] ?? type;

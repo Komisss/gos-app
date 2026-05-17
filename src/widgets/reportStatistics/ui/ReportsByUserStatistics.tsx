@@ -22,6 +22,10 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import {
+  formatReportStatus,
+  formatReportType,
+} from '@/widgets/reportStatistics/lib/formatReportStatisticsValue';
 
 type SelectOption = { value: string; label: string; description?: string };
 
@@ -186,7 +190,7 @@ function ReportsByUserResult({ result, onPageChange }: { result: ReportsByUserRe
             ) : (
               result.items.map((item, index) => (
                 <TableRow key={index} className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
-                  {tableColumns.map((column) => <TableCell key={column.key} className="max-w-[260px] truncate">{formatMetricValue(item[column.key], column.kind)}</TableCell>)}
+                  {tableColumns.map((column) => <TableCell key={column.key} className="max-w-[260px] truncate">{formatTableValue(item, column)}</TableCell>)}
                 </TableRow>
               ))
             )}
@@ -383,6 +387,15 @@ function TotalsGrid({ totals }: { totals: ReportsByUserResponse['totals'] }) {
 
 function InfoPanel({ title, items }: { title: string; items: Array<{ label: string; value: React.ReactNode }> }) {
   return <div className="min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"><h3 className="text-sm font-semibold text-slate-900">{title}</h3><div className="mt-3 grid gap-2 sm:grid-cols-2">{items.map((item) => <div key={item.label} className="rounded-md bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{item.label}</div><div className="mt-1 break-words text-sm font-medium text-slate-900">{item.value}</div></div>)}</div></div>;
+}
+
+function formatTableValue(item: ReportsByUserItem, column: (typeof tableColumns)[number]) {
+  const value = item[column.key];
+
+  if (column.key === 'report_type') return formatReportType(value) ?? formatMetricValue(value, column.kind);
+  if (column.key === 'report_status') return formatReportStatus(value) ?? formatMetricValue(value, column.kind);
+
+  return formatMetricValue(value, column.kind);
 }
 
 function formatMetricValue(value: unknown, kind?: 'boolean' | 'date' | 'number') {

@@ -136,7 +136,7 @@ function mapUserListDto(user: UserListDto): UserListItem {
 function mapUserDetailsDto(user: UserDetailsDto): UserDetails {
   return {
     id: user.id,
-    active: user.status === 'active',
+    active: user.active === true || user.active === 'true' || user.status === 'active',
     status: user.status,
     username: user.username,
     fullName: user.full_name,
@@ -144,6 +144,7 @@ function mapUserDetailsDto(user: UserDetailsDto): UserDetails {
     region: user.region,
     orgUnit: user.org_unit,
     headUser: user.head_user,
+    maxUserId: user.max_user_id,
     phone: user.phone,
     birthday: user.birthday,
     createdAt: user.created_at,

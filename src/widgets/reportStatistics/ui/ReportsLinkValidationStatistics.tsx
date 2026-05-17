@@ -122,7 +122,6 @@ const labelByKey: Record<string, string> = {
   not_completed_rate: 'Не выполнено',
   overdue_rate: 'Просрочки',
   revision_rate: 'Доработки',
-  problem_level: 'Уровень проблемы',
 };
 
 export function ReportsLinkValidationStatistics() {
@@ -438,7 +437,7 @@ function formatAppliedFilters(filters: ReportsLinkValidationResponse['filters_ap
 function getColumns(rows: Array<Record<string, unknown>>) {
   const keys = new Set<string>();
   rows.forEach((row) => Object.keys(row).forEach((key) => keys.add(key)));
-  return Array.from(keys);
+  return Array.from(keys).filter((key) => key !== 'problem_level');
 }
 
 function formatMetricValue(value: unknown) {

@@ -31,6 +31,7 @@ const initialForm: RegisterUserPayload = {
   username: '',
   password: '',
   full_name: '',
+  max_user_id: '',
   role: 2,
   region: null,
   org_unit: 0,
@@ -117,6 +118,17 @@ export function NewUserForm() {
                 setForm((current) => ({ ...current, full_name: event.target.value }))
               }
               required
+            />
+          </Field>
+
+          <Field label="ID пользователя в MAX">
+            <Input
+              className="border-slate-200"
+              placeholder="Введите ID пользователя в MAX"
+              value={form.max_user_id}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, max_user_id: event.target.value }))
+              }
             />
           </Field>
 

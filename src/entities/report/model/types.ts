@@ -342,13 +342,20 @@ export type ReportReturnReason = {
 
 export type AcceptReportPayload = {
   comment: string;
-  expected_status: string | null;
+};
+
+export type FederalAcceptReportPayload = AcceptReportPayload & {
+  notify_executor: boolean;
 };
 
 export type RequestReportRevisionPayload = {
   reason_id: number;
   comment: string;
-  expected_status: string | null;
+};
+
+export type FederalRequestReportRevisionPayload = RequestReportRevisionPayload & {
+  notify_executor: boolean;
+  ignore_revision_limit: boolean;
 };
 
 export type BulkAcceptReportsPayload = {

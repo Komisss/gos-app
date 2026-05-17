@@ -74,7 +74,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
       <DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl text-slate-950">Редактирование задачи</DialogTitle>
-          <DialogDescription>Изменения будут отправлены методом PATCH.</DialogDescription>
+          <DialogDescription>Введите данные для изменения задачи.</DialogDescription>
         </DialogHeader>
 
         <form className="space-y-4" onSubmit={handleSubmit}>

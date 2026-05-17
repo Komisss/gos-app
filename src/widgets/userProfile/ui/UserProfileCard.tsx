@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type UserFormState = {
   username: string;
   full_name: string;
+  max_user_id: string;
   phone: string;
   birthday: string;
   role: string;
@@ -96,6 +97,7 @@ export function UserProfileCard() {
     updateMutation.mutate({
       username: form.username,
       full_name: form.full_name,
+      max_user_id: form.max_user_id,
       phone: form.phone,
       birthday: form.birthday || null,
       role: parseOptionalNumber(form.role),
@@ -198,6 +200,15 @@ export function UserProfileCard() {
                   />
                 </Field>
 
+                <Field label="ID пользователя в MAX">
+                  <Input
+                    value={form.max_user_id}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, max_user_id: event.target.value }))
+                    }
+                  />
+                </Field>
+
                 <Field label="Телефон">
                   <Input
                     value={form.phone}
@@ -241,7 +252,6 @@ export function UserProfileCard() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {user.role?.code && <p className="text-xs text-slate-500">{user.role.code}</p>}
                 </Field>
 
                 <FilterSearchSelect
@@ -264,8 +274,10 @@ export function UserProfileCard() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <ReadonlyField label="Руководитель" value={user.headUser?.full_name ?? 'Не указан'} />
-                <ReadonlyField label="Роль руководителя" value={user.headUser?.role ?? 'Не указана'} />
+                <ReadonlyField label="Руководитель" value={formatHeadUser(user.headUser)} />
+                {typeof user.headUser === 'object' && user.headUser?.role && (
+                  <ReadonlyField label="Роль руководителя" value={user.headUser.role} />
+                )}
               </div>
 
               {updateMutation.isError && (
@@ -332,6 +344,7 @@ function getInitialForm(user: UserDetails): UserFormState {
   return {
     username: user.username,
     full_name: user.fullName,
+    max_user_id: user.maxUserId ?? '',
     phone: user.phone ?? '',
     birthday: user.birthday ?? '',
     role: user.role ? String(user.role.id) : '',
@@ -343,6 +356,7 @@ function getInitialForm(user: UserDetails): UserFormState {
 const emptyForm: UserFormState = {
   username: '',
   full_name: '',
+  max_user_id: '',
   phone: '',
   birthday: '',
   role: '',
@@ -358,6 +372,18 @@ function parseOptionalNumber(value: string) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatHeadUser(headUser: UserDetails['headUser']) {
+  if (!headUser) {
+    return 'Не указан';
+  }
+
+  if (typeof headUser === 'string') {
+    return headUser || 'Не указан';
+  }
+
+  return headUser.full_name;
 }
 
 function getRegionName(regionId: number, regions: Array<{ id: number; name: string }>) {

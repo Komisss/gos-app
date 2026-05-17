@@ -4,6 +4,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 
 import type { ReportDetails } from '@/entities/report/model/types';
 import { getReportFormatLabel, getTaskTypeLabel } from '@/entities/task/api/tasks';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Separator } from '@/shared/ui/separator';
@@ -16,11 +17,21 @@ type Props = {
 };
 
 export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
+  const { session } = useAuth();
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const reportPageLink = `/reports/${report.id}`;
   const moderationReportId = report.reportId ?? Number(report.id);
   // report.reportStatus - under_review для обратной совместимости. В будущем, когда under_review не будет, убрать его
-  const canModerateReport = report.reportStatus === 'pending' || report.reportStatus === 'under_review' && Number.isFinite(moderationReportId);
+  const isFederalAdmin = session?.role?.code === 'federal_manager' || session?.role?.id === 1;
+  const isRegionalAdmin = session?.role?.code === 'regional_manager' || session?.role?.id === 2;
+  const canUseModerationEndpoint = Number.isFinite(moderationReportId);
+  const isPendingReport = report.reportStatus === 'pending' || report.reportStatus === 'under_review';
+  const canModeratePendingReport =
+    canUseModerationEndpoint && isPendingReport && (isFederalAdmin || isRegionalAdmin);
+  const canFederalAcceptReport =
+    canUseModerationEndpoint && isFederalAdmin && report.reportStatus === 'revision_requested';
+  const canFederalRequestRevision =
+    canUseModerationEndpoint && isFederalAdmin && report.reportStatus === 'accepted';
 
   async function handleCopyReportLink() {
     try {
@@ -53,7 +64,25 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {canModerateReport && <ReportModerationActions reportId={moderationReportId} />}
+          {canModeratePendingReport && <ReportModerationActions reportId={moderationReportId} />}
+          {canFederalRequestRevision && (
+            <ReportModerationActions
+              reportId={moderationReportId}
+              showAccept={false}
+              federalMode
+              revisionButtonLabel="Федерально вернуть на доработку"
+              revisionTitle="Федерально вернуть на доработку"
+            />
+          )}
+          {canFederalAcceptReport && (
+            <ReportModerationActions
+              reportId={moderationReportId}
+              showRevision={false}
+              federalMode
+              acceptButtonLabel="Федерально принять отчет"
+              acceptTitle="Федерально принять отчет"
+            />
+          )}
           <Button
             type="button"
             size="icon"

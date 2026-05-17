@@ -7,6 +7,8 @@ import type {
   AuditLogItem,
   BulkAcceptReportsPayload,
   BulkRequestReportRevisionPayload,
+  FederalAcceptReportPayload,
+  FederalRequestReportRevisionPayload,
   LinkValidationResponse,
   ModerationActionItem,
   ModerationActionsFilters,
@@ -92,11 +94,28 @@ export async function acceptReport(reportId: number, payload: AcceptReportPayloa
   });
 }
 
+export async function federalAcceptReport(reportId: number, payload: FederalAcceptReportPayload) {
+  return http<ReportDetailsDto>(`${REPORTS_ENDPOINT}/${reportId}/federal-accept`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function requestReportRevision(
   reportId: number,
   payload: RequestReportRevisionPayload,
 ) {
   return http<ReportDetailsDto>(`${REPORTS_ENDPOINT}/${reportId}/request-revision`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function federalRequestReportRevision(
+  reportId: number,
+  payload: FederalRequestReportRevisionPayload,
+) {
+  return http<ReportDetailsDto>(`${REPORTS_ENDPOINT}/${reportId}/federal-request-revision`, {
     method: 'POST',
     body: JSON.stringify(payload),
   });

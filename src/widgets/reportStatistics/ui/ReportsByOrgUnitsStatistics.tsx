@@ -27,6 +27,7 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+import { formatOrgUnitStatus } from '@/widgets/reportStatistics/lib/formatReportStatisticsValue';
 import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
 import { ReportsByOrgUnitsExportPopover } from '@/widgets/reportStatistics/ui/ReportsByOrgUnitsExportPopover';
 
@@ -81,7 +82,6 @@ const tableColumns: Array<{
   kind?: 'percent' | 'number';
 }> = [
   { key: 'org_unit_name', label: 'Оргструктура' },
-  { key: 'org_unit_path', label: 'Путь' },
   { key: 'org_unit_status', label: 'Статус' },
   { key: 'region_name', label: 'Регион' },
   { key: 'total_assignments', label: 'Назначения', kind: 'number' },
@@ -96,7 +96,6 @@ const tableColumns: Array<{
   { key: 'not_completed_rate', label: 'Не выполнено', kind: 'percent' },
   { key: 'overdue_rate', label: 'Просрочки', kind: 'percent' },
   { key: 'revision_rate', label: 'Доработки', kind: 'percent' },
-  { key: 'problem_level', label: 'Уровень проблемы' },
 ];
 
 export function ReportsByOrgUnitsStatistics() {
@@ -460,7 +459,7 @@ function ReportsByOrgUnitsResult({
                 >
                   {tableColumns.map((column) => (
                     <TableCell key={column.key} className="max-w-[260px] truncate">
-                      {formatMetricValue(item[column.key], column.kind)}
+                      {formatTableValue(item, column)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -837,6 +836,16 @@ function InfoPanel({
       </div>
     </div>
   );
+}
+
+function formatTableValue(item: ReportsByOrgUnitsItem, column: (typeof tableColumns)[number]) {
+  const value = item[column.key];
+
+  if (column.key === 'org_unit_status') {
+    return formatOrgUnitStatus(value) ?? formatMetricValue(value, column.kind);
+  }
+
+  return formatMetricValue(value, column.kind);
 }
 
 function formatMetricValue(value: unknown, kind?: 'percent' | 'number') {

@@ -84,7 +84,6 @@ const tableColumns: Array<{
   { key: 'not_completed_rate', label: 'Не выполнено', kind: 'percent' },
   { key: 'overdue_rate', label: 'Просрочки', kind: 'percent' },
   { key: 'moderation_acceptance_rate', label: 'Принятие модерацией', kind: 'percent' },
-  { key: 'problem_level', label: 'Уровень проблемы' },
 ];
 
 export function ReportsByRegionsStatistics() {

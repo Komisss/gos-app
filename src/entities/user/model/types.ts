@@ -20,9 +20,9 @@ export type OrgUnitHeadUser = {
 export type UserOrgUnit = {
   id: number;
   name: string;
-  type: string;
-  parent: number | null;
-  head_user: OrgUnitHeadUser | null;
+  type?: string;
+  parent?: number | null;
+  head_user?: OrgUnitHeadUser | string | null;
 };
 
 export type UserListDto = {
@@ -42,7 +42,9 @@ export type UserDetailsDto = {
   role: UserRole | null;
   region: UserRegion | null;
   org_unit: UserOrgUnit | null;
-  head_user: OrgUnitHeadUser | null;
+  head_user: OrgUnitHeadUser | string | null;
+  max_user_id: string | null;
+  active: boolean | string;
   phone: string | null;
   birthday: string | null;
   status: UserStatus;
@@ -61,7 +63,8 @@ export type UserListItem = {
 };
 
 export type UserDetails = UserListItem & {
-  headUser: OrgUnitHeadUser | null;
+  headUser: OrgUnitHeadUser | string | null;
+  maxUserId: string | null;
   phone: string | null;
   birthday: string | null;
   createdAt: string;
@@ -101,6 +104,7 @@ export type RegisterUserPayload = {
   username: string;
   password: string;
   full_name: string;
+  max_user_id: string;
   role: RegisterUserRoleId;
   region: number | null;
   org_unit: number | null;
