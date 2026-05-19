@@ -7,7 +7,7 @@ import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import type { Region } from '@/entities/region/model/types';
-import { createTask } from '@/entities/task/api/tasks';
+import { createTask, materializeTaskAssignments } from '@/entities/task/api/tasks';
 import type { TaskPayload, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
@@ -62,7 +62,15 @@ export function NewTaskForm() {
   });
 
   const createMutation = useMutation({
-    mutationFn: createTask,
+    mutationFn: async ({ payload, assignAfterCreate }: { payload: TaskPayload; assignAfterCreate: boolean }) => {
+      const createdTask = await createTask(payload);
+
+      if (assignAfterCreate) {
+        await materializeTaskAssignments(createdTask.id);
+      }
+
+      return createdTask;
+    },
     onSuccess: async (createdTask) => {
       await queryClient.invalidateQueries({ queryKey: ['tasks'] });
       navigate(`/tasks/${createdTask.id}`);
@@ -71,7 +79,12 @@ export function NewTaskForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate(normalizeTaskPayload(form));
+    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+
+    createMutation.mutate({
+      payload: normalizeTaskPayload(form),
+      assignAfterCreate: submitter?.value === 'create-and-assign',
+    });
   }
 
   function handleAssignmentChange(target: AssignmentTarget) {
@@ -102,7 +115,7 @@ export function NewTaskForm() {
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold !text-slate-900">Новая задача</h1>
           <p className="text-sm text-slate-500">
-            Заполните поля, которые принимает API создания задачи.
+            Заполните поля задачи.
           </p>
         </div>
 
@@ -147,12 +160,13 @@ export function NewTaskForm() {
               <Input
                 type="number"
                 min={0}
+                max={9}
                 className="border-slate-200"
                 value={form.revision_limit ?? ''}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    revision_limit: event.target.value === '' ? null : Number(event.target.value),
+                    revision_limit: normalizeRevisionLimit(event.target.value),
                   }))
                 }
               />
@@ -287,10 +301,22 @@ export function NewTaskForm() {
               <Link to="/tasks">К списку задач</Link>
             </Button>
             <Button
+              type="submit"
+              name="task-submit-action"
+              value="create"
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
               disabled={createMutation.isPending}
             >
               {createMutation.isPending ? 'Создание...' : 'Создать задачу'}
+            </Button>
+            <Button
+              type="submit"
+              name="task-submit-action"
+              value="create-and-assign"
+              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+              disabled={createMutation.isPending || !assignmentTarget}
+            >
+              {createMutation.isPending ? 'Создание...' : 'Создать и назначить исполнителей'}
             </Button>
           </div>
         </form>
@@ -307,7 +333,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
     short_description: normalizeOptionalString(form.short_description),
     full_description: normalizeOptionalString(form.full_description),
     comment_for_executor: normalizeOptionalString(form.comment_for_executor),
-    revision_limit: form.revision_limit ?? null,
+    revision_limit: clampRevisionLimit(form.revision_limit),
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
   };
@@ -329,6 +355,22 @@ function normalizeOptionalString(value: string | null) {
   const normalized = value?.trim();
 
   return normalized ? normalized : null;
+}
+
+function normalizeRevisionLimit(value: string) {
+  if (value === '') {
+    return null;
+  }
+
+  return clampRevisionLimit(Number(value));
+}
+
+function clampRevisionLimit(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return null;
+  }
+
+  return Math.min(Math.max(0, value), 9);
 }
 
 function omitTargets(payload: TaskPayload): TaskPayload {

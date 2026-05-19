@@ -14,8 +14,76 @@ export type TaskTargetPayload = {
 };
 
 export type TaskTargetDto = {
+  id?: number;
   target_type: TaskTargetType;
   target_id: number;
+};
+
+export type TaskAssignmentDto = {
+  task_assignment_id: number;
+  user_id: number;
+  user_full_name: string;
+  region_id: number | null;
+  region_name: string | null;
+  org_unit_id: number | null;
+  org_unit_name: string | null;
+  status: string;
+  assigned_at: string;
+  deadline_at: string | null;
+  is_overdue: boolean;
+  revision_limit: number | null;
+  revision_used: number;
+  completed_at: string | null;
+  not_completed_reason: string | null;
+};
+
+export type TaskRegionStatisticsDto = {
+  region_id: number;
+  region_name: string;
+  assignments_count: number;
+  assignments_with_reports: number;
+  assignments_without_reports: number;
+  reports_count: number;
+  under_review_reports: number;
+  accepted_reports: number;
+  revision_requested_reports: number;
+  rejected_reports: number;
+  not_completed_assignments: number;
+  overdue_assignments: number;
+  completion_rate: number;
+  submission_rate: number;
+  overdue_rate: number;
+};
+
+export type TaskReportDto = {
+  report_id: number;
+  task_assignment_id: number;
+  task_id: number;
+  task_title: string;
+  version_number: number;
+  report_type: TaskReportFormat;
+  report_status: string;
+  submitted_at: string;
+  submitted_by_user_id: number;
+  link_url: string | null;
+  file_id: number | string | null;
+  executor: {
+    user_id: number;
+    full_name: string;
+    username: string;
+    status: string;
+    role_id: number;
+    role_name: string;
+    role_code: string;
+  } | null;
+  region: {
+    region_id: number;
+    name: string;
+  } | null;
+  org_unit: {
+    org_unit_id: number;
+    name: string;
+  } | null;
 };
 
 export interface TaskDto {
@@ -33,9 +101,19 @@ export interface TaskDto {
   comment_for_executor?: string;
   targets?: TaskTargetDto[];
   is_materialized: boolean;
+  assignments_count?: number;
+  notifications_count?: number;
+  pending_notifications_count?: number;
+  sent_notifications_count?: number;
+  failed_notifications_count?: number;
+  task_assignment_ids?: number[];
+  task_assignments?: TaskAssignmentDto[];
+  regions_statistics?: TaskRegionStatisticsDto[];
+  reports?: TaskReportDto[];
   created_at: string;
   updated_at?: string;
   created_by_user_id: number;
+  created_by_role?: string;
 }
 
 export type TaskPayload = {
@@ -79,12 +157,21 @@ export interface Task {
   deadlineAt?: string;
   scheduledAt?: string | null;
   createdByUserId?: number;
+  createdByRole?: string;
   shortDescription?: string;
   fullDescription?: string;
   revisionLimit?: number;
   commentForExecutor?: string;
   targets?: TaskTargetDto[];
   isMaterialized: boolean;
+  assignmentsCount?: number;
+  notificationsCount?: number;
+  pendingNotificationsCount?: number;
+  sentNotificationsCount?: number;
+  failedNotificationsCount?: number;
+  taskAssignmentIds?: number[];
+  taskAssignments?: TaskAssignmentDto[];
+  regionsStatistics?: TaskRegionStatisticsDto[];
   region: string;
   assignee: string;
   assigneeMeta?: string;
@@ -105,4 +192,5 @@ export interface Task {
   performerSummary?: string;
   aggregatedTasksLabel?: string;
   reports?: TaskReport[];
+  taskReports?: TaskReportDto[];
 }

@@ -198,11 +198,12 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
               <Input
                 type="number"
                 min={0}
+                max={9}
                 value={form.revision_limit ?? ''}
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    revision_limit: event.target.value === '' ? null : Number(event.target.value),
+                    revision_limit: normalizeRevisionLimit(event.target.value),
                   }))
                 }
               />
@@ -505,7 +506,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
     short_description: normalizeOptionalString(form.short_description),
     full_description: normalizeOptionalString(form.full_description),
     comment_for_executor: normalizeOptionalString(form.comment_for_executor),
-    revision_limit: form.revision_limit ?? null,
+    revision_limit: clampRevisionLimit(form.revision_limit),
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
   };
@@ -527,6 +528,22 @@ function normalizeOptionalString(value: string | null) {
   const normalized = value?.trim();
 
   return normalized ? normalized : null;
+}
+
+function normalizeRevisionLimit(value: string) {
+  if (value === '') {
+    return null;
+  }
+
+  return clampRevisionLimit(Number(value));
+}
+
+function clampRevisionLimit(value: number | null | undefined) {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return null;
+  }
+
+  return Math.min(Math.max(0, value), 9);
 }
 
 function omitTargets(payload: TaskPayload): TaskPayload {

@@ -33,6 +33,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Separator } from '@/shared/ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
+import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
 import { TaskEditDialog } from '@/widgets/taskRegistry/ui/TaskEditDialog';
 import { getStatusClassName } from '@/widgets/taskRegistry/ui/TaskRegistryTable';
 
@@ -55,6 +57,7 @@ export function TaskDetailsCard({
   const [editOpen, setEditOpen] = useState(false);
   const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const hasTargets = Boolean(task.targets?.length);
   const canMaterializeAssignments =
@@ -222,6 +225,12 @@ export function TaskDetailsCard({
         <InfoItem label="Создана" value={formatDateTime(task.createdAt)} />
         <InfoItem label="Обновлена" value={formatDateTime(task.updatedAt)} />
         <InfoItem label="Автор" value={<AuthorLink author={authorQuery.data} authorId={task.createdByUserId} />} />
+        <InfoItem label="Роль автора" value={formatRole(task.createdByRole)} />
+        <InfoItem label="Назначений" value={formatNumber(task.assignmentsCount)} />
+        <InfoItem label="Уведомлений" value={formatNumber(task.notificationsCount)} />
+        <InfoItem label="Ожидают отправки" value={formatNumber(task.pendingNotificationsCount)} />
+        <InfoItem label="Отправлено" value={formatNumber(task.sentNotificationsCount)} />
+        <InfoItem label="Ошибок отправки" value={formatNumber(task.failedNotificationsCount)} />
         <InfoItem
           label="Адресаты"
           value={<TargetsPopover targets={targetItems} />}
@@ -244,6 +253,11 @@ export function TaskDetailsCard({
           </p>
         </aside>
         </div>
+
+        <TaskAssignmentIds ids={task.taskAssignmentIds ?? []} />
+        <TaskAssignmentsTable assignments={task.taskAssignments ?? []} />
+        <TaskRegionsStatisticsTable statistics={task.regionsStatistics ?? []} />
+        <TaskReportsTable reports={task.taskReports ?? []} onReportClick={setSelectedReportId} />
       </article>
 
       <TaskEditDialog
@@ -315,7 +329,225 @@ export function TaskDetailsCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReportDetailsDialog
+        reportId={selectedReportId}
+        open={selectedReportId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedReportId(null);
+          }
+        }}
+      />
     </>
+  );
+}
+
+function TaskAssignmentIds({ ids }: { ids: number[] }) {
+  if (ids.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="mt-6 rounded-md border border-slate-200 bg-slate-50 p-4">
+      <h2 className="text-base font-semibold text-slate-900">ID назначений</h2>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {ids.map((id) => (
+          <Badge key={id} className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
+            #{id}
+          </Badge>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['taskAssignments']> }) {
+  if (assignments.length === 0) {
+    return null;
+  }
+
+  return (
+    <TaskDataSection title="Назначения исполнителей">
+      <Table className="min-w-[1200px] whitespace-nowrap">
+        <TableHeader>
+          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+            <TableHead>ID</TableHead>
+            <TableHead>Исполнитель</TableHead>
+            <TableHead>Регион</TableHead>
+            <TableHead>Оргструктура</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead>Назначено</TableHead>
+            <TableHead>Дедлайн</TableHead>
+            <TableHead>Просрочено</TableHead>
+            <TableHead>Правки</TableHead>
+            <TableHead>Завершено</TableHead>
+            <TableHead>Причина невыполнения</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {assignments.map((assignment) => (
+            <TableRow key={assignment.task_assignment_id}>
+              <TableCell>#{assignment.task_assignment_id}</TableCell>
+              <TableCell>
+                <Link to={`/users/${assignment.user_id}`} className="text-[#465cd3] hover:underline">
+                  {assignment.user_full_name || `Пользователь #${assignment.user_id}`}
+                </Link>
+              </TableCell>
+              <TableCell>{assignment.region_name ?? 'Не указан'}</TableCell>
+              <TableCell>{assignment.org_unit_name ?? 'Не указана'}</TableCell>
+              <TableCell>{formatAssignmentStatus(assignment.status)}</TableCell>
+              <TableCell>{formatDateTime(assignment.assigned_at)}</TableCell>
+              <TableCell>{formatDateTime(assignment.deadline_at)}</TableCell>
+              <TableCell>{formatBoolean(assignment.is_overdue)}</TableCell>
+              <TableCell>
+                {formatNumber(assignment.revision_used)} / {formatNumber(assignment.revision_limit)}
+              </TableCell>
+              <TableCell>{formatDateTime(assignment.completed_at)}</TableCell>
+              <TableCell>{formatNotCompletedReason(assignment.not_completed_reason)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TaskDataSection>
+  );
+}
+
+function TaskRegionsStatisticsTable({ statistics }: { statistics: NonNullable<Task['regionsStatistics']> }) {
+  if (statistics.length === 0) {
+    return null;
+  }
+
+  return (
+    <TaskDataSection title="Статистика по регионам">
+      <Table className="min-w-[1100px] whitespace-nowrap">
+        <TableHeader>
+          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+            <TableHead>Регион</TableHead>
+            <TableHead>Назначения</TableHead>
+            <TableHead>С отчетами</TableHead>
+            <TableHead>Без отчетов</TableHead>
+            <TableHead>Отчеты</TableHead>
+            <TableHead>На проверке</TableHead>
+            <TableHead>Принято</TableHead>
+            <TableHead>На доработке</TableHead>
+            <TableHead>Не выполнено</TableHead>
+            <TableHead>Просрочено</TableHead>
+            <TableHead>Выполнение</TableHead>
+            <TableHead>Отправка</TableHead>
+            <TableHead>Просрочки</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {statistics.map((item) => (
+            <TableRow key={item.region_id}>
+              <TableCell>{item.region_name}</TableCell>
+              <TableCell>{formatNumber(item.assignments_count)}</TableCell>
+              <TableCell>{formatNumber(item.assignments_with_reports)}</TableCell>
+              <TableCell>{formatNumber(item.assignments_without_reports)}</TableCell>
+              <TableCell>{formatNumber(item.reports_count)}</TableCell>
+              <TableCell>{formatNumber(item.under_review_reports)}</TableCell>
+              <TableCell>{formatNumber(item.accepted_reports)}</TableCell>
+              <TableCell>{formatNumber(item.revision_requested_reports)}</TableCell>
+              <TableCell>{formatNumber(item.not_completed_assignments)}</TableCell>
+              <TableCell>{formatNumber(item.overdue_assignments)}</TableCell>
+              <TableCell>{formatPercent(item.completion_rate)}</TableCell>
+              <TableCell>{formatPercent(item.submission_rate)}</TableCell>
+              <TableCell>{formatPercent(item.overdue_rate)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TaskDataSection>
+  );
+}
+
+function TaskReportsTable({
+  reports,
+  onReportClick,
+}: {
+  reports: NonNullable<Task['taskReports']>;
+  onReportClick: (reportId: number) => void;
+}) {
+  if (reports.length === 0) {
+    return null;
+  }
+
+  return (
+    <TaskDataSection title="Отчеты по задаче">
+      <Table className="min-w-[1100px] whitespace-nowrap">
+        <TableHeader>
+          <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+            <TableHead>ID отчета</TableHead>
+            <TableHead>ID назначения</TableHead>
+            <TableHead>Версия</TableHead>
+            <TableHead>Тип</TableHead>
+            <TableHead>Статус</TableHead>
+            <TableHead>Отправлен</TableHead>
+            <TableHead>Исполнитель</TableHead>
+            <TableHead>Регион</TableHead>
+            <TableHead>Оргструктура</TableHead>
+            <TableHead>Ссылка / файл</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {reports.map((report) => (
+            <TableRow
+              key={report.report_id}
+              className="cursor-pointer hover:bg-slate-50"
+              onClick={() => onReportClick(report.report_id)}
+            >
+              <TableCell>
+                <button
+                  type="button"
+                  className="font-medium text-[#465cd3] hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onReportClick(report.report_id);
+                  }}
+                >
+                  #{report.report_id}
+                </button>
+              </TableCell>
+              <TableCell>#{report.task_assignment_id}</TableCell>
+              <TableCell>{formatNumber(report.version_number)}</TableCell>
+              <TableCell>{getReportFormatLabel(report.report_type)}</TableCell>
+              <TableCell>{formatReportStatus(report.report_status)}</TableCell>
+              <TableCell>{formatDateTime(report.submitted_at)}</TableCell>
+              <TableCell>{report.executor?.full_name ?? `Пользователь #${report.submitted_by_user_id}`}</TableCell>
+              <TableCell>{report.region?.name ?? 'Не указан'}</TableCell>
+              <TableCell>{report.org_unit?.name ?? 'Не указана'}</TableCell>
+              <TableCell>
+                {report.link_url ? (
+                  <a
+                    href={report.link_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[#465cd3] hover:underline"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    Открыть ссылку
+                  </a>
+                ) : (
+                  report.file_id ?? 'Не указан'
+                )}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TaskDataSection>
+  );
+}
+
+function TaskDataSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-6 space-y-3">
+      <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -433,6 +665,80 @@ function buildTargetItems(
       description: region ? `Регион: ${region.name}` : 'Регион не указан',
     };
   });
+}
+
+function formatRole(value?: string | null) {
+  const labels: Record<string, string> = {
+    federal_manager: 'Федеральный управляющий',
+    regional_manager: 'Региональный руководитель',
+    executor: 'Исполнитель',
+    main_manager: 'Главный менеджер',
+    assistant: 'Помощник главного менеджера',
+    unit_head: 'Руководитель управления',
+    department_head: 'Руководитель отдела',
+    employee: 'Сотрудник',
+  };
+
+  return value ? labels[value] ?? value : 'Не указана';
+}
+
+function formatAssignmentStatus(value?: string | null) {
+  const labels: Record<string, string> = {
+    assigned: 'Назначено',
+    in_progress: 'В работе',
+    pending: 'На проверке',
+    under_review: 'На проверке',
+    revision_requested: 'На доработке',
+    accepted: 'Принято',
+    not_completed: 'Не выполнено',
+    deactivated_not_completed: 'Не выполнено из-за деактивации',
+  };
+
+  return value ? labels[value] ?? value : 'Не указан';
+}
+
+function formatReportStatus(value?: string | null) {
+  const labels: Record<string, string> = {
+    pending: 'На проверке',
+    under_review: 'На проверке',
+    accepted: 'Принято',
+    revision_requested: 'На доработке',
+    not_completed: 'Не выполнено',
+  };
+
+  return value ? labels[value] ?? value : 'Не указан';
+}
+
+function formatNotCompletedReason(value?: string | null) {
+  const labels: Record<string, string> = {
+    NO_REPORT_SUBMITTED_BEFORE_DEADLINE: 'Отчет не отправлен до дедлайна',
+  };
+
+  return value ? labels[value] ?? value : 'Не указана';
+}
+
+function formatBoolean(value?: boolean | null) {
+  if (value === null || value === undefined) {
+    return 'Не указано';
+  }
+
+  return value ? 'Да' : 'Нет';
+}
+
+function formatNumber(value?: number | null) {
+  if (value === null || value === undefined) {
+    return 'Не указано';
+  }
+
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatPercent(value?: number | null) {
+  if (value === null || value === undefined) {
+    return 'Не указано';
+  }
+
+  return `${formatNumber(value)}%`;
 }
 
 function formatDateTime(value?: string | null) {
