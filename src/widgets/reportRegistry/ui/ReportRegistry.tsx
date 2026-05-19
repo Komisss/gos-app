@@ -1222,6 +1222,10 @@ function getAssignmentStatusLabel(status: string) {
 }
 
 function getReportStatusLabel(status: string) {
+  if (status === 'under_review') {
+    return 'На проверке';
+  }
+
   return reportStatusOptions.find((option) => option.value === status)?.label ?? status;
 }
 

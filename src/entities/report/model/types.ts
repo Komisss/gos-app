@@ -1,7 +1,7 @@
 export type ReportTaskType = 'online_action' | 'street_action';
 export type ReportTaskScope = 'federal' | 'regional';
 export type ReportType = 'link' | 'image';
-export type ReportStatus = 'pending' | 'accepted' | 'revision_requested' | 'not_completed';
+export type ReportStatus = 'pending' | 'under_review' | 'accepted' | 'revision_requested' | 'not_completed';
 export type AssignmentStatus =
   | 'assigned'
   | 'in_progress'
