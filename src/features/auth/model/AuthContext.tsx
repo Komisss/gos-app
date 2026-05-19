@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { requestAuthTokens } from '@/shared/api/auth';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { refreshAccessToken, requestAuthTokens } from '@/shared/api/auth';
 import { clearSession, readSession, saveSession, type SessionSnapshot } from './tokenStorage';
 
 type LoginPayload = {
@@ -10,6 +10,7 @@ type LoginPayload = {
 type AuthContextValue = {
   session: SessionSnapshot | null;
   isAuthenticated: boolean;
+  isInitializing: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   logout: () => void;
 };
@@ -18,6 +19,47 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionSnapshot | null>(() => readSession());
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function restoreSession() {
+      const currentSession = readSession();
+
+      if (!currentSession) {
+        if (isActive) {
+          setSession(null);
+          setIsInitializing(false);
+        }
+        return;
+      }
+
+      try {
+        await refreshAccessToken();
+
+        if (isActive) {
+          setSession(currentSession);
+        }
+      } catch {
+        clearSession();
+
+        if (isActive) {
+          setSession(null);
+        }
+      } finally {
+        if (isActive) {
+          setIsInitializing(false);
+        }
+      }
+    }
+
+    restoreSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   const login = useCallback(async ({ username, password }: LoginPayload) => {
     const authUser = await requestAuthTokens({ username, password });
@@ -41,10 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session,
       isAuthenticated: Boolean(session),
+      isInitializing,
       login,
       logout,
     }),
-    [login, logout, session],
+    [isInitializing, login, logout, session],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

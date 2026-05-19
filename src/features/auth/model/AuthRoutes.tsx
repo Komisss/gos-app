@@ -2,8 +2,12 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 
 export function ProtectedRoute() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
   const location = useLocation();
+
+  if (isInitializing) {
+    return <AuthRouteLoader />;
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
@@ -13,15 +17,27 @@ export function ProtectedRoute() {
 }
 
 export function PublicOnlyRoute() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing } = useAuth();
   const location = useLocation();
   const from = getRedirectPath(location.state);
+
+  if (isInitializing) {
+    return <AuthRouteLoader />;
+  }
 
   if (isAuthenticated) {
     return <Navigate to={from} replace />;
   }
 
   return <Outlet />;
+}
+
+function AuthRouteLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">
+      Проверяем сессию...
+    </div>
+  );
 }
 
 function getRedirectPath(state: unknown) {

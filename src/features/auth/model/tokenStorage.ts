@@ -11,12 +11,14 @@ export type SessionSnapshot = {
 };
 
 export function saveSession(session: SessionSnapshot) {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  sessionStorage.setItem(USERNAME_KEY, session.username);
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(USERNAME_KEY, session.username);
 }
 
 export function readSession(): SessionSnapshot | null {
-  const rawSession = sessionStorage.getItem(SESSION_KEY);
+  migrateSessionStorage();
+
+  const rawSession = localStorage.getItem(SESSION_KEY);
 
   if (rawSession) {
     try {
@@ -31,11 +33,11 @@ export function readSession(): SessionSnapshot | null {
         };
       }
     } catch {
-      sessionStorage.removeItem(SESSION_KEY);
+      localStorage.removeItem(SESSION_KEY);
     }
   }
 
-  const username = sessionStorage.getItem(USERNAME_KEY);
+  const username = localStorage.getItem(USERNAME_KEY);
   if (!username) {
     return null;
   }
@@ -49,6 +51,21 @@ export function readSession(): SessionSnapshot | null {
 }
 
 export function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(USERNAME_KEY);
   sessionStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(USERNAME_KEY);
+}
+
+function migrateSessionStorage() {
+  const session = sessionStorage.getItem(SESSION_KEY);
+  const username = sessionStorage.getItem(USERNAME_KEY);
+
+  if (session && !localStorage.getItem(SESSION_KEY)) {
+    localStorage.setItem(SESSION_KEY, session);
+  }
+
+  if (username && !localStorage.getItem(USERNAME_KEY)) {
+    localStorage.setItem(USERNAME_KEY, username);
+  }
 }
