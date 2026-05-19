@@ -192,7 +192,7 @@ export function TaskDetailsCard({
           </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
-              <Link to={`/tasks/${task.id}`}>
+              <Link to={`/tasks/${task.id}`} target="_blank" rel="noreferrer">
                 <ExternalLink />
                 Открыть страницу
               </Link>
@@ -390,7 +390,12 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
             <TableRow key={assignment.task_assignment_id}>
               <TableCell>#{assignment.task_assignment_id}</TableCell>
               <TableCell>
-                <Link to={`/users/${assignment.user_id}`} className="text-[#465cd3] hover:underline">
+                <Link
+                  to={`/users/${assignment.user_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#465cd3] hover:underline"
+                >
                   {assignment.user_full_name || `Пользователь #${assignment.user_id}`}
                 </Link>
               </TableCell>
@@ -557,7 +562,7 @@ function AuthorLink({ author, authorId }: { author?: UserDetails; authorId?: num
   }
 
   return (
-    <Link to={`/users/${authorId}`} className="text-[#465cd3] hover:underline">
+    <Link to={`/users/${authorId}`} target="_blank" rel="noreferrer" className="text-[#465cd3] hover:underline">
       {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
     </Link>
   );
@@ -595,7 +600,7 @@ function TargetsPopover({ targets }: { targets: TargetItem[] }) {
               );
 
               return target.href ? (
-                <Link key={target.key} to={target.href}>
+                <Link key={target.key} to={target.href} target="_blank" rel="noreferrer">
                   {content}
                 </Link>
               ) : (

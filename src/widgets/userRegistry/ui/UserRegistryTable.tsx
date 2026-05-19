@@ -1,5 +1,4 @@
 import { Power, PowerOff } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 import { getUserStatusLabel } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
@@ -15,8 +14,6 @@ type Props = {
 };
 
 export function UserRegistryTable({ users, togglingUserId, onToggleActive }: Props) {
-  const navigate = useNavigate();
-
   return (
     <TableScrollArea headerHeight="3rem" height="68vh">
       <Table className="min-w-[1040px] whitespace-nowrap">
@@ -46,7 +43,7 @@ export function UserRegistryTable({ users, togglingUserId, onToggleActive }: Pro
                 className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
                   index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
                 }`}
-                onClick={() => navigate(`/users/${user.id}`)}
+                onClick={() => openInNewTab(`/users/${user.id}`)}
               >
                 <TableCell className="text-slate-700">{user.id}</TableCell>
                 <TableCell className="min-w-[240px]">
@@ -91,4 +88,11 @@ export function UserRegistryTable({ users, togglingUserId, onToggleActive }: Pro
       </Table>
     </TableScrollArea>
   );
+}
+
+function openInNewTab(path: string) {
+  const openedWindow = window.open(path, '_blank', 'noopener,noreferrer');
+  if (openedWindow) {
+    openedWindow.opener = null;
+  }
 }

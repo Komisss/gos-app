@@ -96,7 +96,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
           </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
-              <Link to={reportPageLink}>
+              <Link to={reportPageLink} target="_blank" rel="noreferrer">
                 <ExternalLink />
                 Открыть страницу
               </Link>
