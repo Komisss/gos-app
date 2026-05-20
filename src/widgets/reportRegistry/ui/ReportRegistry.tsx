@@ -612,6 +612,7 @@ export function ReportRegistry() {
                         onCheckedChange={(checked) => handleToggleCurrentPage(checked === true)}
                       />
                     </TableHead>
+                    <TableHead className="w-28">Отчет</TableHead>
                     <TableHead className="w-28">Назначение</TableHead>
                     <TableHead className="min-w-[300px]">Задача</TableHead>
                     <TableHead className="min-w-[240px]">Исполнитель</TableHead>
@@ -619,7 +620,7 @@ export function ReportRegistry() {
                     <TableHead className="min-w-[220px]">Оргструктура</TableHead>
                     <TableHead className="w-40">Тип задачи</TableHead>
                     <TableHead className="w-40">Формат отчета</TableHead>
-                    <TableHead className="w-40">Отчет</TableHead>
+                    <TableHead className="w-40">Статус отчета</TableHead>
                     <TableHead className="w-44">Статус назначения</TableHead>
                     <TableHead className="w-32">Правки</TableHead>
                     <TableHead className="w-44">Отправлен</TableHead>
@@ -630,7 +631,7 @@ export function ReportRegistry() {
                 <TableBody>
                   {reports.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={14} className="py-10 text-center text-sm text-slate-500">
+                      <TableCell colSpan={15} className="py-10 text-center text-sm text-slate-500">
                         Отчетов пока нет.
                       </TableCell>
                     </TableRow>
@@ -658,6 +659,9 @@ export function ReportRegistry() {
                                 }
                               }}
                             />
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-700">
+                            {report.reportId ? `#${report.reportId}` : 'n/a'}
                           </TableCell>
                           <TableCell className="font-medium text-slate-700">
                             #{report.assignmentId}

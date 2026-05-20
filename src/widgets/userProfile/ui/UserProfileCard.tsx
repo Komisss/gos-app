@@ -83,7 +83,13 @@ export function UserProfileCard() {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: (user: UserDetails) => (user.active ? deactivateUser(user.id) : activateUser(user.id)),
+    mutationFn: (user: UserDetails) => {
+      if (isFederalManager(user)) {
+        throw new Error('Нельзя изменять федерального управляющего.');
+      }
+
+      return user.active ? deactivateUser(user.id) : activateUser(user.id);
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['users'] }),
@@ -94,6 +100,11 @@ export function UserProfileCard() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (userQuery.data && isFederalManager(userQuery.data)) {
+      return;
+    }
+
     updateMutation.mutate({
       username: form.username,
       full_name: form.full_name,
@@ -119,6 +130,7 @@ export function UserProfileCard() {
   }
 
   const user = userQuery.data;
+  const isLockedFederalManager = isFederalManager(user);
   const regions = regionsQuery.data ?? [];
   const orgUnits = orgUnitsQuery.data ?? [];
   const regionOptions = regions.map((region) => ({
@@ -160,7 +172,7 @@ export function UserProfileCard() {
             <Button
               type="button"
               variant={user.active ? 'destructive' : 'outline'}
-              disabled={toggleActiveMutation.isPending}
+              disabled={toggleActiveMutation.isPending || isLockedFederalManager}
               onClick={() => toggleActiveMutation.mutate(user)}
             >
               {user.active ? <PowerOff /> : <Power />}
@@ -177,11 +189,17 @@ export function UserProfileCard() {
                 <p className="mt-1 text-sm text-slate-500">
                   Статус меняется только кнопкой активации или деактивации.
                 </p>
+                {isLockedFederalManager && (
+                  <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    Федерального управляющего нельзя редактировать, активировать или деактивировать.
+                  </div>
+                )}
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
                 <Field label="Логин">
                   <Input
+                    disabled={isLockedFederalManager}
                     value={form.username}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, username: event.target.value }))
@@ -192,6 +210,7 @@ export function UserProfileCard() {
 
                 <Field label="ФИО">
                   <Input
+                    disabled={isLockedFederalManager}
                     value={form.full_name}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, full_name: event.target.value }))
@@ -202,6 +221,7 @@ export function UserProfileCard() {
 
                 <Field label="ID пользователя в MAX">
                   <Input
+                    disabled={isLockedFederalManager}
                     value={form.max_user_id}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, max_user_id: event.target.value }))
@@ -211,6 +231,7 @@ export function UserProfileCard() {
 
                 <Field label="Телефон">
                   <Input
+                    disabled={isLockedFederalManager}
                     value={form.phone}
                     onChange={(event) =>
                       setForm((current) => ({ ...current, phone: event.target.value }))
@@ -220,6 +241,7 @@ export function UserProfileCard() {
 
                 <Field label="Дата рождения">
                   <DatePicker
+                    disabled={isLockedFederalManager}
                     value={parseDateOnly(form.birthday)}
                     onChange={(birthday) =>
                       setForm((current) => ({
@@ -238,6 +260,7 @@ export function UserProfileCard() {
               <div className="grid gap-5 md:grid-cols-3">
                 <Field label="Роль">
                   <Select
+                    disabled={isLockedFederalManager}
                     value={form.role || undefined}
                     onValueChange={(role) => setForm((current) => ({ ...current, role }))}
                   >
@@ -260,6 +283,7 @@ export function UserProfileCard() {
                   placeholder="Регион не указан"
                   searchPlaceholder="Поиск региона"
                   options={regionOptions}
+                  disabled={isLockedFederalManager}
                   onChange={(region) => setForm((current) => ({ ...current, region }))}
                 />
 
@@ -269,6 +293,7 @@ export function UserProfileCard() {
                   placeholder="Оргструктура не указана"
                   searchPlaceholder="Поиск оргструктуры"
                   options={orgUnitOptions}
+                  disabled={isLockedFederalManager}
                   onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
                 />
               </div>
@@ -293,7 +318,10 @@ export function UserProfileCard() {
               )}
 
               <div className="flex justify-end border-t border-slate-200 pt-4">
-                <Button className="bg-[#465cd3] text-white hover:bg-[#3c50bd]" disabled={updateMutation.isPending}>
+                <Button
+                  className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+                  disabled={updateMutation.isPending || isLockedFederalManager}
+                >
                   <Save />
                   {updateMutation.isPending ? 'Сохранение...' : 'Сохранить'}
                 </Button>
@@ -419,4 +447,8 @@ function toDateOnly(value: Date) {
   const day = String(value.getDate()).padStart(2, '0');
 
   return `${year}-${month}-${day}`;
+}
+
+function isFederalManager(user: Pick<UserDetails, 'role'>) {
+  return user.role?.code === 'federal_manager' || user.role?.id === 1;
 }

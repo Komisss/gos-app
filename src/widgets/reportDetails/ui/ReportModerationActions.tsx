@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, RotateCcw } from 'lucide-react';
 
@@ -23,6 +23,10 @@ type Props = {
   revisionButtonLabel?: string;
   revisionTitle?: string;
   federalMode?: boolean;
+  acceptIcon?: ReactNode;
+  revisionIcon?: ReactNode;
+  iconOnly?: boolean;
+  onSuccess?: () => void;
 };
 
 export function ReportModerationActions({
@@ -34,6 +38,10 @@ export function ReportModerationActions({
   revisionButtonLabel = 'Вернуть на доработку',
   revisionTitle = 'Вернуть на доработку',
   federalMode = false,
+  acceptIcon,
+  revisionIcon,
+  iconOnly = false,
+  onSuccess,
 }: Props) {
   const queryClient = useQueryClient();
   const [acceptOpen, setAcceptOpen] = useState(false);
@@ -66,6 +74,7 @@ export function ReportModerationActions({
       setAcceptComment('');
       setAcceptNotifyExecutor(true);
       await invalidateReportQueries(queryClient, reportId);
+      onSuccess?.();
     },
   });
 
@@ -91,6 +100,7 @@ export function ReportModerationActions({
       setRevisionNotifyExecutor(true);
       setIgnoreRevisionLimit(true);
       await invalidateReportQueries(queryClient, reportId);
+      onSuccess?.();
     },
   });
 
@@ -103,9 +113,14 @@ export function ReportModerationActions({
       {showAccept && (
         <Popover open={acceptOpen} onOpenChange={setAcceptOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" className="bg-emerald-600 text-white hover:bg-emerald-700">
-              <CheckCircle />
-              {acceptButtonLabel}
+            <Button
+              type="button"
+              size={iconOnly ? 'icon-sm' : 'default'}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+              aria-label={acceptButtonLabel}
+            >
+              {acceptIcon ?? <CheckCircle />}
+              {!iconOnly && acceptButtonLabel}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[min(420px,calc(100vw-3rem))] p-4">
@@ -149,9 +164,15 @@ export function ReportModerationActions({
       {showRevision && (
         <Popover open={revisionOpen} onOpenChange={setRevisionOpen}>
           <PopoverTrigger asChild>
-            <Button type="button" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800">
-              <RotateCcw />
-              {revisionButtonLabel}
+            <Button
+              type="button"
+              size={iconOnly ? 'icon-sm' : 'default'}
+              variant="outline"
+              className="border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800"
+              aria-label={revisionButtonLabel}
+            >
+              {revisionIcon ?? <RotateCcw />}
+              {!iconOnly && revisionButtonLabel}
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="w-[min(460px,calc(100vw-3rem))] p-4">

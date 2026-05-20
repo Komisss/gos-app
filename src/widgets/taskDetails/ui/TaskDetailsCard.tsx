@@ -1,8 +1,21 @@
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Archive, ArchiveRestore, ChevronsUpDown, Copy, ExternalLink, Pencil, Trash2, UserCheck } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  ChevronsUpDown,
+  Copy,
+  ExternalLink,
+  Pencil,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+  UserCheck,
+} from 'lucide-react';
 
+import { searchReports } from '@/entities/report/api/reports';
+import type { CrmReport, ReportSearchPayload } from '@/entities/report/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -35,6 +48,7 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Separator } from '@/shared/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
+import { ReportModerationActions } from '@/widgets/reportDetails/ui/ReportModerationActions';
 import { TaskEditDialog } from '@/widgets/taskRegistry/ui/TaskEditDialog';
 import { getStatusClassName } from '@/widgets/taskRegistry/ui/TaskRegistryTable';
 
@@ -45,6 +59,8 @@ type Props = {
   onToggleArchive?: (task: Task) => void;
   onDeleted?: () => void;
 };
+
+type TaskRegionStatistic = NonNullable<Task['regionsStatistics']>[number];
 
 export function TaskDetailsCard({
   task,
@@ -58,6 +74,7 @@ export function TaskDetailsCard({
   const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [selectedRegionStatistics, setSelectedRegionStatistics] = useState<TaskRegionStatistic | null>(null);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const hasTargets = Boolean(task.targets?.length);
   const canMaterializeAssignments =
@@ -256,7 +273,10 @@ export function TaskDetailsCard({
 
         <TaskAssignmentIds ids={task.taskAssignmentIds ?? []} />
         <TaskAssignmentsTable assignments={task.taskAssignments ?? []} />
-        <TaskRegionsStatisticsTable statistics={task.regionsStatistics ?? []} />
+        <TaskRegionsStatisticsTable
+          statistics={task.regionsStatistics ?? []}
+          onRegionClick={setSelectedRegionStatistics}
+        />
         <TaskReportsTable reports={task.taskReports ?? []} onReportClick={setSelectedReportId} />
       </article>
 
@@ -339,6 +359,16 @@ export function TaskDetailsCard({
           }
         }}
       />
+      <TaskRegionReportsDialog
+        taskId={task.id}
+        region={selectedRegionStatistics}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedRegionStatistics(null);
+          }
+        }}
+        onReportClick={setSelectedReportId}
+      />
     </>
   );
 }
@@ -418,7 +448,13 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
   );
 }
 
-function TaskRegionsStatisticsTable({ statistics }: { statistics: NonNullable<Task['regionsStatistics']> }) {
+function TaskRegionsStatisticsTable({
+  statistics,
+  onRegionClick,
+}: {
+  statistics: NonNullable<Task['regionsStatistics']>;
+  onRegionClick: (region: TaskRegionStatistic) => void;
+}) {
   if (statistics.length === 0) {
     return null;
   }
@@ -445,7 +481,11 @@ function TaskRegionsStatisticsTable({ statistics }: { statistics: NonNullable<Ta
         </TableHeader>
         <TableBody>
           {statistics.map((item) => (
-            <TableRow key={item.region_id}>
+            <TableRow
+              key={item.region_id}
+              className="cursor-pointer hover:bg-slate-50"
+              onClick={() => onRegionClick(item)}
+            >
               <TableCell>{item.region_name}</TableCell>
               <TableCell>{formatNumber(item.assignments_count)}</TableCell>
               <TableCell>{formatNumber(item.assignments_with_reports)}</TableCell>
@@ -464,6 +504,183 @@ function TaskRegionsStatisticsTable({ statistics }: { statistics: NonNullable<Ta
         </TableBody>
       </Table>
     </TaskDataSection>
+  );
+}
+
+function TaskRegionReportsDialog({
+  taskId,
+  region,
+  onOpenChange,
+  onReportClick,
+}: {
+  taskId: number;
+  region: TaskRegionStatistic | null;
+  onOpenChange: (open: boolean) => void;
+  onReportClick: (reportId: number) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [page, setPage] = useState(1);
+  const pageSize = 50;
+  const open = region !== null;
+  const regionId = region?.region_id ?? null;
+
+  const reportsQuery = useQuery({
+    queryKey: ['crm-reports', 'task-region-review', taskId, regionId, page, pageSize],
+    queryFn: () => searchReports(createTaskRegionReportsPayload({ taskId, regionId: regionId ?? 0, page, pageSize })),
+    enabled: open && regionId !== null,
+  });
+
+  const reports = reportsQuery.data?.items ?? [];
+  const total = reportsQuery.data?.total ?? 0;
+  const hasMore = reportsQuery.data?.hasMore ?? false;
+
+  async function handleModerationSuccess() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['task', taskId] }),
+      queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    ]);
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          setPage(1);
+        }
+        onOpenChange(nextOpen);
+      }}
+    >
+      <DialogContent className="flex max-h-[90vh] w-[min(1200px,calc(100vw-2rem))] max-w-none flex-col overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Отчеты на проверке</DialogTitle>
+          <DialogDescription>
+            {region?.region_name ?? 'Регион'}: отчеты по задаче #{taskId}
+          </DialogDescription>
+        </DialogHeader>
+
+        {reportsQuery.isLoading ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+            Загружаем отчеты...
+          </div>
+        ) : reportsQuery.isError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
+            Не удалось загрузить отчеты.
+          </div>
+        ) : (
+          <div className="flex min-h-0 w-full max-w-full flex-1 flex-col space-y-3 overflow-hidden">
+            <div className="min-w-0 max-w-full flex-1 overflow-x-auto overflow-y-auto rounded-md border border-slate-200">
+              <Table className="min-w-[1600px] whitespace-nowrap">
+                <TableHeader>
+                  <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
+                    <TableHead className="w-24">Действия</TableHead>
+                    <TableHead className="w-28">Отчет</TableHead>
+                    <TableHead className="w-28">Назначение</TableHead>
+                    <TableHead className="min-w-[300px]">Задача</TableHead>
+                    <TableHead className="min-w-[240px]">Исполнитель</TableHead>
+                    <TableHead className="min-w-[220px]">Регион</TableHead>
+                    <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+                    <TableHead className="w-40">Тип задачи</TableHead>
+                    <TableHead className="w-40">Формат отчета</TableHead>
+                    <TableHead className="w-40">Статус отчета</TableHead>
+                    <TableHead className="w-44">Статус назначения</TableHead>
+                    <TableHead className="w-32">Правки</TableHead>
+                    <TableHead className="w-44">Отправлен</TableHead>
+                    <TableHead className="w-44">Дедлайн</TableHead>
+                    <TableHead className="w-32">Просрочен</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reports.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={15} className="py-10 text-center text-sm text-slate-500">
+                        Нет отчетов на проверке.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    reports.map((report) => (
+                      <TableRow key={getReportRowKey(report)} className="hover:bg-slate-50">
+                        <TableCell>
+                          {report.reportId ? (
+                            <ReportModerationActions
+                              reportId={report.reportId}
+                              iconOnly
+                              acceptIcon={<ThumbsUp />}
+                              revisionIcon={<ThumbsDown />}
+                              acceptButtonLabel="Принять отчет"
+                              acceptTitle="Принять отчет"
+                              revisionButtonLabel="Вернуть на доработку"
+                              revisionTitle="Вернуть на доработку"
+                              onSuccess={handleModerationSuccess}
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-500">n/a</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {report.reportId ? (
+                            <button
+                              type="button"
+                              className="font-medium text-[#465cd3] hover:underline"
+                              onClick={() => onReportClick(report.reportId ?? 0)}
+                            >
+                              #{report.reportId}
+                            </button>
+                          ) : (
+                            'n/a'
+                          )}
+                        </TableCell>
+                        <TableCell>#{report.assignmentId}</TableCell>
+                        <TableCell className="min-w-[300px]">
+                          <div className="space-y-1 whitespace-normal">
+                            <div className="font-medium text-slate-900">{report.taskTitle}</div>
+                            <div className="text-xs text-slate-500">
+                              ID задачи: {report.taskId} • {getScopeLabel(report.taskScope)}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            <div className="font-medium text-slate-900">{report.executorName}</div>
+                            <div className="text-xs text-slate-500">
+                              ID: {report.executorId ?? 'n/a'} • {report.executorRole}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>{report.regionName}</TableCell>
+                        <TableCell>{report.orgUnitName}</TableCell>
+                        <TableCell>{getTaskTypeLabel(report.taskType)}</TableCell>
+                        <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
+                        <TableCell>{formatReportStatus(report.reportStatus)}</TableCell>
+                        <TableCell>{formatAssignmentStatus(report.assignmentStatus)}</TableCell>
+                        <TableCell>{report.revisionUsed} / {report.revisionLimit}</TableCell>
+                        <TableCell>{formatDateTime(report.submittedAt)}</TableCell>
+                        <TableCell>{formatDateTime(report.deadlineAt)}</TableCell>
+                        <TableCell>{formatBoolean(report.isOverdue)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white p-3">
+              <span className="text-sm text-slate-500">
+                Найдено: {total}, страница {page}
+              </span>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>
+                  Назад
+                </Button>
+                <Button type="button" variant="outline" disabled={!hasMore} onClick={() => setPage((current) => current + 1)}>
+                  Вперед
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -566,6 +783,66 @@ function AuthorLink({ author, authorId }: { author?: UserDetails; authorId?: num
       {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
     </Link>
   );
+}
+
+function createTaskRegionReportsPayload({
+  taskId,
+  regionId,
+  page,
+  pageSize,
+}: {
+  taskId: number;
+  regionId: number;
+  page: number;
+  pageSize: number;
+}): ReportSearchPayload {
+  const dateRange = createTenYearDateRange();
+
+  return {
+    search: '',
+    region_ids: [regionId],
+    task_ids: [taskId],
+    user_ids: [],
+    org_unit_ids: [],
+    role_ids: [],
+    task_types: [],
+    task_scope: [],
+    report_types: [],
+    report_statuses: ['under_review'],
+    assignment_statuses: [],
+    submitted_from: dateRange.from,
+    submitted_to: dateRange.to,
+    deadline_from: dateRange.from,
+    deadline_to: dateRange.to,
+    created_from: dateRange.from,
+    created_to: dateRange.to,
+    is_overdue: false,
+    has_report: true,
+    only_current_version: true,
+    include_removed: false,
+    page,
+    page_size: pageSize,
+    sort_by: 'submitted_at',
+    sort_direction: 'desc',
+  };
+}
+
+function getReportRowKey(report: CrmReport) {
+  return report.reportId ?? `${report.assignmentId}-${report.versionNumber ?? 'no-version'}`;
+}
+
+function createTenYearDateRange() {
+  const now = new Date();
+  const from = new Date(now);
+  const to = new Date(now);
+
+  from.setFullYear(from.getFullYear() - 10);
+  to.setFullYear(to.getFullYear() + 10);
+
+  return {
+    from: from.toISOString(),
+    to: to.toISOString(),
+  };
 }
 
 type TargetItem = {

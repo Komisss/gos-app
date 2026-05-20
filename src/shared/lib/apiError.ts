@@ -12,6 +12,10 @@ export class ApiError extends Error {
 
 export function getErrorMessage(error: unknown) {
   if (error instanceof ApiError) {
+    if (error.status === 500) {
+      return error.message;
+    }
+
     return `Ошибка ${error.status}: ${error.message}`;
   }
 
@@ -23,7 +27,7 @@ export function getErrorMessage(error: unknown) {
 }
 
 export function getApiErrorDescription(error: unknown) {
-  if (!(error instanceof ApiError) || error.details === undefined) {
+  if (!(error instanceof ApiError) || error.details === undefined || error.status === 500) {
     return undefined;
   }
 

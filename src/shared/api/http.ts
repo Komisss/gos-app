@@ -59,7 +59,10 @@ async function parseResponse<T>(response: Response, responseType: HttpOptions['r
     const details = await parseErrorResponse(response);
     throw new ApiError({
       status: response.status,
-      message: extractApiErrorMessage(details, response.statusText || 'Request failed'),
+      message:
+        response.status === 500
+          ? 'Произошла непредвиденная ошибка'
+          : extractApiErrorMessage(details, response.statusText || 'Request failed'),
       details,
     });
   }

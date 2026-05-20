@@ -19,6 +19,7 @@ export function FilterSearchSelect({
   placeholder,
   searchPlaceholder = 'Поиск',
   options,
+  disabled = false,
   onChange,
 }: {
   label: string;
@@ -26,6 +27,7 @@ export function FilterSearchSelect({
   placeholder: string;
   searchPlaceholder?: string;
   options: FilterSearchSelectOption[];
+  disabled?: boolean;
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -51,11 +53,12 @@ export function FilterSearchSelect({
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open && !disabled} onOpenChange={(nextOpen) => setOpen(disabled ? false : nextOpen)}>
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
+            disabled={disabled}
             className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
           >
             <span className="min-w-0 truncate">{selectedOption?.label.trim() ?? placeholder}</span>

@@ -14,13 +14,15 @@ type Props = {
   value?: Date
   onChange?: (date?: Date) => void
   placeholder?: string
+  disabled?: boolean
 }
 
-export function DatePicker({ value, onChange, placeholder }: Props) {
+export function DatePicker({ value, onChange, placeholder, disabled = false }: Props) {
   return (
     <Popover>
       <PopoverTrigger asChild>
         <Button
+          disabled={disabled}
           variant="outline"
           className={cn(
             "w-full justify-between border-stroke",

@@ -71,9 +71,12 @@ export function UserRegistryTable({ users, togglingUserId, onToggleActive }: Pro
                     size="icon-sm"
                     variant="ghost"
                     className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                    disabled={togglingUserId === user.id}
+                    disabled={togglingUserId === user.id || isFederalManager(user)}
                     onClick={(event) => {
                       event.stopPropagation();
+                      if (isFederalManager(user)) {
+                        return;
+                      }
                       onToggleActive(user);
                     }}
                     aria-label={user.active ? 'Деактивировать пользователя' : 'Активировать пользователя'}
@@ -95,4 +98,8 @@ function openInNewTab(path: string) {
   if (openedWindow) {
     openedWindow.opener = null;
   }
+}
+
+function isFederalManager(user: Pick<UserListItem, 'role'>) {
+  return user.role?.code === 'federal_manager' || user.role?.id === 1;
 }

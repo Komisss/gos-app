@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { ReportsByOrgUnitsStatistics } from '@/widgets/reportStatistics/ui/ReportsByOrgUnitsStatistics';
 import { ReportsByRegionsStatistics } from '@/widgets/reportStatistics/ui/ReportsByRegionsStatistics';
 import { ReportsByTasksStatistics } from '@/widgets/reportStatistics/ui/ReportsByTasksStatistics';
-import { ReportsByUserStatistics } from '@/widgets/reportStatistics/ui/ReportsByUserStatistics';
 import { ReportsByUsersStatistics } from '@/widgets/reportStatistics/ui/ReportsByUsersStatistics';
 import { ReportsDeadlinesStatistics } from '@/widgets/reportStatistics/ui/ReportsDeadlinesStatistics';
 import { ReportsLinkValidationStatistics } from '@/widgets/reportStatistics/ui/ReportsLinkValidationStatistics';
@@ -15,7 +14,6 @@ const reportStatisticsTitles: Record<string, string> = {
   'org-units': 'По оргструктуре',
   regions: 'По регионам',
   tasks: 'По задачам',
-  user: 'По пользователю',
   executors: 'По исполнителям',
   deadlines: 'По дедлайнам отчетов',
   links: 'По ссылочным отчетам',
@@ -42,8 +40,6 @@ export default function ReportStatisticsPage() {
           <ReportsByRegionsStatistics />
         ) : section === 'tasks' ? (
           <ReportsByTasksStatistics />
-        ) : section === 'user' ? (
-          <ReportsByUserStatistics />
         ) : section === 'executors' ? (
           <ReportsByUsersStatistics />
         ) : section === 'deadlines' ? (

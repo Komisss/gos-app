@@ -56,7 +56,13 @@ export function UserRegistry() {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: (user: UserListItem) => (user.active ? deactivateUser(user.id) : activateUser(user.id)),
+    mutationFn: (user: UserListItem) => {
+      if (isFederalManager(user)) {
+        throw new Error('Нельзя изменять федерального управляющего.');
+      }
+
+      return user.active ? deactivateUser(user.id) : activateUser(user.id);
+    },
     onMutate: (user) => setTogglingUserId(user.id),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['users'] });
@@ -364,4 +370,8 @@ function FilterSelect({
       </Select>
     </div>
   );
+}
+
+function isFederalManager(user: Pick<UserListItem, 'role'>) {
+  return user.role?.code === 'federal_manager' || user.role?.id === 1;
 }

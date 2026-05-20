@@ -13,7 +13,6 @@ export const sidebarSections = [
           { label: 'По оргструктуре', href: '/stats/reports/org-units' },
           { label: 'По регионам', href: '/stats/reports/regions' },
           { label: 'По задачам', href: '/stats/reports/tasks' },
-          { label: 'По пользователю', href: '/stats/reports/user' },
           { label: 'По исполнителям', href: '/stats/reports/executors' },
           { label: 'По дедлайнам отчетов', href: '/stats/reports/deadlines' },
           { label: 'По ссылочным отчетам', href: '/stats/reports/links' },
