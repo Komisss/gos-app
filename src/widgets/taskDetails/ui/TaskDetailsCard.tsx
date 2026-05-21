@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,7 +11,6 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  UserCheck,
 } from 'lucide-react';
 
 import { searchReports } from '@/entities/report/api/reports';
@@ -27,14 +26,15 @@ import {
   getStatusLabel,
   getTaskTypeLabel,
   deleteTask,
-  materializeTaskAssignments,
   updateTask,
 } from '@/entities/task/api/tasks';
 import type { TaskPayload } from '@/entities/task/model/types';
 import { getUserById, getUsers } from '@/entities/user/api/users';
 import type { UserDetails, UserListItem } from '@/entities/user/model/types';
+import { copyToClipboard } from '@/shared/lib/copyToClipboard';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { toast } from '@/shared/ui/sonner';
 import {
   Dialog,
   DialogContent,
@@ -69,16 +69,12 @@ export function TaskDetailsCard({
   onToggleArchive,
   onDeleted,
 }: Props) {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
-  const [selectedRegionStatistics, setSelectedRegionStatistics] = useState<TaskRegionStatistic | null>(null);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
-  const hasTargets = Boolean(task.targets?.length);
-  const canMaterializeAssignments =
-    hasTargets && (task.status === 'active' || task.status === 'scheduled');
   const authorQuery = useQuery({
     queryKey: ['user', task.createdByUserId],
     queryFn: () => getUserById(task.createdByUserId ?? 0),
@@ -119,15 +115,6 @@ export function TaskDetailsCard({
     },
   });
 
-  const materializeAssignmentsMutation = useMutation({
-    mutationFn: () => materializeTaskAssignments(task.id),
-    onSuccess: async () => {
-      setAssignConfirmOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
-      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: () => {
       if (task.isMaterialized) {
@@ -149,7 +136,12 @@ export function TaskDetailsCard({
 
     try {
       setIsCopyingLink(true);
-      await navigator.clipboard.writeText(link);
+      await copyToClipboard(link);
+      toast.success('Ссылка скопирована');
+    } catch {
+      toast.error('Не удалось скопировать ссылку', {
+        description: 'Скопируйте адрес из открытой страницы задачи.',
+      });
     } finally {
       setIsCopyingLink(false);
     }
@@ -190,16 +182,6 @@ export function TaskDetailsCard({
           </Button>
           <Button
             type="button"
-            variant="outline"
-            className="border-slate-200"
-            disabled={!canMaterializeAssignments || materializeAssignmentsMutation.isPending}
-            onClick={() => setAssignConfirmOpen(true)}
-          >
-            <UserCheck />
-            Назначить исполнителей
-          </Button>
-          <Button
-            type="button"
             variant="destructive"
             disabled={task.isMaterialized || deleteMutation.isPending}
             onClick={() => setDeleteConfirmOpen(true)}
@@ -223,7 +205,7 @@ export function TaskDetailsCard({
               onClick={() => onToggleArchive(task)}
             >
               {task.status === 'archived' ? <ArchiveRestore /> : <Archive />}
-              {task.status === 'archived' ? 'Активировать' : 'Архивировать'}
+              {task.status === 'archived' ? 'Активировать' : 'Деактивировать'}
             </Button>
           )}
         </div>
@@ -271,11 +253,12 @@ export function TaskDetailsCard({
         </aside>
         </div>
 
-        <TaskAssignmentIds ids={task.taskAssignmentIds ?? []} />
         <TaskAssignmentsTable assignments={task.taskAssignments ?? []} />
         <TaskRegionsStatisticsTable
           statistics={task.regionsStatistics ?? []}
-          onRegionClick={setSelectedRegionStatistics}
+          onRegionClick={(region) =>
+            navigate(`/stats/by_region?task_id=${task.id}&region_id=${region.region_id}`)
+          }
         />
         <TaskReportsTable reports={task.taskReports ?? []} onReportClick={setSelectedReportId} />
       </article>
@@ -287,34 +270,6 @@ export function TaskDetailsCard({
         onOpenChange={setEditOpen}
         onSubmit={(taskId, payload) => updateMutation.mutate({ taskId, payload })}
       />
-
-      <Dialog open={assignConfirmOpen} onOpenChange={setAssignConfirmOpen}>
-        <DialogContent className="max-w-[460px]">
-          <DialogHeader>
-            <DialogTitle>Запустить назначение исполнителей?</DialogTitle>
-            <DialogDescription>
-              Система создаст назначения по выбранным адресатам задачи.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAssignConfirmOpen(false)}
-              disabled={materializeAssignmentsMutation.isPending}
-            >
-              Отмена
-            </Button>
-            <Button
-              type="button"
-              onClick={() => materializeAssignmentsMutation.mutate()}
-              disabled={materializeAssignmentsMutation.isPending}
-            >
-              {materializeAssignmentsMutation.isPending ? 'Запуск...' : 'Запустить'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
         <DialogContent className="max-w-[460px]">
@@ -359,36 +314,7 @@ export function TaskDetailsCard({
           }
         }}
       />
-      <TaskRegionReportsDialog
-        taskId={task.id}
-        region={selectedRegionStatistics}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedRegionStatistics(null);
-          }
-        }}
-        onReportClick={setSelectedReportId}
-      />
     </>
-  );
-}
-
-function TaskAssignmentIds({ ids }: { ids: number[] }) {
-  if (ids.length === 0) {
-    return null;
-  }
-
-  return (
-    <section className="mt-6 rounded-md border border-slate-200 bg-slate-50 p-4">
-      <h2 className="text-base font-semibold text-slate-900">ID назначений</h2>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {ids.map((id) => (
-          <Badge key={id} className="rounded-md bg-white px-2.5 py-1 text-xs font-medium text-slate-700">
-            #{id}
-          </Badge>
-        ))}
-      </div>
-    </section>
   );
 }
 
@@ -481,12 +407,16 @@ function TaskRegionsStatisticsTable({
         </TableHeader>
         <TableBody>
           {statistics.map((item) => (
-            <TableRow
-              key={item.region_id}
-              className="cursor-pointer hover:bg-slate-50"
-              onClick={() => onRegionClick(item)}
-            >
-              <TableCell>{item.region_name}</TableCell>
+            <TableRow key={item.region_id} className="hover:bg-slate-50">
+              <TableCell>
+                <button
+                  type="button"
+                  className="font-medium text-[#465cd3] hover:underline"
+                  onClick={() => onRegionClick(item)}
+                >
+                  {item.region_name}
+                </button>
+              </TableCell>
               <TableCell>{formatNumber(item.assignments_count)}</TableCell>
               <TableCell>{formatNumber(item.assignments_with_reports)}</TableCell>
               <TableCell>{formatNumber(item.assignments_without_reports)}</TableCell>

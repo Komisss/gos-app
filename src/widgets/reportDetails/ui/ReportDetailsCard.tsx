@@ -5,6 +5,8 @@ import { Copy, ExternalLink } from 'lucide-react';
 import type { ReportDetails } from '@/entities/report/model/types';
 import { getReportFormatLabel, getTaskTypeLabel } from '@/entities/task/api/tasks';
 import { useAuth } from '@/features/auth/model/AuthContext';
+import { copyToClipboard } from '@/shared/lib/copyToClipboard';
+import { toast } from '@/shared/ui/sonner';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Separator } from '@/shared/ui/separator';
@@ -36,7 +38,12 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
   async function handleCopyReportLink() {
     try {
       setIsCopyingLink(true);
-      await navigator.clipboard.writeText(`${window.location.origin}${reportPageLink}`);
+      await copyToClipboard(`${window.location.origin}${reportPageLink}`);
+      toast.success('Ссылка скопирована');
+    } catch {
+      toast.error('Не удалось скопировать ссылку', {
+        description: 'Скопируйте адрес из открытой страницы отчета.',
+      });
     } finally {
       setIsCopyingLink(false);
     }
@@ -119,7 +126,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
         <InfoItem label="Просрочен" value={report.isOverdue ? 'Да' : 'Нет'} />
       </div>
 
-      <div className="mt-6 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="mt-6 grid min-w-0 gap-5">
         <section className="min-w-0 space-y-3">
           <h2 className="text-base font-semibold text-slate-900">Содержание отчета</h2>
           {report.reportContent?.displayValue ? (
@@ -135,21 +142,6 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
             <p className="text-sm text-slate-500">Содержание отчета не указано.</p>
           )}
         </section>
-
-        <aside className="min-w-0 rounded-md border border-slate-200 bg-slate-50 p-4">
-          <h2 className="text-base font-semibold text-slate-900">Доступные действия</h2>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {report.availableActions.length ? (
-              report.availableActions.map((action) => (
-                <Badge key={action} className="rounded-md border-0 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
-                  {action}
-                </Badge>
-              ))
-            ) : (
-              <p className="text-sm text-slate-500">Нет доступных действий.</p>
-            )}
-          </div>
-        </aside>
       </div>
 
       <ReportHistory reportId={Number(report.id)} reportType={report.reportType} taskAssignmentId={report.assignmentId} />

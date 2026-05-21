@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -93,6 +93,7 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 ];
 
 const reportStatusOptions: Array<{ value: ReportStatus; label: string }> = [
+  { value: 'under_review', label: 'На проверке' },
   { value: 'pending', label: 'На проверке' },
   { value: 'accepted', label: 'Принят' },
   { value: 'revision_requested', label: 'Нужна доработка' },
@@ -108,9 +109,32 @@ const assignmentStatusOptions: Array<{ value: AssignmentStatus; label: string }>
   { value: 'not_completed', label: 'Не выполнено' },
 ];
 
-export function ReportRegistry() {
-  const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters());
-  const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(null);
+type ReportRegistryProps = {
+  title?: string;
+  description?: string;
+  initialFilters?: Partial<ReportFilters>;
+  autoLoad?: boolean;
+  statusFilterOnly?: boolean;
+  showHeaderActions?: boolean;
+  showBulkActions?: boolean;
+  emptyStateText?: string;
+};
+
+export function ReportRegistry({
+  title = 'Отчеты',
+  description = 'Реестр отчетов по задачам, пользователям, регионам и оргструктурам.',
+  initialFilters,
+  autoLoad = false,
+  statusFilterOnly = false,
+  showHeaderActions = true,
+  showBulkActions = true,
+  emptyStateText = 'Настройте фильтры и нажмите «Получить отчеты».',
+}: ReportRegistryProps = {}) {
+  const initialFiltersKey = JSON.stringify(initialFilters ?? {});
+  const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters(initialFilters));
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(() =>
+    autoLoad ? createInitialFilters(initialFilters) : null,
+  );
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [selectedReportIds, setSelectedReportIds] = useState<Set<number>>(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -188,6 +212,13 @@ export function ReportRegistry() {
     label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
   }));
 
+  useEffect(() => {
+    const nextFilters = createInitialFilters(initialFilters);
+    setFilters(nextFilters);
+    setAppliedFilters(autoLoad ? nextFilters : null);
+    setSelectedReportIds(new Set());
+  }, [autoLoad, initialFiltersKey]);
+
   function applyFilters(nextFilters: ReportFilters) {
     setFilters(nextFilters);
     setAppliedFilters(nextFilters);
@@ -246,12 +277,11 @@ export function ReportRegistry() {
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold !text-slate-900">Отчеты</h1>
-            <p className="text-sm text-slate-500">
-              Реестр отчетов по задачам, пользователям, регионам и оргструктурам.
-            </p>
+            <h1 className="text-3xl font-semibold !text-slate-900">{title}</h1>
+            <p className="text-sm text-slate-500">{description}</p>
           </div>
 
+          {showHeaderActions && (
           <div className="flex flex-wrap gap-2">
             <ReportExportPopover
               reportFilters={toReportPayload(appliedFilters ?? filters)}
@@ -277,9 +307,30 @@ export function ReportRegistry() {
               Фильтры
             </Button>
           </div>
+          )}
         </div>
 
-        {filtersOpen && (
+        {statusFilterOnly ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="max-w-sm">
+              <MultiSelect
+                label="Статус отчета"
+                values={filters.report_statuses}
+                placeholder="Все статусы отчетов"
+                options={reportStatusOptions}
+                onChange={(report_statuses) => {
+                  const nextFilters = {
+                    ...filters,
+                    report_statuses: report_statuses as ReportStatus[],
+                    page: 1,
+                  };
+
+                  applyFilters(nextFilters);
+                }}
+              />
+            </div>
+          </div>
+        ) : filtersOpen && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <FilterText
@@ -565,7 +616,7 @@ export function ReportRegistry() {
           </div>
         )}
 
-        {selectedReportIdsList.length > 0 && (
+        {showBulkActions && selectedReportIdsList.length > 0 && (
           <ReportBulkActions
             reportIds={selectedReportIdsList}
             disabled={reportsQuery.isFetching}
@@ -587,7 +638,7 @@ export function ReportRegistry() {
 
         {!hasRequestedReports ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-            Настройте фильтры и нажмите «Получить отчеты».
+            {emptyStateText}
           </div>
         ) : reportsQuery.isLoading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
@@ -777,7 +828,7 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
   };
 }
 
-function createInitialFilters(): ReportFilters {
+function createInitialFilters(overrides: Partial<ReportFilters> = {}): ReportFilters {
   const dateFrom = new Date('2025-01-01T00:00:00');
   const dateTo = new Date('2030-01-01T00:00:00');
 
@@ -807,6 +858,7 @@ function createInitialFilters(): ReportFilters {
     page_size: 50,
     sort_by: 'submitted_at',
     sort_direction: 'desc',
+    ...overrides,
   };
 }
 

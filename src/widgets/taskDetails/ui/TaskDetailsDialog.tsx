@@ -30,6 +30,7 @@ export function TaskDetailsDialog({
   });
 
   const detailsTask = taskQuery.data ?? task;
+  const shouldShowError = open && (taskQuery.isError || !detailsTask);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,11 +42,11 @@ export function TaskDetailsDialog({
               <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
                 Загружаем задачу...
               </div>
-            ) : taskQuery.isError || !detailsTask ? (
+            ) : shouldShowError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
                 Не удалось загрузить задачу.
               </div>
-            ) : (
+            ) : !detailsTask ? null : (
               <TaskDetailsCard
                 task={detailsTask}
                 isTogglingArchive={isTogglingArchive}

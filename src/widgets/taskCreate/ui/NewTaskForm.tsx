@@ -79,11 +79,11 @@ export function NewTaskForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+    const shouldAssignAfterCreate = form.status === 'scheduled' || form.status === 'active';
 
     createMutation.mutate({
       payload: normalizeTaskPayload(form),
-      assignAfterCreate: submitter?.value === 'create-and-assign',
+      assignAfterCreate: shouldAssignAfterCreate,
     });
   }
 
@@ -302,21 +302,14 @@ export function NewTaskForm() {
             </Button>
             <Button
               type="submit"
-              name="task-submit-action"
-              value="create"
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={createMutation.isPending}
+              disabled={createMutation.isPending || (form.status !== 'draft' && !assignmentTarget)}
             >
-              {createMutation.isPending ? 'Создание...' : 'Создать задачу'}
-            </Button>
-            <Button
-              type="submit"
-              name="task-submit-action"
-              value="create-and-assign"
-              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={createMutation.isPending || !assignmentTarget}
-            >
-              {createMutation.isPending ? 'Создание...' : 'Создать и назначить исполнителей'}
+              {createMutation.isPending
+                ? 'Создание...'
+                : form.status === 'draft'
+                  ? 'Создать задачу'
+                  : 'Создать и назначить исполнителей'}
             </Button>
           </div>
         </form>

@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { Archive, ArchiveRestore, Pencil, Trash2 } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 
 type Props = {
   tasks: Task[];
@@ -26,11 +26,7 @@ type Props = {
 
 export function TaskRegistryTable({
   tasks,
-  togglingTaskId,
-  deletingTaskId,
   onTaskClick,
-  onToggleArchive,
-  onDelete,
   onEdit,
 }: Props) {
   return (
@@ -127,62 +123,6 @@ export function TaskRegistryTable({
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Редактировать</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            disabled={togglingTaskId === task.id}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onToggleArchive?.(task);
-                            }}
-                            aria-label={
-                              task.status === 'archived'
-                                ? `Активировать задачу ${task.id}`
-                                : `Архивировать задачу ${task.id}`
-                            }
-                          >
-                            {task.status === 'archived' ? (
-                              <ArchiveRestore size={15} />
-                            ) : (
-                              <Archive size={15} />
-                            )}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{task.status === 'archived' ? 'Активировать' : 'Архивировать'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            className="text-red-500 hover:bg-red-50 hover:text-red-700"
-                            disabled={task.isMaterialized || deletingTaskId === task.id}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDelete?.(task);
-                            }}
-                            aria-label={`Удалить задачу ${task.id}`}
-                          >
-                            <Trash2 size={15} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>
-                            {task.isMaterialized
-                              ? 'Нельзя удалить задачу с назначенными исполнителями'
-                              : 'Удалить'}
-                          </p>
                         </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>

@@ -17,6 +17,7 @@ export function ReportDetailsDialog({ reportId, open, onOpenChange }: Props) {
     queryFn: () => getReportSummary(reportId ?? 0),
     enabled: open && Boolean(reportId),
   });
+  const shouldShowError = open && (reportQuery.isError || !reportQuery.data);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -28,11 +29,11 @@ export function ReportDetailsDialog({ reportId, open, onOpenChange }: Props) {
               <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
                 Загружаем отчет...
               </div>
-            ) : reportQuery.isError || !reportQuery.data ? (
+            ) : shouldShowError ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
                 Не удалось загрузить отчет.
               </div>
-            ) : (
+            ) : !reportQuery.data ? null : (
               <ReportDetailsCard report={reportQuery.data} showOpenPageLink />
             )}
           </div>

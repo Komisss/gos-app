@@ -9,6 +9,7 @@ import ReportDetailsPage from '@pages/reports/ui/ReportDetailsPage';
 import ReportsPage from '@pages/reports/ui/ReportsPage';
 import ReportStatisticsPage from '@pages/stats/ui/ReportStatisticsPage';
 import StatsPage from '@pages/stats/ui/StatsPage';
+import TaskRegionReportsPage from '@pages/stats/ui/TaskRegionReportsPage';
 import TaskDetailsPage from '@pages/tasks/ui/TaskDetailsPage';
 import TasksListPage from '@pages/tasks/ui/TasksListPage';
 import UserProfilePage from '@pages/users/ui/UserProfilePage';
@@ -27,6 +28,7 @@ export const AppRouter = () => {
           <Route element={<MainLayout />}>
             <Route path="/stats" element={<StatsPage />} />
             <Route path="/stats/dashboard" element={<ReportsPage />} />
+            <Route path="/stats/by_region" element={<TaskRegionReportsPage />} />
             <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
             <Route path="/reports/:reportId" element={<ReportDetailsPage />} />
             <Route path="/tasks" element={<TasksListPage />} />
