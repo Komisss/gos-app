@@ -97,6 +97,22 @@ export type CrmReportDto = {
     name: string;
   } | null;
   link_validation: unknown;
+  link_preview: {
+    link_url: string | null;
+    url: string | null;
+    image_url: string | null;
+    file_url: string | null;
+    domain: string | null;
+    display_url: string | null;
+    title: string | null;
+    description: string | null;
+    preview_status: string | null;
+    is_allowed_domain: boolean | null;
+    is_reachable: boolean | null;
+    http_status: number | null;
+    checked_at: string | null;
+    system_comment: string | null;
+  } | null;
   last_moderation: unknown;
   available_actions: string[];
 };
@@ -156,6 +172,15 @@ export type CrmReport = {
   regionName: string;
   orgUnitId?: number;
   orgUnitName: string;
+  linkPreview: {
+    linkUrl: string | null;
+    url: string | null;
+    imageUrl: string | null;
+    fileUrl: string | null;
+    displayUrl: string | null;
+    title: string | null;
+    description: string | null;
+  } | null;
   availableActions: string[];
   raw: CrmReportDto;
 };

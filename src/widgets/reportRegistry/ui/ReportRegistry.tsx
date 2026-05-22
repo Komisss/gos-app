@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, ListFilter, Search, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { searchReports } from '@/entities/report/api/reports';
@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
 import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
+import { ReportModerationActions } from '@/widgets/reportDetails/ui/ReportModerationActions';
 import { ReportBulkActions } from '@/widgets/reportRegistry/ui/ReportBulkActions';
 import { ReportExportPopover } from '@/widgets/reportRegistry/ui/ReportExportPopover';
 import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
@@ -118,6 +119,7 @@ type ReportRegistryProps = {
   showHeaderActions?: boolean;
   showBulkActions?: boolean;
   emptyStateText?: string;
+  tableVariant?: 'default' | 'task-region';
 };
 
 export function ReportRegistry({
@@ -129,6 +131,7 @@ export function ReportRegistry({
   showHeaderActions = true,
   showBulkActions = true,
   emptyStateText = 'Настройте фильтры и нажмите «Получить отчеты».',
+  tableVariant = 'default',
 }: ReportRegistryProps = {}) {
   const initialFiltersKey = JSON.stringify(initialFilters ?? {});
   const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters(initialFilters));
@@ -625,7 +628,7 @@ export function ReportRegistry({
           />
         )}
 
-        {summary && (
+        {tableVariant === 'default' && summary && (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <SummaryItem label="Всего отчетов" value={summary.total_reports} />
             <SummaryItem label="На проверке" value={summary.under_review_count} />
@@ -648,6 +651,8 @@ export function ReportRegistry({
           <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center text-sm text-red-700">
             Не удалось загрузить отчеты.
           </div>
+        ) : tableVariant === 'task-region' ? (
+          <TaskRegionReportsTable reports={reports} onReportClick={setSelectedReportId} />
         ) : (
           <div className="space-y-3">
             <TableScrollArea headerHeight="3rem" height="70vh">
@@ -826,6 +831,135 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
     created_from: filters.created_from || null,
     created_to: filters.created_to || null,
   };
+}
+
+function TaskRegionReportsTable({
+  reports,
+  onReportClick,
+}: {
+  reports: CrmReport[];
+  onReportClick: (reportId: number) => void;
+}) {
+  return (
+    <TableScrollArea headerHeight="3rem" height="70vh">
+      <Table className="min-w-[980px] whitespace-nowrap">
+        <TableHeader>
+          <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+            <TableHead className="w-24">Действия</TableHead>
+            <TableHead className="w-28">ID отчета</TableHead>
+            <TableHead className="min-w-[320px]">Задача</TableHead>
+            <TableHead className="min-w-[280px]">Превью / ссылка</TableHead>
+            <TableHead className="min-w-[240px]">Исполнитель</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {reports.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} className="py-10 text-center text-sm text-slate-500">
+                Отчетов пока нет.
+              </TableCell>
+            </TableRow>
+          ) : (
+            reports.map((report, index) => (
+              <TableRow
+                key={`${report.id}-${index}`}
+                className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${
+                  index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
+                }`}
+              >
+                <TableCell>
+                  {report.reportId ? (
+                    <ReportModerationActions
+                      reportId={report.reportId}
+                      iconOnly
+                      acceptIcon={<ThumbsUp />}
+                      revisionIcon={<ThumbsDown />}
+                      acceptButtonLabel="Принять отчет"
+                      acceptTitle="Принять отчет"
+                      revisionButtonLabel="Вернуть на доработку"
+                      revisionTitle="Вернуть на доработку"
+                    />
+                  ) : (
+                    <span className="text-xs text-slate-500">n/a</span>
+                  )}
+                </TableCell>
+                <TableCell className="font-medium text-slate-700">
+                  {report.reportId ? (
+                    <button
+                      type="button"
+                      className="font-medium text-[#465cd3] hover:underline"
+                      onClick={() => onReportClick(report.reportId ?? 0)}
+                    >
+                      #{report.reportId}
+                    </button>
+                  ) : (
+                    'n/a'
+                  )}
+                </TableCell>
+                <TableCell className="min-w-[320px]">
+                  <div className="space-y-1 whitespace-normal">
+                    <div className="font-medium text-slate-900">{report.taskTitle}</div>
+                    <div className="text-xs text-slate-500">
+                      ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="min-w-[280px]">
+                  <ReportPreviewLink report={report} />
+                </TableCell>
+                <TableCell>
+                  <div className="space-y-1">
+                    <div className="font-medium text-slate-900">{report.executorName}</div>
+                    <div className="text-xs text-slate-500">
+                      ID: {report.executorId ?? 'n/a'} • {report.executorRole}
+                    </div>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </TableScrollArea>
+  );
+}
+
+function ReportPreviewLink({ report }: { report: CrmReport }) {
+  const previewUrl = report.linkPreview?.url ?? report.linkPreview?.linkUrl;
+  const imageUrl = report.linkPreview?.imageUrl;
+  const displayUrl = report.linkPreview?.displayUrl ?? previewUrl;
+
+  if (report.reportType === 'image') {
+    if (!imageUrl) {
+      return <span className="text-sm text-slate-500">Нет превью</span>;
+    }
+
+    return (
+      <a href={imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
+        <img
+          src={imageUrl}
+          alt={report.linkPreview?.title ?? `Отчет #${report.reportId ?? report.id}`}
+          className="h-20 w-32 rounded-md border border-slate-200 object-cover"
+        />
+      </a>
+    );
+  }
+
+  if (!previewUrl) {
+    return <span className="text-sm text-slate-500">Нет ссылки</span>;
+  }
+
+  return (
+    <a
+      href={previewUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="block max-w-[360px] truncate text-sm font-medium text-[#465cd3] hover:underline"
+      title={previewUrl}
+    >
+      {displayUrl}
+    </a>
+  );
 }
 
 function createInitialFilters(overrides: Partial<ReportFilters> = {}): ReportFilters {

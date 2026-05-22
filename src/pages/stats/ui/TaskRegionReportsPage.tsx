@@ -43,6 +43,7 @@ export default function TaskRegionReportsPage() {
       statusFilterOnly
       showHeaderActions={false}
       showBulkActions={false}
+      tableVariant="task-region"
       emptyStateText="В URL не переданы id задачи и региона."
     />
   );

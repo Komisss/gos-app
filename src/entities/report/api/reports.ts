@@ -203,6 +203,17 @@ function mapReportDto(report: CrmReportDto): CrmReport {
     regionName: report.region?.name ?? 'Регион не указан',
     orgUnitId: report.org_unit?.org_unit_id,
     orgUnitName: report.org_unit?.name ?? 'Оргструктура не указана',
+    linkPreview: report.link_preview
+      ? {
+          linkUrl: report.link_preview.link_url,
+          url: report.link_preview.url,
+          imageUrl: report.link_preview.image_url,
+          fileUrl: report.link_preview.file_url,
+          displayUrl: report.link_preview.display_url,
+          title: report.link_preview.title,
+          description: report.link_preview.description,
+        }
+      : null,
     availableActions: report.available_actions,
     raw: report,
   };
