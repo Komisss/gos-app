@@ -175,19 +175,6 @@ export function TaskDetailsCard({
           >
             <Copy />
           </Button>
-          <Button type="button" variant="outline" className="border-slate-200" onClick={() => setEditOpen(true)}>
-            <Pencil />
-            Редактировать
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={task.isMaterialized || deleteMutation.isPending}
-            onClick={() => setDeleteConfirmOpen(true)}
-          >
-            <Trash2 />
-            Удалить
-          </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
               <Link to={`/tasks/${task.id}`} target="_blank" rel="noreferrer">
@@ -196,6 +183,10 @@ export function TaskDetailsCard({
               </Link>
             </Button>
           )}
+          <Button type="button" variant="outline" className="border-slate-200" onClick={() => setEditOpen(true)}>
+            <Pencil />
+            Редактировать
+          </Button>
           {onToggleArchive && (
             <Button
               type="button"
@@ -207,6 +198,15 @@ export function TaskDetailsCard({
               {task.status === 'archived' ? 'Активировать' : 'Деактивировать'}
             </Button>
           )}
+                    <Button
+            type="button"
+            variant="destructive"
+            disabled={task.isMaterialized || deleteMutation.isPending}
+            onClick={() => setDeleteConfirmOpen(true)}
+          >
+            <Trash2 />
+            Удалить
+          </Button>
         </div>
         </div>
 
