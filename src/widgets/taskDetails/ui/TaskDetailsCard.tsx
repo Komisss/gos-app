@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -69,7 +69,6 @@ export function TaskDetailsCard({
   onToggleArchive,
   onDeleted,
 }: Props) {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -256,9 +255,7 @@ export function TaskDetailsCard({
         <TaskAssignmentsTable assignments={task.taskAssignments ?? []} />
         <TaskRegionsStatisticsTable
           statistics={task.regionsStatistics ?? []}
-          onRegionClick={(region) =>
-            navigate(`/stats/by_region?task_id=${task.id}&region_id=${region.region_id}`)
-          }
+          getRegionHref={(region) => `/stats/by_region?task_id=${task.id}&region_id=${region.region_id}`}
         />
         <TaskReportsTable reports={task.taskReports ?? []} onReportClick={setSelectedReportId} />
       </article>
@@ -376,10 +373,10 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
 
 function TaskRegionsStatisticsTable({
   statistics,
-  onRegionClick,
+  getRegionHref,
 }: {
   statistics: NonNullable<Task['regionsStatistics']>;
-  onRegionClick: (region: TaskRegionStatistic) => void;
+  getRegionHref: (region: TaskRegionStatistic) => string;
 }) {
   if (statistics.length === 0) {
     return null;
@@ -409,13 +406,14 @@ function TaskRegionsStatisticsTable({
           {statistics.map((item) => (
             <TableRow key={item.region_id} className="hover:bg-slate-50">
               <TableCell>
-                <button
-                  type="button"
+                <Link
+                  to={getRegionHref(item)}
+                  target="_blank"
+                  rel="noreferrer"
                   className="font-medium text-[#465cd3] hover:underline"
-                  onClick={() => onRegionClick(item)}
                 >
                   {item.region_name}
-                </button>
+                </Link>
               </TableCell>
               <TableCell>{formatNumber(item.assignments_count)}</TableCell>
               <TableCell>{formatNumber(item.assignments_with_reports)}</TableCell>
