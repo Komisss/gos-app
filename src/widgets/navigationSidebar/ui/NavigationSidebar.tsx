@@ -19,10 +19,13 @@ import {sidebarSections} from '../config/navigationConfig.ts';
 import {NavLink, useLocation} from "react-router";
 import {clsx} from 'clsx'
 import {useState} from "react";
+import { useAuth } from '@/features/auth/model/AuthContext';
 
 export function NavigationSidebar() {
   const location = useLocation();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
+  const { session } = useAuth();
+  const roleCode = session?.role?.code;
 
   return (
     <Sidebar collapsible="icon">
@@ -39,7 +42,9 @@ export function NavigationSidebar() {
               {section.title && <SidebarGroupLabel>{section.title ? (<div className="px-4">{section.title}</div>) : ''}</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0">
-                  {section.items.map((item, navIndex) => {
+                  {section.items
+                    .filter((item) => !('roles' in item) || !item.roles || item.roles.includes(roleCode ?? ''))
+                    .map((item, navIndex) => {
                     const Icon = item.icon;
                     const itemKey = `${index}-${navIndex}`;
                     const isNested = 'items' in item && Array.isArray(item.items);

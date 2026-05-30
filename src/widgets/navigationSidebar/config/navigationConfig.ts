@@ -36,6 +36,7 @@ export const sidebarSections = [
       { label: 'Новый пользователь', icon: UserPlus, href: '/users/new' },
       { label: 'Новая оргструктура', icon: Building2, href: '/org-units/new' },
       { label: 'Список пользователей', icon: Users, href: '/users' },
+      { label: 'Регионы с управляющими', icon: Users, href: '/users/region-managers', roles: ['federal_manager'] },
     ],
   },
 ];

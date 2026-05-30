@@ -1,20 +1,13 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ListFilter, UserPlus } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
-import {
-  activateUser,
-  deactivateUser,
-  getUsersPage,
-  type UserFilters,
-} from '@/entities/user/api/users';
-import type { UserListItem } from '@/entities/user/model/types';
+import { getUsersPage, type UserFilters } from '@/entities/user/api/users';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
-import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { useUserExport } from '../model/useUserExport';
@@ -31,18 +24,49 @@ const emptyUserFilters: UserFilters = {
   status: '',
 };
 
-export function UserRegistry() {
-  const queryClient = useQueryClient();
-  const [togglingUserId, setTogglingUserId] = useState<number | null>(null);
-  const [filters, setFilters] = useState<UserFilters>(emptyUserFilters);
+const emptyRegions: Awaited<ReturnType<typeof getRegions>> = [];
+const emptyOrgUnits: Awaited<ReturnType<typeof getOrgUnitsTree>> = [];
+
+type UserRegistryProps = {
+  title?: string;
+  initialFilters?: UserFilters;
+  showActions?: boolean;
+  showFilterCard?: boolean;
+  showTableFilters?: boolean;
+};
+
+export function UserRegistry({
+  title = 'Список пользователей',
+  initialFilters = {},
+  showActions = true,
+  showFilterCard = true,
+  showTableFilters = true,
+}: UserRegistryProps = {}) {
+  const initialUserFilters = useMemo(
+    () => ({
+      ...emptyUserFilters,
+      ...initialFilters,
+    }),
+    [initialFilters],
+  );
+  const [filters, setFilters] = useState<UserFilters>(initialUserFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const debouncedSearch = useDebouncedValue(filters.search ?? '', 500);
   const userExport = useUserExport();
+  const queryFilters = useMemo(
+    () => ({
+      ...filters,
+      search: debouncedSearch,
+    }),
+    [debouncedSearch, filters],
+  );
 
   const usersQuery = useQuery({
-    queryKey: ['users', filters, page, pageSize],
-    queryFn: () => getUsersPage(filters, page, pageSize),
+    queryKey: ['users', queryFilters, page, pageSize],
+    queryFn: () => getUsersPage(queryFilters, page, pageSize),
+    placeholderData: keepPreviousData,
   });
 
   const regionsQuery = useQuery({
@@ -55,92 +79,74 @@ export function UserRegistry() {
     queryFn: getOrgUnitsTree,
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: (user: UserListItem) => {
-      if (isFederalManager(user)) {
-        throw new Error('Нельзя изменять федерального управляющего.');
-      }
-
-      return user.active ? deactivateUser(user.id) : activateUser(user.id);
-    },
-    onMutate: (user) => setTogglingUserId(user.id),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-    onSettled: () => setTogglingUserId(null),
-  });
-
   const usersPage = usersQuery.data;
   const users = usersPage?.items ?? [];
   const total = usersPage?.total ?? 0;
   const hasMore = usersPage?.hasMore ?? false;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+  const regions = regionsQuery.data ?? emptyRegions;
+  const orgUnits = orgUnitsQuery.data ?? emptyOrgUnits;
 
-  function updateFilters(patch: UserFilters) {
+  const updateFilters = useCallback((patch: UserFilters) => {
     setPage(1);
     setFilters((current) => ({ ...current, ...patch }));
-  }
+  }, []);
 
-  function changePageSize(nextPageSize: number) {
+  const changePageSize = useCallback((nextPageSize: number) => {
     setPage(1);
     setPageSize(nextPageSize);
-  }
+  }, []);
 
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="space-y-2">
-            <h1 className="text-3xl font-semibold !text-slate-900">Список пользователей</h1>
+            <h1 className="text-3xl font-semibold !text-slate-900">{title}</h1>
             <div className="space-y-1 text-sm text-slate-500">
               <p>Итого</p>
               <p className="text-base font-semibold text-slate-900">{total}</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-slate-200 bg-white"
-              onClick={() => setFiltersOpen((current) => !current)}
-            >
-              <ListFilter />
-              Фильтры
-            </Button>
-            <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
-              <Link to="/users/new">
-                <UserPlus />
-                Добавить пользователя
-              </Link>
-            </Button>
-            <UserExportPopover
-              filters={filters}
-              exportFilters={userExport.exportFilters}
-              exportPending={userExport.exportPending}
-              exportError={userExport.exportError}
-              open={userExport.exportOpen}
-              orgUnits={orgUnitsQuery.data ?? []}
-              regions={regionsQuery.data ?? []}
-              onDownload={userExport.runExport}
-              onExportFiltersChange={userExport.setExportFilters}
-              onOpenChange={userExport.setExportOpen}
-            />
-          </div>
+          {showActions && (
+            <div className="flex flex-wrap gap-2">
+              {showFilterCard && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-slate-200 bg-white"
+                  onClick={() => setFiltersOpen((current) => !current)}
+                >
+                  <ListFilter />
+                  Фильтры
+                </Button>
+              )}
+              <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
+                <Link to="/users/new">
+                  <UserPlus />
+                  Добавить пользователя
+                </Link>
+              </Button>
+              <UserExportPopover
+                filters={queryFilters}
+                exportFilters={userExport.exportFilters}
+                exportPending={userExport.exportPending}
+                exportError={userExport.exportError}
+                open={userExport.exportOpen}
+                orgUnits={orgUnits}
+                regions={regions}
+                onDownload={userExport.runExport}
+                onExportFiltersChange={userExport.setExportFilters}
+                onOpenChange={userExport.setExportOpen}
+              />
+            </div>
+          )}
         </div>
 
-        {filtersOpen && (
+        {showFilterCard && filtersOpen && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-500 !mb-1">Поиск</p>
-                <Input
-                  className="h-9 border-slate-200 text-sm"
-                  placeholder="ФИО, логин"
-                  value={filters.search ?? ''}
-                  onChange={(event) => updateFilters({ search: event.target.value })}
-                />
-              </div>
               <FilterInput
                 label="Создан от"
                 type="datetime"
@@ -153,57 +159,6 @@ export function UserRegistry() {
                 value={filters.created_to}
                 onChange={(created_to) => updateFilters({ created_to })}
               />
-              <FilterSearchSelect
-                label="Оргструктура"
-                value={filters.org_unit}
-                placeholder="Все оргструктуры"
-                searchPlaceholder="Поиск оргструктуры"
-                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-                  value: String(orgUnit.id),
-                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                }))}
-                onChange={(org_unit) => updateFilters({ org_unit })}
-              />
-              <FilterSearchSelect
-                label="Регион"
-                value={filters.region}
-                placeholder="Все регионы"
-                searchPlaceholder="Поиск региона"
-                options={(regionsQuery.data ?? []).map((region) => ({
-                  value: String(region.id),
-                  label: region.name,
-                }))}
-                onChange={(region) => updateFilters({ region })}
-              />
-              <FilterSelect
-                label="Роль"
-                value={filters.role}
-                placeholder="Все"
-                options={[
-                  { value: '1', label: 'Региональный' },
-                  { value: '2', label: 'Федеральный' },
-                ]}
-                onChange={(role) => updateFilters({ role })}
-              />
-              <div className="space-y-1 md:col-span-2">
-                <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
-                <Select
-                  value={filters.status || 'all'}
-                  onValueChange={(status) =>
-                    updateFilters({ status: status === 'all' ? '' : status })
-                  }
-                >
-                  <SelectTrigger className="w-full border-slate-200 bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    <SelectItem value="all">Все</SelectItem>
-                    <SelectItem value="active">Активен</SelectItem>
-                    <SelectItem value="inactive">Неактивен</SelectItem>
-                    <SelectItem value="deactivated">Деактивирован</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
               <Button
@@ -211,7 +166,7 @@ export function UserRegistry() {
                 variant="outline"
                 onClick={() => {
                   setPage(1);
-                  setFilters(emptyUserFilters);
+                  setFilters(initialUserFilters);
                 }}
               >
                 Сбросить фильтры
@@ -232,8 +187,11 @@ export function UserRegistry() {
           <>
             <UserRegistryTable
               users={users}
-              togglingUserId={togglingUserId}
-              onToggleActive={(user) => toggleActiveMutation.mutate(user)}
+              filters={filters}
+              orgUnits={orgUnits}
+              regions={regions}
+              showFilters={showTableFilters}
+              onFiltersChange={updateFilters}
             />
             <UserPagination
               page={page}
@@ -268,6 +226,28 @@ function UserPagination({
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
+  const [pageInput, setPageInput] = useState(String(page));
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    if (!pageInput.trim()) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const nextPage = clampPage(Number(pageInput) || 1, totalPages);
+
+      if (nextPage !== page) {
+        onPageChange(nextPage);
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [onPageChange, page, pageInput, totalPages]);
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -280,8 +260,17 @@ function UserPagination({
           Назад
         </Button>
         <span className="text-sm text-slate-500">
-          Страница {page} из {totalPages}
+          Страница
         </span>
+        <Input
+          className="h-9 w-20 border-slate-200 bg-white text-sm"
+          min={1}
+          max={totalPages}
+          type="number"
+          value={pageInput}
+          onChange={(event) => setPageInput(event.target.value)}
+        />
+        <span className="text-sm text-slate-500">из {totalPages}</span>
         <Button
           type="button"
           variant="outline"
@@ -309,6 +298,10 @@ function UserPagination({
       </div>
     </div>
   );
+}
+
+function clampPage(page: number, totalPages: number) {
+  return Math.min(Math.max(1, page), Math.max(totalPages, 1));
 }
 
 function FilterInput({
@@ -339,39 +332,14 @@ function FilterInput({
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  placeholder,
-  options,
-  onChange,
-}: {
-  label: string;
-  value?: string;
-  placeholder: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
-        <SelectTrigger className="w-full border-slate-200 bg-white">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectItem value="all">{placeholder}</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
+function useDebouncedValue<T>(value: T, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
 
-function isFederalManager(user: Pick<UserListItem, 'role'>) {
-  return user.role?.code === 'federal_manager' || user.role?.id === 1;
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delay);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delay, value]);
+
+  return debouncedValue;
 }

@@ -1,140 +1,270 @@
-﻿import type { Task } from '@/entities/task/model/types';
-import { getReportFormatLabel, getScopeLabel, getStatusLabel, getTaskTypeLabel } from '@/entities/task/api/tasks';
+import { memo } from 'react';
+import { Pencil } from 'lucide-react';
+
+import {
+  getReportFormatLabel,
+  getScopeLabel,
+  getStatusLabel,
+  getTaskTypeLabel,
+  type TaskFilters,
+} from '@/entities/task/api/tasks';
+import type { Task } from '@/entities/task/model/types';
+import type { UserListItem } from '@/entities/user/model/types';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/shared/ui/tooltip';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/shared/ui/table';
+import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { Pencil } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip';
 
 type Props = {
   tasks: Task[];
+  filters: TaskFilters;
+  users: UserListItem[];
   togglingTaskId?: number | null;
   deletingTaskId?: number | null;
+  onFiltersChange: (filters: TaskFilters) => void;
   onTaskClick?: (task: Task) => void;
   onToggleArchive?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onEdit?: (task: Task) => void;
 };
 
-export function TaskRegistryTable({
+export const TaskRegistryTable = memo(function TaskRegistryTable({
   tasks,
+  filters,
+  users,
+  onFiltersChange,
   onTaskClick,
   onEdit,
 }: Props) {
   return (
-    <TableScrollArea headerHeight="3rem" height="70vh">
-      <Table className="min-w-[980px] whitespace-nowrap">
-        <TableHeader>
-          <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
-            <TableHead className="w-24">#</TableHead>
-            <TableHead className="min-w-[320px]">Название</TableHead>
-            <TableHead className="w-36">Уровень</TableHead>
-            <TableHead className="w-40">Тип</TableHead>
-            <TableHead className="w-36">Отчет</TableHead>
-            <TableHead className="w-44">Дедлайн</TableHead>
-            <TableHead className="w-44">Создана</TableHead>
-            <TableHead className="w-32">Статус</TableHead>
-            <TableHead className="w-36">Исполнители</TableHead>
-            <TableHead className="w-24 text-right" />
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {tasks.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={10} className="py-10 text-center text-sm text-slate-500">
-                Задач пока нет.
-              </TableCell>
-            </TableRow>
-          ) : (
-            tasks.map((task, index) => (
-              <TableRow
-                key={task.id}
-                className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
-                  index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
-                }`}
-                onClick={() => onTaskClick?.(task)}
-              >
-                <TableCell className="font-medium text-slate-700">{task.id}</TableCell>
-                <TableCell className="min-w-[320px]">
-                  <div className="space-y-1 whitespace-normal">
-                    <div className="text-sm leading-5 font-medium text-slate-900">
-                      {task.title}
-                    </div>
-                    {task.subtitle && (
-                      <div className="text-xs leading-4 text-slate-500">{task.subtitle}</div>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="align-top text-slate-700">
-                  {getScopeLabel(task.scope ?? task.region)}
-                </TableCell>
-                <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
-                <TableCell className="align-top text-slate-700">
-                  {getReportFormatLabel(task.reportFormat ?? '')}
-                </TableCell>
-                <TableCell className="align-top text-slate-700">{task.deadlineLabel}</TableCell>
-                <TableCell className="align-top text-slate-700">
-                  {task.createdAt ? formatDateTime(task.createdAt) : 'n/a'}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge
-                    className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}
-                  >
-                    {task.statusLabel ?? getStatusLabel(task.status)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge
-                    className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
-                      task.isMaterialized
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {task.isMaterialized ? 'Назначены' : 'Не назначены'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="pt-3 text-right align-top">
-                  <div className="flex justify-end gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onEdit?.(task);
-                            }}
-                            aria-label={`Редактировать задачу ${task.id}`}
-                          >
-                            <Pencil size={15} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Редактировать</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
+    <TableScrollArea headerHeight="5rem" height="70vh">
+      <Table className="min-w-[1160px] whitespace-nowrap">
+        <TaskRegistryTableHeader filters={filters} users={users} onFiltersChange={onFiltersChange} />
+        <TaskRegistryTableBody tasks={tasks} users={users} onTaskClick={onTaskClick} onEdit={onEdit} />
       </Table>
     </TableScrollArea>
   );
+});
+
+const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
+  filters,
+  users,
+  onFiltersChange,
+}: {
+  filters: TaskFilters;
+  users: UserListItem[];
+  onFiltersChange: (filters: TaskFilters) => void;
+}) {
+  return (
+    <TableHeader>
+      <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+        <TableHead className="w-24" />
+        <TableHead className="min-w-[320px]" />
+        <TableHead className="min-w-[220px] align-bottom">
+          <FilterSearchSelect
+            label=""
+            value={filters.created_by_user_id}
+            placeholder="Все авторы"
+            searchPlaceholder="Поиск по ФИО или логину"
+            options={users.map((user) => ({
+              value: String(user.id),
+              label: user.fullName,
+              description: `@${user.username}`,
+            }))}
+            onChange={(created_by_user_id) => onFiltersChange({ created_by_user_id })}
+          />
+        </TableHead>
+        <TableHead className="w-36 align-bottom">
+          <HeaderSelect
+            value={filters.scope}
+            placeholder="Все уровни"
+            options={[
+              { value: 'regional', label: 'Региональный' },
+              { value: 'federal', label: 'Федеральный' },
+            ]}
+            onChange={(scope) => onFiltersChange({ scope })}
+          />
+        </TableHead>
+        <TableHead className="w-40" />
+        <TableHead className="w-36" />
+        <TableHead className="w-44" />
+        <TableHead className="w-44" />
+        <TableHead className="w-32 align-bottom">
+          <HeaderSelect
+            value={filters.status}
+            placeholder="Все статусы"
+            options={[
+              { value: 'draft', label: 'Черновик' },
+              { value: 'scheduled', label: 'Запланирована' },
+              { value: 'active', label: 'Активная' },
+              { value: 'pending', label: 'В работе' },
+              { value: 'completed', label: 'Завершена' },
+              { value: 'archived', label: 'В архиве' },
+            ]}
+            onChange={(status) => onFiltersChange({ status })}
+          />
+        </TableHead>
+        <TableHead className="w-36" />
+        <TableHead className="w-24" />
+      </TableRow>
+      <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+        <TableHead className="w-24">#</TableHead>
+        <TableHead className="min-w-[320px]">Название</TableHead>
+        <TableHead className="min-w-[220px]">Автор</TableHead>
+        <TableHead className="w-36">Уровень</TableHead>
+        <TableHead className="w-40">Тип</TableHead>
+        <TableHead className="w-36">Отчет</TableHead>
+        <TableHead className="w-44">Дедлайн</TableHead>
+        <TableHead className="w-44">Создана</TableHead>
+        <TableHead className="w-32">Статус</TableHead>
+        <TableHead className="w-36">Исполнители</TableHead>
+        <TableHead className="w-24 text-right" />
+      </TableRow>
+    </TableHeader>
+  );
+});
+
+const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
+  tasks,
+  users,
+  onTaskClick,
+  onEdit,
+}: {
+  tasks: Task[];
+  users: UserListItem[];
+  onTaskClick?: (task: Task) => void;
+  onEdit?: (task: Task) => void;
+}) {
+  return (
+    <TableBody>
+      {tasks.length === 0 ? (
+        <TableRow>
+          <TableCell colSpan={11} className="py-10 text-center text-sm text-slate-500">
+            Задач пока нет.
+          </TableCell>
+        </TableRow>
+      ) : (
+        tasks.map((task, index) => (
+          <TableRow
+            key={task.id}
+            className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
+              index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
+            }`}
+            onClick={() => onTaskClick?.(task)}
+          >
+            <TableCell className="font-medium text-slate-700">{task.id}</TableCell>
+            <TableCell className="min-w-[320px]">
+              <div className="space-y-1 whitespace-normal">
+                <div className="text-sm leading-5 font-medium text-slate-900">{task.title}</div>
+                {task.subtitle && <div className="text-xs leading-4 text-slate-500">{task.subtitle}</div>}
+              </div>
+            </TableCell>
+            <TableCell className="align-top">
+              <div className="space-y-1">
+                <div className="font-medium text-slate-900">{getTaskAuthorLabel(task, users)}</div>
+                <div className="text-xs text-slate-500">{getTaskAuthorMeta(task, users)}</div>
+              </div>
+            </TableCell>
+            <TableCell className="align-top text-slate-700">{getScopeLabel(task.scope ?? task.region)}</TableCell>
+            <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
+            <TableCell className="align-top text-slate-700">{getReportFormatLabel(task.reportFormat ?? '')}</TableCell>
+            <TableCell className="align-top text-slate-700">{task.deadlineLabel}</TableCell>
+            <TableCell className="align-top text-slate-700">{task.createdAt ? formatDateTime(task.createdAt) : 'n/a'}</TableCell>
+            <TableCell className="align-top">
+              <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
+                {task.statusLabel ?? getStatusLabel(task.status)}
+              </Badge>
+            </TableCell>
+            <TableCell className="align-top">
+              <Badge
+                className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
+                  task.isMaterialized ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {task.isMaterialized ? 'Назначены' : 'Не назначены'}
+              </Badge>
+            </TableCell>
+            <TableCell className="pt-3 text-right align-top">
+              <div className="flex justify-end gap-1">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon-sm"
+                        variant="ghost"
+                        className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onEdit?.(task);
+                        }}
+                        aria-label={`Редактировать задачу ${task.id}`}
+                      >
+                        <Pencil size={15} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Редактировать</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))
+      )}
+    </TableBody>
+  );
+});
+
+function HeaderSelect({
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  value?: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
+      <SelectTrigger className="h-9 w-full border-slate-200 bg-white text-sm font-normal">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent align="start">
+        <SelectItem value="all">{placeholder}</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function getTaskAuthorLabel(task: Task, users: UserListItem[]) {
+  const author = users.find((user) => user.id === task.createdByUserId);
+
+  if (author) {
+    return author.fullName;
+  }
+
+  return task.createdByUserId ? `#${task.createdByUserId}` : 'n/a';
+}
+
+function getTaskAuthorMeta(task: Task, users: UserListItem[]) {
+  const author = users.find((user) => user.id === task.createdByUserId);
+
+  if (author?.username) {
+    return `@${author.username}`;
+  }
+
+  return task.createdByUserId ? `Автор #${task.createdByUserId}` : 'n/a';
 }
 
 export function getStatusClassName(status: Task['status']) {

@@ -22,7 +22,7 @@ export function FilterSearchSelect({
   disabled = false,
   onChange,
 }: {
-  label: string;
+  label?: string;
   value?: string;
   placeholder: string;
   searchPlaceholder?: string;
@@ -52,7 +52,7 @@ export function FilterSearchSelect({
 
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      {label && <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>}
       <Popover open={open && !disabled} onOpenChange={(nextOpen) => setOpen(disabled ? false : nextOpen)}>
         <PopoverTrigger asChild>
           <Button

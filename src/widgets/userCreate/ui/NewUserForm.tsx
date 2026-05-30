@@ -20,12 +20,12 @@ import { UserBulkImportDropzone } from './UserBulkImportDropzone';
 const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
   { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
   { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: 3, code: 'executor', label: 'Исполнитель' },
-  { id: 4, code: 'main_manager', label: 'Главный менеджер' },
-  { id: 5, code: 'assistant', label: 'Помощник главного менеджера' },
-  { id: 6, code: 'unit_head', label: 'Руководитель управления' },
-  { id: 7, code: 'department_head', label: 'Руководитель отдела' },
-  { id: 8, code: 'employee', label: 'Сотрудник' },
+  // { id: 3, code: 'executor', label: 'Исполнитель' }, // Исполнителя необходимо убрать при создании
+  { id: 4, code: 'main_manager', label: 'Б3' },
+  { id: 5, code: 'assistant', label: 'Помощник Б3' },
+  { id: 6, code: 'unit_head', label: 'Б2' },
+  { id: 7, code: 'department_head', label: 'Б1' },
+  { id: 8, code: 'employee', label: 'Активист' },
 ];
 
 const initialForm: RegisterUserPayload = {

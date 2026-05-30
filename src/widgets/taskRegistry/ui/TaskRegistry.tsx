@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListFilter, Plus } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
@@ -44,6 +44,8 @@ const emptyTaskFilters: TaskFilters = {
   status: '',
 };
 
+const emptyUsers: Awaited<ReturnType<typeof getUsers>> = [];
+
 export function TaskRegistry() {
   const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -59,6 +61,7 @@ export function TaskRegistry() {
   const tasksQuery = useQuery({
     queryKey: ['tasks', filters, page, size],
     queryFn: () => getTasksPage(filters, page, size),
+    placeholderData: keepPreviousData,
   });
 
   const regionsQuery = useQuery({
@@ -123,16 +126,17 @@ export function TaskRegistry() {
   const tasks = tasksPage?.items ?? [];
   const totalElements = tasksPage?.totalElements ?? 0;
   const totalPages = tasksPage?.totalPages ?? 1;
+  const users = usersQuery.data ?? emptyUsers;
 
-  function updateFilters(patch: TaskFilters) {
+  const updateFilters = useCallback((patch: TaskFilters) => {
     setPage(1);
     setFilters((current) => ({ ...current, ...patch }));
-  }
+  }, []);
 
-  function changeSize(nextSize: number) {
+  const changeSize = useCallback((nextSize: number) => {
     setPage(1);
     setSize(nextSize);
-  }
+  }, []);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -162,18 +166,6 @@ export function TaskRegistry() {
         {filtersOpen && (
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FilterSearchSelect
-                label="Автор"
-                value={filters.created_by_user_id}
-                placeholder="Все авторы"
-                searchPlaceholder="Поиск по ФИО или логину"
-                options={(usersQuery.data ?? []).map((user) => ({
-                  value: String(user.id),
-                  label: user.fullName,
-                  description: `@${user.username}`,
-                }))}
-                onChange={(created_by_user_id) => updateFilters({ created_by_user_id })}
-              />
               <FilterInput
                 label="Создана от"
                 type="datetime"
@@ -208,37 +200,6 @@ export function TaskRegistry() {
                 }))}
                 onChange={(region_id) => updateFilters({ region_id })}
               />
-              <FilterSelect
-                label="Уровень"
-                value={filters.scope}
-                placeholder="Все"
-                options={[
-                  { value: '1', label: 'Региональный' },
-                  { value: '2', label: 'Федеральный' },
-                ]}
-                onChange={(scope) => updateFilters({ scope })}
-              />
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
-                <Select
-                  value={filters.status || 'all'}
-                  onValueChange={(status) =>
-                    updateFilters({ status: status === 'all' ? '' : status })
-                  }
-                >
-                  <SelectTrigger className="w-full border-slate-200 bg-white">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent align="start">
-                    <SelectItem value="all">Все</SelectItem>
-                    <SelectItem value="draft">Черновик</SelectItem>
-                    <SelectItem value="active">Активная</SelectItem>
-                    <SelectItem value="pending">В работе</SelectItem>
-                    <SelectItem value="completed">Завершена</SelectItem>
-                    <SelectItem value="archived">В архиве</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
               <Button
@@ -267,8 +228,11 @@ export function TaskRegistry() {
           <>
             <TaskRegistryTable
               tasks={tasks}
+              filters={filters}
+              users={users}
               togglingTaskId={togglingTaskId}
               deletingTaskId={deletingTaskId}
+              onFiltersChange={updateFilters}
               onTaskClick={setSelectedTask}
               onEdit={setEditingTask}
               onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
@@ -364,6 +328,27 @@ function TaskPagination({
   onSizeChange: (size: number) => void;
 }) {
   const safeTotalPages = Math.max(totalPages, 1);
+  const [pageInput, setPageInput] = useState(String(page));
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    if (!pageInput.trim()) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const nextPage = clampPage(Number(pageInput) || 1, safeTotalPages);
+
+      if (nextPage !== page) {
+        onPageChange(nextPage);
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [onPageChange, page, pageInput, safeTotalPages]);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3">
@@ -377,8 +362,17 @@ function TaskPagination({
           Назад
         </Button>
         <span className="text-sm text-slate-500">
-          Страница {page} из {safeTotalPages}
+          Страница
         </span>
+        <Input
+          className="h-9 w-20 border-slate-200 bg-white text-sm"
+          min={1}
+          max={safeTotalPages}
+          type="number"
+          value={pageInput}
+          onChange={(event) => setPageInput(event.target.value)}
+        />
+        <span className="text-sm text-slate-500">из {safeTotalPages}</span>
         <Button
           type="button"
           variant="outline"
@@ -406,6 +400,10 @@ function TaskPagination({
       </div>
     </div>
   );
+}
+
+function clampPage(page: number, totalPages: number) {
+  return Math.min(Math.max(1, page), Math.max(totalPages, 1));
 }
 
 function FilterInput({

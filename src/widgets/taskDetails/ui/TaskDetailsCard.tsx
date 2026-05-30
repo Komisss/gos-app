@@ -882,11 +882,11 @@ function formatRole(value?: string | null) {
     federal_manager: 'Федеральный управляющий',
     regional_manager: 'Региональный руководитель',
     executor: 'Исполнитель',
-    main_manager: 'Главный менеджер',
-    assistant: 'Помощник главного менеджера',
-    unit_head: 'Руководитель управления',
-    department_head: 'Руководитель отдела',
-    employee: 'Сотрудник',
+    main_manager: 'Б3',
+    assistant: 'Помощник Б3',
+    unit_head: 'Б2',
+    department_head: 'Б1',
+    employee: 'Активист',
   };
 
   return value ? labels[value] ?? value : 'Не указана';

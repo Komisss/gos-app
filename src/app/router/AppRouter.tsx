@@ -12,6 +12,7 @@ import StatsPage from '@pages/stats/ui/StatsPage';
 import TaskRegionReportsPage from '@pages/stats/ui/TaskRegionReportsPage';
 import TaskDetailsPage from '@pages/tasks/ui/TaskDetailsPage';
 import TasksListPage from '@pages/tasks/ui/TasksListPage';
+import RegionManagersPage from '@pages/users/ui/RegionManagersPage';
 import UserProfilePage from '@pages/users/ui/UserProfilePage';
 import UsersPage from '@pages/users/ui/UsersPage';
 import { ProtectedRoute, PublicOnlyRoute } from '@/features/auth/model/AuthRoutes';
@@ -35,6 +36,7 @@ export const AppRouter = () => {
             <Route path="/tasks/new" element={<NewTaskPage />} />
             <Route path="/tasks/:taskId" element={<TaskDetailsPage />} />
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/users/region-managers" element={<RegionManagersPage />} />
             <Route path="/users/new" element={<NewUserPage />} />
             <Route path="/users/:userId" element={<UserProfilePage />} />
             <Route path="/org-units/new" element={<NewOrgUnitPage />} />

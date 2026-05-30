@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
@@ -71,11 +71,11 @@ const roleOptions = [
   { value: '1', label: 'Федеральный управляющий' },
   { value: '2', label: 'Региональный руководитель' },
   { value: '3', label: 'Исполнитель' },
-  { value: '4', label: 'Главный менеджер' },
-  { value: '5', label: 'Помощник главного менеджера' },
-  { value: '6', label: 'Руководитель управления' },
-  { value: '7', label: 'Руководитель отдела' },
-  { value: '8', label: 'Сотрудник' },
+  { value: '4', label: 'Б3' },
+  { value: '5', label: 'Помощник Б3' },
+  { value: '6', label: 'Б2' },
+  { value: '7', label: 'Б1' },
+  { value: '8', label: 'Активист' },
 ];
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
@@ -174,6 +174,7 @@ export function ReportRegistry({
     queryKey: ['crm-reports', appliedFilters],
     queryFn: () => searchReports(toReportPayload(appliedFilters ?? createInitialFilters())),
     enabled: appliedFilters !== null,
+    placeholderData: keepPreviousData,
   });
 
   const reports = reportsQuery.data?.items ?? [];
@@ -195,25 +196,41 @@ export function ReportRegistry({
     Math.ceil(totalReports / currentPageSize),
     reportsQuery.data?.hasMore ? currentPage + 1 : currentPage,
   );
-  const regionOptions = (regionsQuery.data ?? []).map((region) => ({
-    value: String(region.id),
-    label: region.name,
-    description: region.code,
-  }));
-  const taskOptions = (tasksQuery.data ?? []).map((task) => ({
-    value: String(task.id),
-    label: `#${task.id} ${task.title}`,
-    description: task.statusLabel,
-  }));
-  const userOptions = (usersQuery.data ?? []).map((user) => ({
-    value: String(user.id),
-    label: user.fullName,
-    description: `@${user.username}`,
-  }));
-  const orgUnitOptions = (orgUnitsQuery.data ?? []).map((orgUnit) => ({
-    value: String(orgUnit.id),
-    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-  }));
+  const regionOptions = useMemo(
+    () =>
+      (regionsQuery.data ?? []).map((region) => ({
+        value: String(region.id),
+        label: region.name,
+        description: region.code,
+      })),
+    [regionsQuery.data],
+  );
+  const taskOptions = useMemo(
+    () =>
+      (tasksQuery.data ?? []).map((task) => ({
+        value: String(task.id),
+        label: `#${task.id} ${task.title}`,
+        description: task.statusLabel,
+      })),
+    [tasksQuery.data],
+  );
+  const userOptions = useMemo(
+    () =>
+      (usersQuery.data ?? []).map((user) => ({
+        value: String(user.id),
+        label: user.fullName,
+        description: `@${user.username}`,
+      })),
+    [usersQuery.data],
+  );
+  const orgUnitOptions = useMemo(
+    () =>
+      (orgUnitsQuery.data ?? []).map((orgUnit) => ({
+        value: String(orgUnit.id),
+        label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+      })),
+    [orgUnitsQuery.data],
+  );
 
   useEffect(() => {
     const nextFilters = createInitialFilters(initialFilters);
@@ -241,7 +258,22 @@ export function ReportRegistry({
     applyFilters({ ...filters, page: 1, page_size: pageSize });
   }
 
-  function handleToggleReport(reportId: number, checked: boolean) {
+  const handleTableFiltersChange = useCallback(
+    (patch: Partial<ReportFilters>) => {
+      setFilters((current) => {
+        const nextFilters = { ...current, ...patch, page: 1 };
+
+        if (appliedFilters !== null) {
+          setAppliedFilters(nextFilters);
+        }
+
+        return nextFilters;
+      });
+    },
+    [appliedFilters],
+  );
+
+  const handleToggleReport = useCallback((reportId: number, checked: boolean) => {
     setSelectedReportIds((current) => {
       const next = new Set(current);
 
@@ -253,9 +285,9 @@ export function ReportRegistry({
 
       return next;
     });
-  }
+  }, []);
 
-  function handleToggleCurrentPage(checked: boolean) {
+  const handleToggleCurrentPage = useCallback((checked: boolean) => {
     setSelectedReportIds((current) => {
       const next = new Set(current);
 
@@ -269,11 +301,11 @@ export function ReportRegistry({
 
       return next;
     });
-  }
+  }, [currentPageReportIds]);
 
-  function handleClearSelection() {
+  const handleClearSelection = useCallback(() => {
     setSelectedReportIds(new Set());
-  }
+  }, []);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -294,7 +326,6 @@ export function ReportRegistry({
               orgUnitOptions={orgUnitOptions}
               roleOptions={roleOptions}
               taskTypeOptions={taskTypeOptions}
-              taskScopeOptions={taskScopeOptions}
               reportTypeOptions={reportTypeOptions}
               reportStatusOptions={reportStatusOptions}
               assignmentStatusOptions={assignmentStatusOptions}
@@ -342,69 +373,6 @@ export function ReportRegistry({
                 placeholder="Поиск по отчетам"
                 onChange={(search) => setFilters((current) => ({ ...current, search, page: 1 }))}
               />
-              <MultiSearchSelect
-                label="Регионы"
-                values={filters.region_ids.map(String)}
-                placeholder="Все регионы"
-                searchPlaceholder="Поиск региона"
-                options={(regionsQuery.data ?? []).map((region) => ({
-                  value: String(region.id),
-                  label: region.name,
-                  description: region.code,
-                }))}
-                onChange={(region_ids) =>
-                  setFilters((current) => ({
-                    ...current,
-                    region_ids: toNumbers(region_ids),
-                    page: 1,
-                  }))
-                }
-              />
-              <MultiSearchSelect
-                label="Задачи"
-                values={filters.task_ids.map(String)}
-                placeholder="Все задачи"
-                searchPlaceholder="Поиск по id или названию"
-                options={(tasksQuery.data ?? []).map((task) => ({
-                  value: String(task.id),
-                  label: `#${task.id} ${task.title}`,
-                  description: task.statusLabel,
-                }))}
-                onChange={(task_ids) =>
-                  setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids), page: 1 }))
-                }
-              />
-              <MultiSearchSelect
-                label="Пользователи"
-                values={filters.user_ids.map(String)}
-                placeholder="Все пользователи"
-                searchPlaceholder="Поиск по ФИО или username"
-                options={(usersQuery.data ?? []).map((user) => ({
-                  value: String(user.id),
-                  label: user.fullName,
-                  description: `@${user.username}`,
-                }))}
-                onChange={(user_ids) =>
-                  setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids), page: 1 }))
-                }
-              />
-              <MultiSearchSelect
-                label="Оргструктуры"
-                values={filters.org_unit_ids.map(String)}
-                placeholder="Все оргструктуры"
-                searchPlaceholder="Поиск оргструктуры"
-                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-                  value: String(orgUnit.id),
-                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                }))}
-                onChange={(org_unit_ids) =>
-                  setFilters((current) => ({
-                    ...current,
-                    org_unit_ids: toNumbers(org_unit_ids),
-                    page: 1,
-                  }))
-                }
-              />
               <MultiSelect
                 label="Роли"
                 values={filters.role_ids.map(String)}
@@ -412,71 +380,6 @@ export function ReportRegistry({
                 options={roleOptions}
                 onChange={(role_ids) =>
                   setFilters((current) => ({ ...current, role_ids: toNumbers(role_ids), page: 1 }))
-                }
-              />
-              <MultiSelect
-                label="Тип задачи"
-                values={filters.task_types}
-                placeholder="Все типы"
-                options={taskTypeOptions}
-                onChange={(task_types) =>
-                  setFilters((current) => ({
-                    ...current,
-                    task_types: task_types as ReportTaskType[],
-                    page: 1,
-                  }))
-                }
-              />
-              <MultiSelect
-                label="Масштаб задачи"
-                values={filters.task_scope}
-                placeholder="Любой масштаб"
-                options={taskScopeOptions}
-                onChange={(task_scope) =>
-                  setFilters((current) => ({
-                    ...current,
-                    task_scope: task_scope as ReportTaskScope[],
-                    page: 1,
-                  }))
-                }
-              />
-              <MultiSelect
-                label="Тип отчета"
-                values={filters.report_types}
-                placeholder="Все типы отчетов"
-                options={reportTypeOptions}
-                onChange={(report_types) =>
-                  setFilters((current) => ({
-                    ...current,
-                    report_types: report_types as ReportType[],
-                    page: 1,
-                  }))
-                }
-              />
-              <MultiSelect
-                label="Статус отчета"
-                values={filters.report_statuses}
-                placeholder="Все статусы отчетов"
-                options={reportStatusOptions}
-                onChange={(report_statuses) =>
-                  setFilters((current) => ({
-                    ...current,
-                    report_statuses: report_statuses as ReportStatus[],
-                    page: 1,
-                  }))
-                }
-              />
-              <MultiSelect
-                label="Статус назначения"
-                values={filters.assignment_statuses}
-                placeholder="Все статусы назначений"
-                options={assignmentStatusOptions}
-                onChange={(assignment_statuses) =>
-                  setFilters((current) => ({
-                    ...current,
-                    assignment_statuses: assignment_statuses as AssignmentStatus[],
-                    page: 1,
-                  }))
                 }
               />
               <DateFilter
@@ -602,14 +505,11 @@ export function ReportRegistry({
         )}
 
         {hasRequestedReports && (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-slate-500">
-              Найдено: {totalReports}
-              {reportsQuery.data ? `, страница ${reportsQuery.data.page} из ${totalPages}` : ''}
-            </p>
+          <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
             <ReportPagination
               page={currentPage}
               pageSize={currentPageSize}
+              total={totalReports}
               totalPages={totalPages}
               hasMore={reportsQuery.data?.hasMore ?? false}
               disabled={reportsQuery.isFetching}
@@ -652,145 +552,42 @@ export function ReportRegistry({
             Не удалось загрузить отчеты.
           </div>
         ) : tableVariant === 'task-region' ? (
-          <TaskRegionReportsTable reports={reports} onReportClick={setSelectedReportId} />
+          <TaskRegionReportsTable
+            reports={reports}
+            filters={filters}
+            taskOptions={taskOptions}
+            userOptions={userOptions}
+            onFiltersChange={handleTableFiltersChange}
+            onReportClick={setSelectedReportId}
+          />
         ) : (
           <div className="space-y-3">
-            <TableScrollArea headerHeight="3rem" height="70vh">
-              <Table className="min-w-[1500px] whitespace-nowrap">
-                <TableHeader>
-                  <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={
-                          isCurrentPagePartiallySelected ? 'indeterminate' : isCurrentPageSelected
-                        }
-                        disabled={currentPageReportIds.length === 0}
-                        onCheckedChange={(checked) => handleToggleCurrentPage(checked === true)}
-                      />
-                    </TableHead>
-                    <TableHead className="w-28">Отчет</TableHead>
-                    <TableHead className="w-28">Назначение</TableHead>
-                    <TableHead className="min-w-[300px]">Задача</TableHead>
-                    <TableHead className="min-w-[240px]">Исполнитель</TableHead>
-                    <TableHead className="min-w-[220px]">Регион</TableHead>
-                    <TableHead className="min-w-[220px]">Оргструктура</TableHead>
-                    <TableHead className="w-40">Тип задачи</TableHead>
-                    <TableHead className="w-40">Формат отчета</TableHead>
-                    <TableHead className="w-40">Статус отчета</TableHead>
-                    <TableHead className="w-44">Статус назначения</TableHead>
-                    <TableHead className="w-32">Правки</TableHead>
-                    <TableHead className="w-44">Отправлен</TableHead>
-                    <TableHead className="w-44">Дедлайн</TableHead>
-                    <TableHead className="w-32">Просрочен</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reports.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={15} className="py-10 text-center text-sm text-slate-500">
-                        Отчетов пока нет.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    reports.map((report, index) => {
-                      const selectableReportId = getSelectableReportId(report);
-
-                      return (
-                        <TableRow
-                          key={`${report.id}-${index}`}
-                          className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
-                          onClick={() => setSelectedReportId(getReportOpenId(report))}
-                        >
-                          <TableCell onClick={(event) => event.stopPropagation()}>
-                            <Checkbox
-                              checked={
-                                selectableReportId
-                                  ? selectedReportIds.has(selectableReportId)
-                                  : false
-                              }
-                              disabled={!selectableReportId}
-                              onCheckedChange={(checked) => {
-                                if (selectableReportId) {
-                                  handleToggleReport(selectableReportId, checked === true);
-                                }
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium text-slate-700">
-                            {report.reportId ? `#${report.reportId}` : 'n/a'}
-                          </TableCell>
-                          <TableCell className="font-medium text-slate-700">
-                            #{report.assignmentId}
-                          </TableCell>
-                          <TableCell className="min-w-[300px]">
-                            <div className="space-y-1 whitespace-normal">
-                              <div className="font-medium text-slate-900">{report.taskTitle}</div>
-                              <div className="text-xs text-slate-500">
-                                ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium text-slate-900">
-                                {report.executorName}
-                              </div>
-                              <div className="text-xs text-slate-500">
-                                ID: {report.executorId ?? 'n/a'} • {report.executorRole}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-slate-700">{report.regionName}</TableCell>
-                          <TableCell className="text-slate-700">{report.orgUnitName}</TableCell>
-                          <TableCell>{getTaskTypeLabel(report.taskType)}</TableCell>
-                          <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
-                          <TableCell>
-                            {report.reportStatus ? (
-                              <StatusBadge
-                                value={report.reportStatus}
-                                label={getReportStatusLabel(report.reportStatus)}
-                              />
-                            ) : (
-                              <span className="text-sm text-slate-500">Нет отчета</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge
-                              value={report.assignmentStatus}
-                              label={getAssignmentStatusLabel(report.assignmentStatus)}
-                            />
-                          </TableCell>
-                          <TableCell className="text-slate-700">
-                            {report.revisionUsed} / {report.revisionLimit}
-                          </TableCell>
-                          <TableCell className="text-slate-700">
-                            {formatDateTime(report.submittedAt)}
-                          </TableCell>
-                          <TableCell className="text-slate-700">
-                            {formatDateTime(report.deadlineAt)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
-                                report.isOverdue
-                                  ? 'bg-red-100 text-red-700'
-                                  : 'bg-emerald-100 text-emerald-700'
-                              }`}
-                            >
-                              {report.isOverdue ? 'Да' : 'Нет'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </TableScrollArea>
-            <div className="flex justify-end rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+            <ReportRegistryTable
+              reports={reports}
+              filters={filters}
+              regionOptions={regionOptions}
+              taskOptions={taskOptions}
+              userOptions={userOptions}
+              orgUnitOptions={orgUnitOptions}
+              taskTypeOptions={taskTypeOptions}
+              taskScopeOptions={taskScopeOptions}
+              reportTypeOptions={reportTypeOptions}
+              reportStatusOptions={reportStatusOptions}
+              assignmentStatusOptions={assignmentStatusOptions}
+              selectedReportIds={selectedReportIds}
+              isCurrentPageSelected={isCurrentPageSelected}
+              isCurrentPagePartiallySelected={isCurrentPagePartiallySelected}
+              currentPageReportIds={currentPageReportIds}
+              onFiltersChange={handleTableFiltersChange}
+              onToggleCurrentPage={handleToggleCurrentPage}
+              onToggleReport={handleToggleReport}
+              onReportClick={setSelectedReportId}
+            />
+            <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
               <ReportPagination
                 page={currentPage}
                 pageSize={currentPageSize}
+                total={totalReports}
                 totalPages={totalPages}
                 hasMore={reportsQuery.data?.hasMore ?? false}
                 disabled={reportsQuery.isFetching}
@@ -833,22 +630,365 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
   };
 }
 
-function TaskRegionReportsTable({
+const ReportRegistryTable = memo(function ReportRegistryTable({
   reports,
+  filters,
+  regionOptions,
+  taskOptions,
+  userOptions,
+  orgUnitOptions,
+  taskTypeOptions,
+  reportTypeOptions,
+  reportStatusOptions,
+  assignmentStatusOptions,
+  selectedReportIds,
+  isCurrentPageSelected,
+  isCurrentPagePartiallySelected,
+  currentPageReportIds,
+  onFiltersChange,
+  onToggleCurrentPage,
+  onToggleReport,
   onReportClick,
 }: {
   reports: CrmReport[];
+  filters: ReportFilters;
+  regionOptions: SelectOption[];
+  taskOptions: SelectOption[];
+  userOptions: SelectOption[];
+  orgUnitOptions: SelectOption[];
+  taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
+  reportTypeOptions: Array<{ value: ReportType; label: string }>;
+  reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
+  assignmentStatusOptions: Array<{ value: AssignmentStatus; label: string }>;
+  selectedReportIds: Set<number>;
+  isCurrentPageSelected: boolean;
+  isCurrentPagePartiallySelected: boolean;
+  currentPageReportIds: number[];
+  onFiltersChange: (filters: Partial<ReportFilters>) => void;
+  onToggleCurrentPage: (checked: boolean) => void;
+  onToggleReport: (reportId: number, checked: boolean) => void;
   onReportClick: (reportId: number) => void;
 }) {
   return (
-    <TableScrollArea headerHeight="3rem" height="70vh">
+    <TableScrollArea headerHeight="6rem" height="70vh">
+      <Table className="min-w-[1500px] whitespace-nowrap">
+        <ReportRegistryTableHeader
+          filters={filters}
+          regionOptions={regionOptions}
+          taskOptions={taskOptions}
+          userOptions={userOptions}
+          orgUnitOptions={orgUnitOptions}
+          taskTypeOptions={taskTypeOptions}
+          reportTypeOptions={reportTypeOptions}
+          reportStatusOptions={reportStatusOptions}
+          assignmentStatusOptions={assignmentStatusOptions}
+          isCurrentPageSelected={isCurrentPageSelected}
+          isCurrentPagePartiallySelected={isCurrentPagePartiallySelected}
+          currentPageReportIds={currentPageReportIds}
+          onFiltersChange={onFiltersChange}
+          onToggleCurrentPage={onToggleCurrentPage}
+        />
+        <ReportRegistryTableBody
+          reports={reports}
+          selectedReportIds={selectedReportIds}
+          onToggleReport={onToggleReport}
+          onReportClick={onReportClick}
+        />
+      </Table>
+    </TableScrollArea>
+  );
+});
+
+const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
+  filters,
+  regionOptions,
+  taskOptions,
+  userOptions,
+  orgUnitOptions,
+  taskTypeOptions,
+  reportTypeOptions,
+  reportStatusOptions,
+  assignmentStatusOptions,
+  isCurrentPageSelected,
+  isCurrentPagePartiallySelected,
+  currentPageReportIds,
+  onFiltersChange,
+  onToggleCurrentPage,
+}: {
+  filters: ReportFilters;
+  regionOptions: SelectOption[];
+  taskOptions: SelectOption[];
+  userOptions: SelectOption[];
+  orgUnitOptions: SelectOption[];
+  taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
+  reportTypeOptions: Array<{ value: ReportType; label: string }>;
+  reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
+  assignmentStatusOptions: Array<{ value: AssignmentStatus; label: string }>;
+  isCurrentPageSelected: boolean;
+  isCurrentPagePartiallySelected: boolean;
+  currentPageReportIds: number[];
+  onFiltersChange: (filters: Partial<ReportFilters>) => void;
+  onToggleCurrentPage: (checked: boolean) => void;
+}) {
+  return (
+    <TableHeader>
+      <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+        <TableHead className="w-12" />
+        <TableHead className="w-28" />
+        <TableHead className="w-28" />
+        <TableHead className="min-w-[300px] align-bottom">
+          <MultiSearchSelect
+            label=""
+            values={filters.task_ids.map(String)}
+            placeholder="Все задачи"
+            searchPlaceholder="Поиск задачи"
+            options={taskOptions}
+            onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
+          />
+        </TableHead>
+        <TableHead className="min-w-[240px] align-bottom">
+          <MultiSearchSelect
+            label=""
+            values={filters.user_ids.map(String)}
+            placeholder="Все исполнители"
+            searchPlaceholder="Поиск исполнителя"
+            options={userOptions}
+            onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids) })}
+          />
+        </TableHead>
+        <TableHead className="min-w-[220px] align-bottom">
+          <MultiSearchSelect
+            label=""
+            values={filters.region_ids.map(String)}
+            placeholder="Все регионы"
+            searchPlaceholder="Поиск региона"
+            options={regionOptions}
+            onChange={(region_ids) => onFiltersChange({ region_ids: toNumbers(region_ids) })}
+          />
+        </TableHead>
+        <TableHead className="min-w-[220px] align-bottom">
+          <MultiSearchSelect
+            label=""
+            values={filters.org_unit_ids.map(String)}
+            placeholder="Все оргструктуры"
+            searchPlaceholder="Поиск оргструктуры"
+            options={orgUnitOptions}
+            onChange={(org_unit_ids) => onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids) })}
+          />
+        </TableHead>
+        <TableHead className="w-40 align-bottom">
+          <MultiSelect
+            label=""
+            values={filters.task_types}
+            placeholder="Все типы"
+            options={taskTypeOptions}
+            onChange={(task_types) => onFiltersChange({ task_types: task_types as ReportTaskType[] })}
+          />
+        </TableHead>
+        <TableHead className="w-40 align-bottom">
+          <MultiSelect
+            label=""
+            values={filters.report_types}
+            placeholder="Все форматы"
+            options={reportTypeOptions}
+            onChange={(report_types) => onFiltersChange({ report_types: report_types as ReportType[] })}
+          />
+        </TableHead>
+        <TableHead className="w-40 align-bottom">
+          <MultiSelect
+            label=""
+            values={filters.report_statuses}
+            placeholder="Все статусы"
+            options={reportStatusOptions}
+            onChange={(report_statuses) => onFiltersChange({ report_statuses: report_statuses as ReportStatus[] })}
+          />
+        </TableHead>
+        <TableHead className="w-44 align-bottom">
+          <MultiSelect
+            label=""
+            values={filters.assignment_statuses}
+            placeholder="Все статусы"
+            options={assignmentStatusOptions}
+            onChange={(assignment_statuses) =>
+              onFiltersChange({ assignment_statuses: assignment_statuses as AssignmentStatus[] })
+            }
+          />
+        </TableHead>
+        <TableHead className="w-32" />
+        <TableHead className="w-44" />
+        <TableHead className="w-44" />
+        <TableHead className="w-32" />
+      </TableRow>
+      <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+        <TableHead className="w-12">
+          <Checkbox
+            checked={isCurrentPagePartiallySelected ? 'indeterminate' : isCurrentPageSelected}
+            disabled={currentPageReportIds.length === 0}
+            onCheckedChange={(checked) => onToggleCurrentPage(checked === true)}
+          />
+        </TableHead>
+        <TableHead className="w-28">Отчет</TableHead>
+        <TableHead className="w-28">Назначение</TableHead>
+        <TableHead className="min-w-[300px]">Задача</TableHead>
+        <TableHead className="min-w-[240px]">Исполнитель</TableHead>
+        <TableHead className="min-w-[220px]">Регион</TableHead>
+        <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+        <TableHead className="w-40">Тип задачи</TableHead>
+        <TableHead className="w-40">Формат отчета</TableHead>
+        <TableHead className="w-40">Статус отчета</TableHead>
+        <TableHead className="w-44">Статус назначения</TableHead>
+        <TableHead className="w-32">Правки</TableHead>
+        <TableHead className="w-44">Отправлен</TableHead>
+        <TableHead className="w-44">Дедлайн</TableHead>
+        <TableHead className="w-32">Просрочен</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+});
+
+const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
+  reports,
+  selectedReportIds,
+  onToggleReport,
+  onReportClick,
+}: {
+  reports: CrmReport[];
+  selectedReportIds: Set<number>;
+  onToggleReport: (reportId: number, checked: boolean) => void;
+  onReportClick: (reportId: number) => void;
+}) {
+  return (
+    <TableBody>
+      {reports.length === 0 ? (
+        <TableRow>
+          <TableCell colSpan={15} className="py-10 text-center text-sm text-slate-500">
+            Отчетов пока нет.
+          </TableCell>
+        </TableRow>
+      ) : (
+        reports.map((report, index) => {
+          const selectableReportId = getSelectableReportId(report);
+
+          return (
+            <TableRow
+              key={`${report.id}-${index}`}
+              className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
+              onClick={() => onReportClick(getReportOpenId(report))}
+            >
+              <TableCell onClick={(event) => event.stopPropagation()}>
+                <Checkbox
+                  checked={selectableReportId ? selectedReportIds.has(selectableReportId) : false}
+                  disabled={!selectableReportId}
+                  onCheckedChange={(checked) => {
+                    if (selectableReportId) {
+                      onToggleReport(selectableReportId, checked === true);
+                    }
+                  }}
+                />
+              </TableCell>
+              <TableCell className="font-medium text-slate-700">{report.reportId ? `#${report.reportId}` : 'n/a'}</TableCell>
+              <TableCell className="font-medium text-slate-700">#{report.assignmentId}</TableCell>
+              <TableCell className="min-w-[300px]">
+                <div className="space-y-1 whitespace-normal">
+                  <div className="font-medium text-slate-900">{report.taskTitle}</div>
+                  <div className="text-xs text-slate-500">
+                    ID задачи: {report.taskId} - {getTaskScopeLabel(report.taskScope)}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="space-y-1">
+                  <div className="font-medium text-slate-900">{report.executorName}</div>
+                  <div className="text-xs text-slate-500">
+                    ID: {report.executorId ?? 'n/a'} - {report.executorRole}
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="text-slate-700">{report.regionName}</TableCell>
+              <TableCell className="text-slate-700">{report.orgUnitName}</TableCell>
+              <TableCell>{getTaskTypeLabel(report.taskType)}</TableCell>
+              <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
+              <TableCell>
+                {report.reportStatus ? (
+                  <StatusBadge value={report.reportStatus} label={getReportStatusLabel(report.reportStatus)} />
+                ) : (
+                  <span className="text-sm text-slate-500">Нет отчета</span>
+                )}
+              </TableCell>
+              <TableCell>
+                <StatusBadge value={report.assignmentStatus} label={getAssignmentStatusLabel(report.assignmentStatus)} />
+              </TableCell>
+              <TableCell className="text-slate-700">
+                {report.revisionUsed} / {report.revisionLimit}
+              </TableCell>
+              <TableCell className="text-slate-700">{formatDateTime(report.submittedAt)}</TableCell>
+              <TableCell className="text-slate-700">{formatDateTime(report.deadlineAt)}</TableCell>
+              <TableCell>
+                <Badge
+                  className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
+                    report.isOverdue ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+                  }`}
+                >
+                  {report.isOverdue ? 'Да' : 'Нет'}
+                </Badge>
+              </TableCell>
+            </TableRow>
+          );
+        })
+      )}
+    </TableBody>
+  );
+});
+
+function TaskRegionReportsTable({
+  reports,
+  filters,
+  taskOptions,
+  userOptions,
+  onFiltersChange,
+  onReportClick,
+}: {
+  reports: CrmReport[];
+  filters: ReportFilters;
+  taskOptions: SelectOption[];
+  userOptions: SelectOption[];
+  onFiltersChange: (filters: Partial<ReportFilters>) => void;
+  onReportClick: (reportId: number) => void;
+}) {
+  return (
+    <TableScrollArea headerHeight="6rem" height="70vh">
       <Table className="min-w-[980px] whitespace-nowrap">
         <TableHeader>
+          <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+            <TableHead className="w-24" />
+            <TableHead className="w-28" />
+            <TableHead className="min-w-[320px] align-bottom">
+              <MultiSearchSelect
+                label=""
+                values={filters.task_ids.map(String)}
+                placeholder="Все задачи"
+                searchPlaceholder="Поиск задачи"
+                options={taskOptions}
+                onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
+              />
+            </TableHead>
+            <TableHead className="min-w-[280px]" />
+            <TableHead className="min-w-[240px] align-bottom">
+              <MultiSearchSelect
+                label=""
+                values={filters.user_ids.map(String)}
+                placeholder="Все исполнители"
+                searchPlaceholder="Поиск исполнителя"
+                options={userOptions}
+                onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids) })}
+              />
+            </TableHead>
+          </TableRow>
           <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
             <TableHead className="w-24">Действия</TableHead>
             <TableHead className="w-28">ID отчета</TableHead>
             <TableHead className="min-w-[320px]">Задача</TableHead>
-            <TableHead className="min-w-[280px]">Превью / ссылка</TableHead>
+            <TableHead className="min-w-[280px]">Отчет</TableHead>
             <TableHead className="min-w-[240px]">Исполнитель</TableHead>
           </TableRow>
         </TableHeader>
@@ -1282,6 +1422,7 @@ function SummaryItem({
 function ReportPagination({
   page,
   pageSize,
+  total,
   totalPages,
   hasMore,
   disabled,
@@ -1290,61 +1431,71 @@ function ReportPagination({
 }: {
   page: number;
   pageSize: number;
+  total: number;
   totalPages: number;
   hasMore: boolean;
   disabled: boolean;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) {
+  const [pageInput, setPageInput] = useState(String(page));
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
+
+  useEffect(() => {
+    if (!pageInput.trim()) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      const nextPage = clampPage(Number(pageInput) || 1, totalPages);
+
+      if (nextPage !== page) {
+        onPageChange(nextPage);
+      }
+    }, 1000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [onPageChange, page, pageInput, totalPages]);
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled || page <= 1}
-        onClick={() => onPageChange(1)}
-      >
-        Первая
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled || page <= 1}
-        onClick={() => onPageChange(page - 1)}
-      >
-        Назад
-      </Button>
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-slate-500">Страница</span>
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled || page <= 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          Назад
+        </Button>
+        <span className="text-sm text-slate-500">
+          Страница
+        </span>
         <Input
           className="h-9 w-20 border-slate-200 bg-white text-sm"
           min={1}
           max={totalPages}
           type="number"
-          value={page}
+          value={pageInput}
           disabled={disabled}
-          onChange={(event) => onPageChange(Number(event.target.value) || 1)}
+          onChange={(event) => setPageInput(event.target.value)}
         />
         <span className="text-sm text-slate-500">из {totalPages}</span>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled || !hasMore}
+          onClick={() => onPageChange(page + 1)}
+        >
+          Вперед
+        </Button>
       </div>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled || (!hasMore && page >= totalPages)}
-        onClick={() => onPageChange(page + 1)}
-      >
-        Вперед
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={disabled || page >= totalPages}
-        onClick={() => onPageChange(totalPages)}
-      >
-        Последняя
-      </Button>
-      <div className="ml-2 flex items-center gap-2">
-        <span className="text-sm text-slate-500">На странице</span>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-sm text-slate-500">Всего: {total}</span>
         <Select
           value={String(pageSize)}
           onValueChange={(value) => onPageSizeChange(Number(value))}
@@ -1353,7 +1504,9 @@ function ReportPagination({
           <SelectTrigger className="h-9 w-24 border-slate-200 bg-white">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent align="start">
+          <SelectContent align="end">
+            <SelectItem value="5">5</SelectItem>
+            <SelectItem value="10">10</SelectItem>
             <SelectItem value="25">25</SelectItem>
             <SelectItem value="50">50</SelectItem>
             <SelectItem value="100">100</SelectItem>
@@ -1362,6 +1515,10 @@ function ReportPagination({
       </div>
     </div>
   );
+}
+
+function clampPage(page: number, totalPages: number) {
+  return Math.min(Math.max(1, page), Math.max(totalPages, 1));
 }
 
 function StatusBadge({ value, label }: { value: string; label: string }) {
