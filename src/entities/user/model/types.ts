@@ -104,6 +104,8 @@ export type RegisterUserPayload = {
   username: string;
   password: string;
   full_name: string;
+  phone: string;
+  birthday: string;
   max_user_id: string;
   role: RegisterUserRoleId;
   region: number | null;

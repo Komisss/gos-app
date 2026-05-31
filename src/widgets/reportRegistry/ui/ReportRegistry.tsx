@@ -307,6 +307,14 @@ export function ReportRegistry({
     setSelectedReportIds(new Set());
   }, []);
 
+  const handleOpenReportPage = useCallback((reportId: number) => {
+    if (!Number.isFinite(reportId) || reportId <= 0) {
+      return;
+    }
+
+    window.open(`/reports/${reportId}`, '_blank', 'noopener,noreferrer');
+  }, []);
+
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
@@ -558,7 +566,7 @@ export function ReportRegistry({
             taskOptions={taskOptions}
             userOptions={userOptions}
             onFiltersChange={handleTableFiltersChange}
-            onReportClick={setSelectedReportId}
+            onReportClick={handleOpenReportPage}
           />
         ) : (
           <div className="space-y-3">
@@ -581,7 +589,7 @@ export function ReportRegistry({
               onFiltersChange={handleTableFiltersChange}
               onToggleCurrentPage={handleToggleCurrentPage}
               onToggleReport={handleToggleReport}
-              onReportClick={setSelectedReportId}
+              onReportClick={handleOpenReportPage}
             />
             <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
               <ReportPagination
@@ -670,7 +678,7 @@ const ReportRegistryTable = memo(function ReportRegistryTable({
   onReportClick: (reportId: number) => void;
 }) {
   return (
-    <TableScrollArea headerHeight="6rem" height="70vh">
+    <TableScrollArea headerHeight="5rem" height="70vh">
       <Table className="min-w-[1500px] whitespace-nowrap">
         <ReportRegistryTableHeader
           filters={filters}
@@ -873,7 +881,11 @@ const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
             <TableRow
               key={`${report.id}-${index}`}
               className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
-              onClick={() => onReportClick(getReportOpenId(report))}
+              onClick={() => {
+                if (selectableReportId) {
+                  onReportClick(selectableReportId);
+                }
+              }}
             >
               <TableCell onClick={(event) => event.stopPropagation()}>
                 <Checkbox
@@ -1028,7 +1040,11 @@ function TaskRegionReportsTable({
                     <button
                       type="button"
                       className="font-medium text-[#465cd3] hover:underline"
-                      onClick={() => onReportClick(report.reportId ?? 0)}
+                      onClick={() => {
+                        if (report.reportId) {
+                          onReportClick(report.reportId);
+                        }
+                      }}
                     >
                       #{report.reportId}
                     </button>

@@ -11,13 +11,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
 
+type TableFilterMode = 'all' | 'region' | 'none';
+
 type Props = {
   users: UserListItem[];
   filters: UserFilters;
   orgUnits: OrgUnit[];
   regions: Region[];
-  showFilters?: boolean;
+  tableFilterMode?: TableFilterMode;
   onFiltersChange: (filters: UserFilters) => void;
+  onRegionClick?: (region: Region) => void;
 };
 
 const roleOptions = [
@@ -36,9 +39,12 @@ export const UserRegistryTable = memo(function UserRegistryTable({
   filters,
   orgUnits,
   regions,
-  showFilters = true,
+  tableFilterMode = 'all',
   onFiltersChange,
+  onRegionClick,
 }: Props) {
+  const showFilters = tableFilterMode !== 'none';
+
   return (
     <TableScrollArea headerHeight={showFilters ? '5rem' : '3rem'} height="68vh">
       <Table className="min-w-[1040px] whitespace-nowrap">
@@ -46,10 +52,10 @@ export const UserRegistryTable = memo(function UserRegistryTable({
           filters={filters}
           orgUnits={orgUnits}
           regions={regions}
-          showFilters={showFilters}
+          tableFilterMode={tableFilterMode}
           onFiltersChange={onFiltersChange}
         />
-        <UserRegistryTableBody users={users} />
+        <UserRegistryTableBody users={users} onRegionClick={onRegionClick} />
       </Table>
     </TableScrollArea>
   );
@@ -59,68 +65,81 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
   filters,
   orgUnits,
   regions,
-  showFilters,
+  tableFilterMode,
   onFiltersChange,
 }: {
   filters: UserFilters;
   orgUnits: OrgUnit[];
   regions: Region[];
-  showFilters: boolean;
+  tableFilterMode: TableFilterMode;
   onFiltersChange: (filters: UserFilters) => void;
 }) {
+  const showFilters = tableFilterMode !== 'none';
+  const showAllFilters = tableFilterMode === 'all';
+
   return (
     <TableHeader>
-      {showFilters && <TableRow className="border-b-slate-200 bg-white hover:bg-white">
-        <TableHead className="w-24" />
-        <TableHead className="min-w-[240px] align-bottom">
-          <HeaderSearchInput
-            value={filters.search ?? ''}
-            onChange={(search) => onFiltersChange({ search })}
-          />
-        </TableHead>
-        <TableHead className="min-w-[180px] align-bottom">
-          <HeaderSelect
-            value={filters.role}
-            placeholder="Все роли"
-            options={roleOptions}
-            onChange={(role) => onFiltersChange({ role })}
-          />
-        </TableHead>
-        <TableHead className="min-w-[220px] align-bottom">
-          <FilterSearchSelect
-            label=""
-            value={filters.region}
-            placeholder="Все регионы"
-            searchPlaceholder="Поиск региона"
-            options={regions.map((region) => ({
-              value: String(region.id),
-              label: region.name,
-            }))}
-            onChange={(region) => onFiltersChange({ region })}
-          />
-        </TableHead>
-        <TableHead className="min-w-[220px] align-bottom">
-          <FilterSearchSelect
-            label=""
-            value={filters.org_unit}
-            placeholder="Все оргструктуры"
-            searchPlaceholder="Поиск оргструктуры"
-            options={orgUnits.map((orgUnit) => ({
-              value: String(orgUnit.id),
-              label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-            }))}
-            onChange={(org_unit) => onFiltersChange({ org_unit })}
-          />
-        </TableHead>
-        <TableHead className="w-32 align-bottom">
-          <HeaderSelect
-            value={filters.status}
-            placeholder="Все статусы"
-            options={statusOptions}
-            onChange={(status) => onFiltersChange({ status })}
-          />
-        </TableHead>
-      </TableRow>}
+      {showFilters && (
+        <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+          <TableHead className="w-24" />
+          <TableHead className="min-w-[240px] align-bottom">
+            {showAllFilters && (
+              <HeaderSearchInput
+                value={filters.search ?? ''}
+                onChange={(search) => onFiltersChange({ search })}
+              />
+            )}
+          </TableHead>
+          <TableHead className="min-w-[180px] align-bottom">
+            {showAllFilters && (
+              <HeaderSelect
+                value={filters.role}
+                placeholder="Все роли"
+                options={roleOptions}
+                onChange={(role) => onFiltersChange({ role })}
+              />
+            )}
+          </TableHead>
+          <TableHead className="min-w-[220px] align-bottom">
+            <FilterSearchSelect
+              label=""
+              value={filters.region}
+              placeholder="Все регионы"
+              searchPlaceholder="Поиск региона"
+              options={regions.map((region) => ({
+                value: String(region.id),
+                label: region.name,
+              }))}
+              onChange={(region) => onFiltersChange({ region })}
+            />
+          </TableHead>
+          <TableHead className="min-w-[220px] align-bottom">
+            {showAllFilters && (
+              <FilterSearchSelect
+                label=""
+                value={filters.org_unit}
+                placeholder="Все оргструктуры"
+                searchPlaceholder="Поиск оргструктуры"
+                options={orgUnits.map((orgUnit) => ({
+                  value: String(orgUnit.id),
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                }))}
+                onChange={(org_unit) => onFiltersChange({ org_unit })}
+              />
+            )}
+          </TableHead>
+          <TableHead className="w-32 align-bottom">
+            {showAllFilters && (
+              <HeaderSelect
+                value={filters.status}
+                placeholder="Все статусы"
+                options={statusOptions}
+                onChange={(status) => onFiltersChange({ status })}
+              />
+            )}
+          </TableHead>
+        </TableRow>
+      )}
       <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
         <TableHead className="w-24">#</TableHead>
         <TableHead className="min-w-[240px]">Пользователь</TableHead>
@@ -133,7 +152,13 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
   );
 });
 
-const UserRegistryTableBody = memo(function UserRegistryTableBody({ users }: { users: UserListItem[] }) {
+const UserRegistryTableBody = memo(function UserRegistryTableBody({
+  users,
+  onRegionClick,
+}: {
+  users: UserListItem[];
+  onRegionClick?: (region: Region) => void;
+}) {
   return (
     <TableBody>
       {users.length === 0 ? (
@@ -159,7 +184,22 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({ users }: { u
               </div>
             </TableCell>
             <TableCell className="text-slate-700">{user.role?.name ?? 'Не указана'}</TableCell>
-            <TableCell className="text-slate-700">{user.region?.name ?? 'Не указан'}</TableCell>
+            <TableCell className="text-slate-700">
+              {user.region ? (
+                <button
+                  type="button"
+                  className="font-medium text-[#465cd3] hover:underline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onRegionClick?.(user.region as Region);
+                  }}
+                >
+                  {user.region.name}
+                </button>
+              ) : (
+                'Не указан'
+              )}
+            </TableCell>
             <TableCell className="min-w-[220px] whitespace-normal text-slate-700">
               {user.orgUnit?.name ?? 'Не указана'}
             </TableCell>

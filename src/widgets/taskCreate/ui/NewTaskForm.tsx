@@ -29,15 +29,13 @@ type AssignmentTarget = {
 
 const initialForm: TaskPayload = {
   title: '',
-  short_description: null,
   full_description: null,
-  revision_limit: null,
-  comment_for_executor: null,
   scope: 'regional',
-  status: 'draft',
+  status: 'active',
   task_type: 'online_action',
+  online_task_subtype: 'like',
   report_format: 'link',
-  deadline_at: null,
+  deadline_at: null
 };
 
 export function NewTaskForm() {
@@ -111,7 +109,7 @@ export function NewTaskForm() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-5 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold !text-slate-900">Новая задача</h1>
           <p className="text-sm text-slate-500">
@@ -133,18 +131,8 @@ export function NewTaskForm() {
             />
           </Field>
 
-          <Field label="Короткое описание">
-            <Input
-              placeholder="Введите короткое описание"
-              className="border-slate-200"
-              value={form.short_description ?? ''}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, short_description: event.target.value }))
-              }
-            />
-          </Field>
 
-          <Field label="Полное описание">
+          <Field label="Описание">
             <textarea
               className="min-h-32 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               placeholder="Введите полное описание"
@@ -154,35 +142,6 @@ export function NewTaskForm() {
               }
             />
           </Field>
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Количество правок задачи">
-              <Input
-                type="number"
-                min={0}
-                max={9}
-                className="border-slate-200"
-                value={form.revision_limit ?? ''}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    revision_limit: normalizeRevisionLimit(event.target.value),
-                  }))
-                }
-              />
-            </Field>
-
-            <Field label="Комментарий для исполнителя">
-              <Input
-                placeholder="Введите комментарий"
-                className="border-slate-200"
-                value={form.comment_for_executor ?? ''}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, comment_for_executor: event.target.value }))
-                }
-              />
-            </Field>
-          </div>
 
           <Field label="Адресат задачи">
             <AssignmentCombobox
@@ -196,7 +155,7 @@ export function NewTaskForm() {
           </Field>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Масштаб">
+            <Field label="Уровень">
               <Select
                 value={form.scope}
                 onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
@@ -229,7 +188,6 @@ export function NewTaskForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
-                  <SelectItem value="draft">Черновик</SelectItem>
                   <SelectItem value="scheduled">Запланирована</SelectItem>
                   <SelectItem value="active">Активная</SelectItem>
                 </SelectContent>
@@ -239,7 +197,15 @@ export function NewTaskForm() {
             <Field label="Тип задачи">
               <Select
                 value={form.task_type}
-                onValueChange={(task_type) => setForm((current) => ({ ...current, task_type }))}
+                onValueChange={(task_type) =>
+                  setForm((current) => ({
+                    ...current,
+                    task_type,
+                    report_format: task_type === 'street_action' ? 'image' : current.report_format,
+                    online_task_subtype:
+                      task_type === 'online_action' ? (current.online_task_subtype ?? 'like') : undefined,
+                  }))
+                }
               >
                 <SelectTrigger className="w-full border-slate-200 bg-white">
                   <SelectValue />
@@ -250,12 +216,33 @@ export function NewTaskForm() {
                 </SelectContent>
               </Select>
             </Field>
+            {
+              form.task_type === 'online_action' &&
+              <Field label="Подтип задачи">
+                <Select
+                  value={form.online_task_subtype}
+                  onValueChange={(online_task_subtype) => setForm((current) => ({ ...current, online_task_subtype }))}
+                >
+                  <SelectTrigger className="w-full border-slate-200 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="start">
+                    <SelectItem value="like">Лайк</SelectItem>
+                    <SelectItem value="comment">Комментарий</SelectItem>
+                    <SelectItem value="repost">Репост</SelectItem>
+                    <SelectItem value="post">Пост</SelectItem>
+                    <SelectItem value="other">Другое</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            }
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="Формат отчета">
               <Select
                 value={form.report_format}
+                disabled={form.task_type === 'street_action'}
                 onValueChange={(report_format) =>
                   setForm((current) => ({ ...current, report_format }))
                 }
@@ -303,13 +290,9 @@ export function NewTaskForm() {
             <Button
               type="submit"
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={createMutation.isPending || (form.status !== 'draft' && !assignmentTarget)}
+              disabled={createMutation.isPending || !assignmentTarget}
             >
-              {createMutation.isPending
-                ? 'Создание...'
-                : form.status === 'draft'
-                  ? 'Создать задачу'
-                  : 'Создать и назначить исполнителей'}
+              {createMutation.isPending ? 'Создание...' : 'Создать и назначить исполнителей'}
             </Button>
           </div>
         </form>
@@ -323,10 +306,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
   const scheduledAt = form.scheduled_at ? new Date(form.scheduled_at) : now;
   const normalized: TaskPayload = {
     ...form,
-    short_description: normalizeOptionalString(form.short_description),
     full_description: normalizeOptionalString(form.full_description),
-    comment_for_executor: normalizeOptionalString(form.comment_for_executor),
-    revision_limit: clampRevisionLimit(form.revision_limit),
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
   };
@@ -348,22 +328,6 @@ function normalizeOptionalString(value: string | null) {
   const normalized = value?.trim();
 
   return normalized ? normalized : null;
-}
-
-function normalizeRevisionLimit(value: string) {
-  if (value === '') {
-    return null;
-  }
-
-  return clampRevisionLimit(Number(value));
-}
-
-function clampRevisionLimit(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return null;
-  }
-
-  return Math.min(Math.max(0, value), 9);
 }
 
 function omitTargets(payload: TaskPayload): TaskPayload {
@@ -393,6 +357,7 @@ function AssignmentCombobox({
 
   const data = { users, regions, orgUnits };
   const selectedLabel = getAssignmentLabel(value, data);
+  const selectedNames = getAssignmentNames(value, data);
   const list = useAssignmentList(kind, query, data);
 
   function handleSelect(item: AssignmentOption) {
@@ -406,7 +371,8 @@ function AssignmentCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -489,7 +455,11 @@ function AssignmentCombobox({
           </ScrollArea>
         </div>
       </PopoverContent>
-    </Popover>
+      </Popover>
+      {selectedNames.length > 0 && (
+        <p className="text-sm leading-6 text-slate-600">{selectedNames.join(', ')}</p>
+      )}
+    </div>
   );
 }
 
@@ -569,6 +539,19 @@ function getAssignmentLabel(
   }
 
   return 'Выберите адресата задачи';
+}
+
+function getAssignmentNames(
+  value: AssignmentTarget,
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+) {
+  if (!value) {
+    return [];
+  }
+
+  return getAssignmentOptions(value.kind, data)
+    .filter((item) => value.ids.includes(item.id))
+    .map((item) => item.label.trim());
 }
 
 function getSearchLabel(kind: AssignmentKind) {

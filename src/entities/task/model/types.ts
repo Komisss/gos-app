@@ -4,6 +4,8 @@ export type TaskScope = "federal" | "regional" | "municipal" | string;
 
 export type TaskType = "online_action" | "street_action";
 
+export type OnlineTaskSubtype = "like" | "comment" | "repost" | "post" | "other"
+
 export type TaskReportFormat = "link" | "image";
 
 export type TaskTargetType = 'region' | 'org_unit' | 'user';
@@ -118,14 +120,12 @@ export interface TaskDto {
 
 export type TaskPayload = {
   title: string;
-  short_description: string | null;
   full_description: string | null;
-  revision_limit: number | null;
-  comment_for_executor: string | null;
   scope: TaskScope;
   targets?: TaskTargetPayload[] | null;
   status: TaskStatus;
   task_type: TaskType;
+  online_task_subtype?: OnlineTaskSubtype;
   report_format: TaskReportFormat;
   deadline_at: string | null;
   scheduled_at?: string | null;

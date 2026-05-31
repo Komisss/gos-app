@@ -21,7 +21,7 @@ export default function RegionManagersPage() {
       initialFilters={regionalManagerFilters}
       showActions={false}
       showFilterCard={false}
-      showTableFilters={false}
+      tableFilterMode="region"
     />
   );
 }

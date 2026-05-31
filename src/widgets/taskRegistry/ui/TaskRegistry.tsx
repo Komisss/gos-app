@@ -138,6 +138,10 @@ export function TaskRegistry() {
     setSize(nextSize);
   }, []);
 
+  const openTaskPage = useCallback((task: Task) => {
+    window.open(`/tasks/${task.id}`, '_blank', 'noopener,noreferrer');
+  }, []);
+
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
@@ -233,8 +237,7 @@ export function TaskRegistry() {
               togglingTaskId={togglingTaskId}
               deletingTaskId={deletingTaskId}
               onFiltersChange={updateFilters}
-              onTaskClick={setSelectedTask}
-              onEdit={setEditingTask}
+              onTaskClick={openTaskPage}
               onToggleArchive={(task) => toggleArchiveMutation.mutate(task)}
               onDelete={setDeletingTask}
             />

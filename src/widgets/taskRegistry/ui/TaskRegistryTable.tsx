@@ -1,8 +1,6 @@
 import { memo } from 'react';
-import { Pencil } from 'lucide-react';
 
 import {
-  getReportFormatLabel,
   getScopeLabel,
   getStatusLabel,
   getTaskTypeLabel,
@@ -11,12 +9,10 @@ import {
 import type { Task } from '@/entities/task/model/types';
 import type { UserListItem } from '@/entities/user/model/types';
 import { Badge } from '@/shared/ui/badge';
-import { Button } from '@/shared/ui/button';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shared/ui/tooltip';
 
 type Props = {
   tasks: Task[];
@@ -28,7 +24,6 @@ type Props = {
   onTaskClick?: (task: Task) => void;
   onToggleArchive?: (task: Task) => void;
   onDelete?: (task: Task) => void;
-  onEdit?: (task: Task) => void;
 };
 
 export const TaskRegistryTable = memo(function TaskRegistryTable({
@@ -37,13 +32,12 @@ export const TaskRegistryTable = memo(function TaskRegistryTable({
   users,
   onFiltersChange,
   onTaskClick,
-  onEdit,
 }: Props) {
   return (
     <TableScrollArea headerHeight="5rem" height="70vh">
-      <Table className="min-w-[1160px] whitespace-nowrap">
+      <Table className="min-w-[900px] whitespace-nowrap">
         <TaskRegistryTableHeader filters={filters} users={users} onFiltersChange={onFiltersChange} />
-        <TaskRegistryTableBody tasks={tasks} users={users} onTaskClick={onTaskClick} onEdit={onEdit} />
+        <TaskRegistryTableBody tasks={tasks} users={users} onTaskClick={onTaskClick} />
       </Table>
     </TableScrollArea>
   );
@@ -89,15 +83,12 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
           />
         </TableHead>
         <TableHead className="w-40" />
-        <TableHead className="w-36" />
-        <TableHead className="w-44" />
         <TableHead className="w-44" />
         <TableHead className="w-32 align-bottom">
           <HeaderSelect
             value={filters.status}
             placeholder="Все статусы"
             options={[
-              { value: 'draft', label: 'Черновик' },
               { value: 'scheduled', label: 'Запланирована' },
               { value: 'active', label: 'Активная' },
               { value: 'pending', label: 'В работе' },
@@ -107,8 +98,6 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
             onChange={(status) => onFiltersChange({ status })}
           />
         </TableHead>
-        <TableHead className="w-36" />
-        <TableHead className="w-24" />
       </TableRow>
       <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
         <TableHead className="w-24">#</TableHead>
@@ -116,12 +105,8 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
         <TableHead className="min-w-[220px]">Автор</TableHead>
         <TableHead className="w-36">Уровень</TableHead>
         <TableHead className="w-40">Тип</TableHead>
-        <TableHead className="w-36">Отчет</TableHead>
         <TableHead className="w-44">Дедлайн</TableHead>
-        <TableHead className="w-44">Создана</TableHead>
         <TableHead className="w-32">Статус</TableHead>
-        <TableHead className="w-36">Исполнители</TableHead>
-        <TableHead className="w-24 text-right" />
       </TableRow>
     </TableHeader>
   );
@@ -131,18 +116,16 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
   tasks,
   users,
   onTaskClick,
-  onEdit,
 }: {
   tasks: Task[];
   users: UserListItem[];
   onTaskClick?: (task: Task) => void;
-  onEdit?: (task: Task) => void;
 }) {
   return (
     <TableBody>
       {tasks.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={11} className="py-10 text-center text-sm text-slate-500">
+          <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">
             Задач пока нет.
           </TableCell>
         </TableRow>
@@ -170,47 +153,11 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
             </TableCell>
             <TableCell className="align-top text-slate-700">{getScopeLabel(task.scope ?? task.region)}</TableCell>
             <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
-            <TableCell className="align-top text-slate-700">{getReportFormatLabel(task.reportFormat ?? '')}</TableCell>
             <TableCell className="align-top text-slate-700">{task.deadlineLabel}</TableCell>
-            <TableCell className="align-top text-slate-700">{task.createdAt ? formatDateTime(task.createdAt) : 'n/a'}</TableCell>
             <TableCell className="align-top">
               <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
                 {task.statusLabel ?? getStatusLabel(task.status)}
               </Badge>
-            </TableCell>
-            <TableCell className="align-top">
-              <Badge
-                className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${
-                  task.isMaterialized ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
-                }`}
-              >
-                {task.isMaterialized ? 'Назначены' : 'Не назначены'}
-              </Badge>
-            </TableCell>
-            <TableCell className="pt-3 text-right align-top">
-              <div className="flex justify-end gap-1">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon-sm"
-                        variant="ghost"
-                        className="text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEdit?.(task);
-                        }}
-                        aria-label={`Редактировать задачу ${task.id}`}
-                      >
-                        <Pencil size={15} />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Редактировать</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
             </TableCell>
           </TableRow>
         ))
@@ -283,17 +230,4 @@ export function getStatusClassName(status: Task['status']) {
     default:
       return 'bg-blue-100 text-blue-700';
   }
-}
-
-function formatDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat('ru-RU', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(date);
 }

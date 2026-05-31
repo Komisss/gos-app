@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+﻿import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -10,7 +10,6 @@ import {
   Pencil,
   ThumbsDown,
   ThumbsUp,
-  Trash2,
 } from 'lucide-react';
 
 import { searchReports } from '@/entities/report/api/reports';
@@ -25,7 +24,6 @@ import {
   getScopeLabel,
   getStatusLabel,
   getTaskTypeLabel,
-  deleteTask,
   updateTask,
 } from '@/entities/task/api/tasks';
 import type { TaskPayload } from '@/entities/task/model/types';
@@ -67,11 +65,10 @@ export function TaskDetailsCard({
   isTogglingArchive,
   showOpenPageLink = false,
   onToggleArchive,
-  onDeleted,
 }: Props) {
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [toggleArchiveConfirmOpen, setToggleArchiveConfirmOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const authorQuery = useQuery({
@@ -114,22 +111,6 @@ export function TaskDetailsCard({
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => {
-      if (task.isMaterialized) {
-        throw new Error('Task cannot be deleted after assignments are materialized.');
-      }
-
-      return deleteTask(task.id);
-    },
-    onSuccess: async () => {
-      setDeleteConfirmOpen(false);
-      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      await queryClient.invalidateQueries({ queryKey: ['task', task.id] });
-      onDeleted?.();
-    },
-  });
-
   async function handleCopyTaskLink() {
     const link = `${window.location.origin}/tasks/${task.id}`;
 
@@ -158,9 +139,6 @@ export function TaskDetailsCard({
             <span className="text-xs font-medium text-slate-500">Задача #{task.id}</span>
           </div>
           <h1 className="text-2xl font-semibold leading-tight !text-slate-900">{task.title}</h1>
-          {task.shortDescription && (
-            <p className="max-w-4xl text-sm leading-6 text-slate-600">{task.shortDescription}</p>
-          )}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -192,21 +170,12 @@ export function TaskDetailsCard({
               type="button"
               variant={task.status === 'archived' ? 'outline' : 'destructive'}
               disabled={isTogglingArchive}
-              onClick={() => onToggleArchive(task)}
+              onClick={() => setToggleArchiveConfirmOpen(true)}
             >
               {task.status === 'archived' ? <ArchiveRestore /> : <Archive />}
               {task.status === 'archived' ? 'Активировать' : 'Деактивировать'}
             </Button>
           )}
-                    <Button
-            type="button"
-            variant="destructive"
-            disabled={task.isMaterialized || deleteMutation.isPending}
-            onClick={() => setDeleteConfirmOpen(true)}
-          >
-            <Trash2 />
-            Удалить
-          </Button>
         </div>
         </div>
 
@@ -216,17 +185,15 @@ export function TaskDetailsCard({
         <InfoItem label="Уровень" value={getScopeLabel(task.scope ?? '')} />
         <InfoItem label="Тип задачи" value={getTaskTypeLabel(task.taskType ?? task.type)} />
         <InfoItem label="Формат отчета" value={getReportFormatLabel(task.reportFormat ?? '')} />
-        <InfoItem label="Лимит правок" value={task.revisionLimit ?? 'Не указан'} />
         <InfoItem label="Исполнители" value={task.isMaterialized ? 'Назначены' : 'Не назначены'} />
         <InfoItem label="Дедлайн" value={formatDateTime(task.deadlineAt)} />
         <InfoItem label="Запланирована на" value={formatDateTime(task.scheduledAt)} />
         <InfoItem label="Создана" value={formatDateTime(task.createdAt)} />
-        <InfoItem label="Обновлена" value={formatDateTime(task.updatedAt)} />
         <InfoItem label="Автор" value={<AuthorLink author={authorQuery.data} authorId={task.createdByUserId} />} />
         <InfoItem label="Роль автора" value={formatRole(task.createdByRole)} />
         <InfoItem label="Назначений" value={formatNumber(task.assignmentsCount)} />
         <InfoItem label="Уведомлений" value={formatNumber(task.notificationsCount)} />
-        <InfoItem label="Ожидают отправки" value={formatNumber(task.pendingNotificationsCount)} />
+        <InfoItem label="Ожидают проверки" value={formatNumber(task.pendingNotificationsCount)} />
         <InfoItem label="Отправлено" value={formatNumber(task.sentNotificationsCount)} />
         <InfoItem label="Ошибок отправки" value={formatNumber(task.failedNotificationsCount)} />
         <InfoItem
@@ -236,28 +203,18 @@ export function TaskDetailsCard({
         />
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-6">
         <section className="space-y-3">
-          <h2 className="text-base font-semibold text-slate-900">Полное описание</h2>
+          <h2 className="text-base font-semibold text-slate-900">Описание</h2>
           <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
             {task.fullDescription || task.description || 'Описание задачи пока не заполнено.'}
           </p>
         </section>
-
-        <aside className="rounded-md border border-slate-200 bg-slate-50 p-4">
-          <h2 className="text-base font-semibold text-slate-900">Комментарий для исполнителя</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-            {task.commentForExecutor || 'Комментарий не указан.'}
-          </p>
-        </aside>
         </div>
-
-        <TaskAssignmentsTable assignments={task.taskAssignments ?? []} />
         <TaskRegionsStatisticsTable
           statistics={task.regionsStatistics ?? []}
           getRegionHref={(region) => `/stats/by_region?task_id=${task.id}&region_id=${region.region_id}`}
         />
-        <TaskReportsTable reports={task.taskReports ?? []} onReportClick={setSelectedReportId} />
       </article>
 
       <TaskEditDialog
@@ -268,40 +225,39 @@ export function TaskDetailsCard({
         onSubmit={(taskId, payload) => updateMutation.mutate({ taskId, payload })}
       />
 
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+      <Dialog open={toggleArchiveConfirmOpen} onOpenChange={setToggleArchiveConfirmOpen}>
         <DialogContent className="max-w-[460px]">
           <DialogHeader>
-            <DialogTitle>Удалить задачу?</DialogTitle>
+            <DialogTitle>{task.status === 'archived' ? 'Активировать задачу?' : 'Деактивировать задачу?'}</DialogTitle>
             <DialogDescription>
-              Задача будет удалена без архивирования. Удаление доступно только пока исполнители не назначены.
+              {task.status === 'archived'
+                ? 'Задача станет активной и снова будет доступна в рабочих списках.'
+                : 'Задача будет деактивирована и перестанет отображаться как активная.'}
             </DialogDescription>
           </DialogHeader>
-          {deleteMutation.isError && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Не удалось удалить задачу.
-            </div>
-          )}
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
-              onClick={() => setDeleteConfirmOpen(false)}
-              disabled={deleteMutation.isPending}
+              onClick={() => setToggleArchiveConfirmOpen(false)}
+              disabled={isTogglingArchive}
             >
               Отмена
             </Button>
             <Button
               type="button"
-              variant="destructive"
-              disabled={task.isMaterialized || deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
+              variant={task.status === 'archived' ? 'default' : 'destructive'}
+              disabled={isTogglingArchive}
+              onClick={() => {
+                onToggleArchive?.(task);
+                setToggleArchiveConfirmOpen(false);
+              }}
             >
-              {deleteMutation.isPending ? 'Удаление...' : 'Удалить'}
+              {isTogglingArchive ? 'Выполняем...' : task.status === 'archived' ? 'Активировать' : 'Деактивировать'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
       <ReportDetailsDialog
         reportId={selectedReportId}
         open={selectedReportId !== null}
@@ -333,7 +289,6 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
             <TableHead>Назначено</TableHead>
             <TableHead>Дедлайн</TableHead>
             <TableHead>Просрочено</TableHead>
-            <TableHead>Правки</TableHead>
             <TableHead>Завершено</TableHead>
             <TableHead>Причина невыполнения</TableHead>
           </TableRow>
@@ -358,9 +313,6 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
               <TableCell>{formatDateTime(assignment.assigned_at)}</TableCell>
               <TableCell>{formatDateTime(assignment.deadline_at)}</TableCell>
               <TableCell>{formatBoolean(assignment.is_overdue)}</TableCell>
-              <TableCell>
-                {formatNumber(assignment.revision_used)} / {formatNumber(assignment.revision_limit)}
-              </TableCell>
               <TableCell>{formatDateTime(assignment.completed_at)}</TableCell>
               <TableCell>{formatNotCompletedReason(assignment.not_completed_reason)}</TableCell>
             </TableRow>
@@ -384,22 +336,16 @@ function TaskRegionsStatisticsTable({
 
   return (
     <TaskDataSection title="Статистика по регионам">
-      <Table className="min-w-[1100px] whitespace-nowrap">
+      <Table className="min-w-[760px] whitespace-nowrap">
         <TableHeader>
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
             <TableHead>Регион</TableHead>
             <TableHead>Назначения</TableHead>
-            <TableHead>С отчетами</TableHead>
-            <TableHead>Без отчетов</TableHead>
             <TableHead>Отчеты</TableHead>
             <TableHead>На проверке</TableHead>
             <TableHead>Принято</TableHead>
             <TableHead>На доработке</TableHead>
-            <TableHead>Не выполнено</TableHead>
-            <TableHead>Просрочено</TableHead>
             <TableHead>Выполнение</TableHead>
-            <TableHead>Отправка</TableHead>
-            <TableHead>Просрочки</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -416,17 +362,11 @@ function TaskRegionsStatisticsTable({
                 </Link>
               </TableCell>
               <TableCell>{formatNumber(item.assignments_count)}</TableCell>
-              <TableCell>{formatNumber(item.assignments_with_reports)}</TableCell>
-              <TableCell>{formatNumber(item.assignments_without_reports)}</TableCell>
               <TableCell>{formatNumber(item.reports_count)}</TableCell>
               <TableCell>{formatNumber(item.under_review_reports)}</TableCell>
               <TableCell>{formatNumber(item.accepted_reports)}</TableCell>
               <TableCell>{formatNumber(item.revision_requested_reports)}</TableCell>
-              <TableCell>{formatNumber(item.not_completed_assignments)}</TableCell>
-              <TableCell>{formatNumber(item.overdue_assignments)}</TableCell>
               <TableCell>{formatPercent(item.completion_rate)}</TableCell>
-              <TableCell>{formatPercent(item.submission_rate)}</TableCell>
-              <TableCell>{formatPercent(item.overdue_rate)}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -967,3 +907,5 @@ function formatDateTime(value?: string | null) {
     timeStyle: 'short',
   }).format(date);
 }
+
+

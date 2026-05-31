@@ -33,6 +33,7 @@ type UserRegistryProps = {
   showActions?: boolean;
   showFilterCard?: boolean;
   showTableFilters?: boolean;
+  tableFilterMode?: 'all' | 'region' | 'none';
 };
 
 export function UserRegistry({
@@ -41,7 +42,9 @@ export function UserRegistry({
   showActions = true,
   showFilterCard = true,
   showTableFilters = true,
+  tableFilterMode,
 }: UserRegistryProps = {}) {
+  const resolvedTableFilterMode = tableFilterMode ?? (showTableFilters ? 'all' : 'none');
   const initialUserFilters = useMemo(
     () => ({
       ...emptyUserFilters,
@@ -190,8 +193,9 @@ export function UserRegistry({
               filters={filters}
               orgUnits={orgUnits}
               regions={regions}
-              showFilters={showTableFilters}
+              tableFilterMode={resolvedTableFilterMode}
               onFiltersChange={updateFilters}
+              onRegionClick={(region) => updateFilters({ region: String(region.id) })}
             />
             <UserPagination
               page={page}

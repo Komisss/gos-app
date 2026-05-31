@@ -19,6 +19,14 @@ import { Card, CardContent } from '@/shared/ui/card';
 import { DatePicker } from '@/shared/ui/date-picker';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/shared/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
 type UserFormState = {
@@ -48,6 +56,7 @@ export function UserProfileCard() {
   const parsedUserId = Number(userId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<UserFormState>(emptyForm);
+  const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
 
   const userQuery = useQuery({
     queryKey: ['users', parsedUserId],
@@ -173,7 +182,7 @@ export function UserProfileCard() {
               type="button"
               variant={user.active ? 'destructive' : 'outline'}
               disabled={toggleActiveMutation.isPending || isLockedFederalManager}
-              onClick={() => toggleActiveMutation.mutate(user)}
+              onClick={() => setToggleActiveConfirmOpen(true)}
             >
               {user.active ? <PowerOff /> : <Power />}
               {user.active ? 'Деактивировать' : 'Активировать'}
@@ -277,25 +286,27 @@ export function UserProfileCard() {
                   </Select>
                 </Field>
 
-                <FilterSearchSelect
-                  label="Регион"
-                  value={form.region}
-                  placeholder="Регион не указан"
-                  searchPlaceholder="Поиск региона"
-                  options={regionOptions}
-                  disabled={isLockedFederalManager}
-                  onChange={(region) => setForm((current) => ({ ...current, region }))}
-                />
+                <Field label="Регион">
+                  <FilterSearchSelect
+                    value={form.region}
+                    placeholder="Регион не указан"
+                    searchPlaceholder="Поиск региона"
+                    options={regionOptions}
+                    disabled={isLockedFederalManager}
+                    onChange={(region) => setForm((current) => ({ ...current, region }))}
+                  />
+                </Field>
 
-                <FilterSearchSelect
-                  label="Оргструктура"
-                  value={form.org_unit}
-                  placeholder="Оргструктура не указана"
-                  searchPlaceholder="Поиск оргструктуры"
-                  options={orgUnitOptions}
-                  disabled={isLockedFederalManager}
-                  onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
-                />
+                <Field label="Оргструктура">
+                  <FilterSearchSelect
+                    value={form.org_unit}
+                    placeholder="Оргструктура не указана"
+                    searchPlaceholder="Поиск оргструктуры"
+                    options={orgUnitOptions}
+                    disabled={isLockedFederalManager}
+                    onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
+                  />
+                </Field>
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
@@ -329,6 +340,40 @@ export function UserProfileCard() {
             </form>
           </CardContent>
         </Card>
+
+        <Dialog open={toggleActiveConfirmOpen} onOpenChange={setToggleActiveConfirmOpen}>
+          <DialogContent className="max-w-[460px]">
+            <DialogHeader>
+              <DialogTitle>{user.active ? 'Деактивировать пользователя?' : 'Активировать пользователя?'}</DialogTitle>
+              <DialogDescription>
+                {user.active
+                  ? 'Пользователь будет деактивирован и потеряет доступ к активным действиям.'
+                  : 'Пользователь будет активирован и снова сможет работать в системе.'}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setToggleActiveConfirmOpen(false)}
+                disabled={toggleActiveMutation.isPending}
+              >
+                Отмена
+              </Button>
+              <Button
+                type="button"
+                variant={user.active ? 'destructive' : 'default'}
+                disabled={toggleActiveMutation.isPending || isLockedFederalManager}
+                onClick={() => {
+                  toggleActiveMutation.mutate(user);
+                  setToggleActiveConfirmOpen(false);
+                }}
+              >
+                {toggleActiveMutation.isPending ? 'Выполняем...' : user.active ? 'Деактивировать' : 'Активировать'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
@@ -345,8 +390,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 
 function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
-      <p className="text-sm font-medium text-slate-500">{label}</p>
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-slate-700">{label}</p>
       <p className="text-sm text-slate-900">{value}</p>
     </div>
   );

@@ -86,14 +86,8 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             />
           </Field>
 
-          <Field label="Короткое описание">
-            <Input
-              value={form.short_description ?? ''}
-              onChange={(event) => setForm((current) => ({ ...current, short_description: event.target.value }))}
-            />
-          </Field>
 
-          <Field label="Полное описание">
+          <Field label="Описание">
             <textarea
               className="min-h-28 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               value={form.full_description ?? ''}
@@ -118,7 +112,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Масштаб">
+            <Field label="Уровень">
               <Select
                 value={form.scope}
                 onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
@@ -151,7 +145,6 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="draft">Черновик</SelectItem>
                   <SelectItem value="scheduled">Запланирована</SelectItem>
                   <SelectItem value="active">Активная</SelectItem>
                 </SelectContent>
@@ -163,7 +156,15 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             <Field label="Тип задачи">
               <Select
                 value={form.task_type}
-                onValueChange={(task_type) => setForm((current) => ({ ...current, task_type }))}
+                onValueChange={(task_type) =>
+                  setForm((current) => ({
+                    ...current,
+                    task_type,
+                    report_format: task_type === 'street_action' ? 'image' : current.report_format,
+                    online_task_subtype:
+                      task_type === 'online_action' ? (current.online_task_subtype ?? 'like') : undefined,
+                  }))
+                }
               >
                 <SelectTrigger className="w-full bg-white">
                   <SelectValue />
@@ -178,6 +179,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             <Field label="Формат отчета">
               <Select
                 value={form.report_format}
+                disabled={form.task_type === 'street_action'}
                 onValueChange={(report_format) =>
                   setForm((current) => ({ ...current, report_format }))
                 }
@@ -192,31 +194,13 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
               </Select>
             </Field>
           </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Количество правок">
-              <Input
-                type="number"
-                min={0}
-                max={9}
-                value={form.revision_limit ?? ''}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    revision_limit: normalizeRevisionLimit(event.target.value),
-                  }))
-                }
-              />
-            </Field>
-
-            <Field label="Дедлайн">
+          <Field label="Дедлайн">
               <DateTimePicker
                 value={form.deadline_at ?? undefined}
                 onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
                 placeholder="Выберите дедлайн"
               />
             </Field>
-          </div>
 
           {form.status === 'scheduled' && (
             <Field label="Время активации задачи">
@@ -229,14 +213,6 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             </Field>
           )}
 
-          <Field label="Комментарий для исполнителя">
-            <Input
-              value={form.comment_for_executor ?? ''}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, comment_for_executor: event.target.value }))
-              }
-            />
-          </Field>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -284,6 +260,7 @@ function AssignmentCombobox({
   const [query, setQuery] = useState('');
   const data = { users, regions, orgUnits };
   const selectedLabel = getAssignmentLabel(value, data);
+  const selectedNames = getAssignmentNames(value, data);
   const list = useAssignmentList(kind, query, data);
 
   function handleSelect(item: AssignmentOption) {
@@ -296,7 +273,8 @@ function AssignmentCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <div className="space-y-2">
+      <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -379,7 +357,11 @@ function AssignmentCombobox({
           </ScrollArea>
         </div>
       </PopoverContent>
-    </Popover>
+      </Popover>
+      {selectedNames.length > 0 && (
+        <p className="text-sm leading-6 text-slate-600">{selectedNames.join(', ')}</p>
+      )}
+    </div>
   );
 }
 
@@ -460,6 +442,19 @@ function getAssignmentTarget(targets?: TaskTargetPayload[] | null): AssignmentTa
   return firstTarget ? { kind: firstTarget.target_type, ids: firstTarget.target_id } : null;
 }
 
+function getAssignmentNames(
+  value: AssignmentTarget,
+  data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
+) {
+  if (!value) {
+    return [];
+  }
+
+  return getAssignmentOptions(value.kind, data)
+    .filter((item) => value.ids.includes(item.id))
+    .map((item) => item.label.trim());
+}
+
 function getSearchLabel(kind: TaskTargetType) {
   if (kind === 'region') {
     return 'Регион';
@@ -484,12 +479,9 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 function getInitialForm(task: Task | null): TaskPayload {
   return {
     title: task?.title ?? '',
-    short_description: task?.shortDescription ?? null,
     full_description: task?.fullDescription ?? task?.description ?? null,
-    revision_limit: task?.revisionLimit ?? null,
-    comment_for_executor: task?.commentForExecutor ?? null,
     scope: task?.scope === 'federal' ? 'federal' : 'regional',
-    status: task?.status ?? 'draft',
+    status: task?.status === 'scheduled' ? 'scheduled' : 'active',
     task_type: task?.taskType ?? 'online_action',
     report_format: task?.reportFormat ?? 'link',
     deadline_at: task?.deadlineAt ?? null,
@@ -503,10 +495,9 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
   const scheduledAt = form.scheduled_at ? new Date(form.scheduled_at) : now;
   const normalized: TaskPayload = {
     ...form,
-    short_description: normalizeOptionalString(form.short_description),
     full_description: normalizeOptionalString(form.full_description),
-    comment_for_executor: normalizeOptionalString(form.comment_for_executor),
-    revision_limit: clampRevisionLimit(form.revision_limit),
+    report_format: form.task_type === 'street_action' ? 'image' : form.report_format,
+    online_task_subtype: form.task_type === 'online_action' ? form.online_task_subtype : undefined,
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
   };
@@ -528,22 +519,6 @@ function normalizeOptionalString(value: string | null) {
   const normalized = value?.trim();
 
   return normalized ? normalized : null;
-}
-
-function normalizeRevisionLimit(value: string) {
-  if (value === '') {
-    return null;
-  }
-
-  return clampRevisionLimit(Number(value));
-}
-
-function clampRevisionLimit(value: number | null | undefined) {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return null;
-  }
-
-  return Math.min(Math.max(0, value), 9);
 }
 
 function omitTargets(payload: TaskPayload): TaskPayload {

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
@@ -6,11 +6,11 @@ import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
-import type { Region } from '@/entities/region/model/types';
 import { registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
+import { DatePicker } from '@/shared/ui/date-picker';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
@@ -20,7 +20,6 @@ import { UserBulkImportDropzone } from './UserBulkImportDropzone';
 const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
   { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
   { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  // { id: 3, code: 'executor', label: 'Исполнитель' }, // Исполнителя необходимо убрать при создании
   { id: 4, code: 'main_manager', label: 'Б3' },
   { id: 5, code: 'assistant', label: 'Помощник Б3' },
   { id: 6, code: 'unit_head', label: 'Б2' },
@@ -32,6 +31,8 @@ const initialForm: RegisterUserPayload = {
   username: '',
   password: '',
   full_name: '',
+  phone: '',
+  birthday: '',
   max_user_id: '',
   role: 2,
   region: null,
@@ -61,17 +62,30 @@ export function NewUserForm() {
     },
   });
 
+  const availableOrgUnits = useMemo(
+    () => getAvailableOrgUnits(orgUnitsQuery.data ?? [], form.role, form.region),
+    [form.region, form.role, orgUnitsQuery.data],
+  );
+
+  useEffect(() => {
+    if (form.org_unit && !availableOrgUnits.some((orgUnit) => orgUnit.id === form.org_unit)) {
+      setForm((current) => ({ ...current, org_unit: 0 }));
+    }
+  }, [availableOrgUnits, form.org_unit]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     createMutation.mutate({
       ...form,
+      phone: form.phone.trim(),
+      birthday: form.birthday,
       region: form.role === 1 ? null : form.region,
     });
   }
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-5 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold !text-slate-900">Новый пользователь</h1>
           <p className="text-sm text-slate-500">
@@ -86,56 +100,25 @@ export function NewUserForm() {
           onSubmit={handleSubmit}
         >
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Логин">
-              <Input
-                className="border-slate-200"
-                placeholder="Введите логин"
-                value={form.username}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, username: event.target.value }))
-                }
-                required
-              />
-            </Field>
+            {form.role !== 1 && (
+              <Field label="Регион">
+                <SearchSelect
+                  placeholder="Выберите регион"
+                  searchPlaceholder="Поиск региона"
+                  loading={regionsQuery.isLoading}
+                  value={form.region}
+                  options={(regionsQuery.data ?? []).map((region) => ({
+                    id: region.id,
+                    label: region.name,
+                    description: region.code,
+                  }))}
+                  onChange={(region) =>
+                    setForm((current) => ({ ...current, region, org_unit: 0 }))
+                  }
+                />
+              </Field>
+            )}
 
-            <Field label="Пароль">
-              <Input
-                type="password"
-                className="border-slate-200"
-                placeholder="Введите пароль"
-                value={form.password}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, password: event.target.value }))
-                }
-                required
-              />
-            </Field>
-          </div>
-
-          <Field label="ФИО">
-            <Input
-              className="border-slate-200"
-              placeholder="Введите ФИО"
-              value={form.full_name}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, full_name: event.target.value }))
-              }
-              required
-            />
-          </Field>
-
-          <Field label="ID пользователя в MAX">
-            <Input
-              className="border-slate-200"
-              placeholder="Введите ID пользователя в MAX"
-              value={form.max_user_id}
-              onChange={(event) =>
-                setForm((current) => ({ ...current, max_user_id: event.target.value }))
-              }
-            />
-          </Field>
-
-          <div className="grid gap-5 md:grid-cols-2">
             <Field label="Роль">
               <Select
                 value={String(form.role)}
@@ -146,6 +129,7 @@ export function NewUserForm() {
                     ...current,
                     role: nextRole,
                     region: nextRole === 1 ? null : current.region,
+                    org_unit: 0,
                   }));
                 }}
               >
@@ -161,37 +145,87 @@ export function NewUserForm() {
                 </SelectContent>
               </Select>
             </Field>
-
-            {form.role !== 1 && (
-              <Field label="Регион">
-                <SearchSelect
-                  placeholder="Выберите регион"
-                  searchPlaceholder="Поиск региона"
-                  loading={regionsQuery.isLoading}
-                  value={form.region}
-                  options={(regionsQuery.data ?? []).map((region) => ({
-                    id: region.id,
-                    label: region.name,
-                    description: region.code,
-                  }))}
-                  onChange={(region) => setForm((current) => ({ ...current, region }))}
-                />
-              </Field>
-            )}
           </div>
 
           <Field label="Оргструктура">
             <SearchSelect
-              placeholder="Выберите оргструктуру"
+              placeholder={getOrgUnitPlaceholder(form.role, form.region)}
               searchPlaceholder="Поиск оргструктуры"
               loading={orgUnitsQuery.isLoading}
+              disabled={requiresScopedOrgUnit(form.role) && !form.region}
               value={form.org_unit}
-              options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
+              options={availableOrgUnits.map((orgUnit) => ({
                 id: orgUnit.id,
                 label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                 description: getOrgUnitDescription(orgUnit),
               }))}
               onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
+            />
+          </Field>
+
+          <Field label="ФИО">
+            <Input
+              className="border-slate-200"
+              placeholder="Введите ФИО"
+              value={form.full_name}
+              onChange={(event) => setForm((current) => ({ ...current, full_name: event.target.value }))}
+              required
+            />
+          </Field>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field label="Телефон">
+              <Input
+                className="border-slate-200"
+                inputMode="tel"
+                placeholder="+79990000000"
+                value={form.phone}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, phone: normalizePhone(event.target.value) }))
+                }
+              />
+            </Field>
+
+            <Field label="День рождения">
+              <DatePicker
+                value={parseDateOnly(form.birthday)}
+                placeholder="Выберите день рождения"
+                onChange={(birthday) =>
+                  setForm((current) => ({ ...current, birthday: toDateOnly(birthday) }))
+                }
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <Field label="Логин">
+              <Input
+                className="border-slate-200"
+                placeholder="Введите логин"
+                value={form.username}
+                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                required
+              />
+            </Field>
+
+            <Field label="Пароль">
+              <Input
+                type="password"
+                className="border-slate-200"
+                placeholder="Введите пароль"
+                value={form.password}
+                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                required
+              />
+            </Field>
+          </div>
+
+          <Field label="ID пользователя в MAX">
+            <Input
+              className="border-slate-200"
+              placeholder="Введите ID пользователя в MAX"
+              value={form.max_user_id}
+              onChange={(event) => setForm((current) => ({ ...current, max_user_id: event.target.value }))}
             />
           </Field>
 
@@ -228,6 +262,7 @@ function SearchSelect({
   placeholder,
   searchPlaceholder,
   loading,
+  disabled = false,
   value,
   options,
   onChange,
@@ -235,6 +270,7 @@ function SearchSelect({
   placeholder: string;
   searchPlaceholder: string;
   loading: boolean;
+  disabled?: boolean;
   value: number | null;
   options: SearchOption[];
   onChange: (value: number) => void;
@@ -260,11 +296,12 @@ function SearchSelect({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open && !disabled} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
           variant="outline"
+          disabled={disabled}
           className="h-10 w-full justify-between border-slate-200 bg-white text-left font-normal"
         >
           <span className="min-w-0 truncate">{selectedOption?.label.trim() ?? placeholder}</span>
@@ -324,6 +361,77 @@ function SearchSelect({
 
 function getOrgUnitDescription(orgUnit: OrgUnit) {
   return orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined;
+}
+
+function getAvailableOrgUnits(orgUnits: OrgUnit[], role: RegisterUserRoleId, regionId: number | null) {
+  const targetDepth = getOrgUnitDepthForRole(role);
+
+  if (targetDepth === null) {
+    return orgUnits;
+  }
+
+  if (!regionId) {
+    return [];
+  }
+
+  return orgUnits.filter((orgUnit) => orgUnit.depth === targetDepth && orgUnit.regionId === regionId);
+}
+
+function getOrgUnitDepthForRole(role: RegisterUserRoleId) {
+  if (role === 4) {
+    return 0;
+  }
+
+  if (role === 6) {
+    return 1;
+  }
+
+  if (role === 7) {
+    return 2;
+  }
+
+  return null;
+}
+
+function requiresScopedOrgUnit(role: RegisterUserRoleId) {
+  return getOrgUnitDepthForRole(role) !== null;
+}
+
+function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null) {
+  if (requiresScopedOrgUnit(role) && !regionId) {
+    return 'Сначала выберите регион';
+  }
+
+  return 'Выберите оргструктуру';
+}
+
+function normalizePhone(value: string) {
+  const trimmedValue = value.trimStart();
+  const digits = value.replace(/\D/g, '');
+
+  return trimmedValue.startsWith('+') ? `+${digits}` : digits;
+}
+
+function parseDateOnly(value: string) {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function toDateOnly(date?: Date) {
+  if (!date) {
+    return '';
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

@@ -64,7 +64,7 @@ export function NewOrgUnitForm() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[960px] flex-col gap-5 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold !text-slate-900">Новая оргструктура</h1>
           <p className="text-sm text-slate-500">
@@ -87,18 +87,19 @@ export function NewOrgUnitForm() {
           </Field>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <FilterSearchSelect
-              label="Регион"
-              value={form.region_id}
-              placeholder="Выберите регион"
-              searchPlaceholder="Поиск региона"
-              options={(regionsQuery.data ?? []).map((region) => ({
-                value: String(region.id),
-                label: region.name,
-                description: region.code,
-              }))}
-              onChange={(region_id) => setForm((current) => ({ ...current, region_id }))}
-            />
+            <Field label="Регион">
+              <FilterSearchSelect
+                value={form.region_id}
+                placeholder="Выберите регион"
+                searchPlaceholder="Поиск региона"
+                options={(regionsQuery.data ?? []).map((region) => ({
+                  value: String(region.id),
+                  label: region.name,
+                  description: region.code,
+                }))}
+                onChange={(region_id) => setForm((current) => ({ ...current, region_id }))}
+              />
+            </Field>
 
             <Field label="Тип">
               <Select
@@ -118,31 +119,33 @@ export function NewOrgUnitForm() {
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <FilterSearchSelect
-              label="Родительская оргструктура"
-              value={form.parent_id}
-              placeholder="Без родителя"
-              searchPlaceholder="Поиск оргструктуры"
-              options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-                value: String(orgUnit.id),
-                label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
-              }))}
-              onChange={(parent_id) => setForm((current) => ({ ...current, parent_id }))}
-            />
+            <Field label="Родительская оргструктура">
+              <FilterSearchSelect
+                value={form.parent_id}
+                placeholder="Без родителя"
+                searchPlaceholder="Поиск оргструктуры"
+                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
+                  value: String(orgUnit.id),
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                  description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
+                }))}
+                onChange={(parent_id) => setForm((current) => ({ ...current, parent_id }))}
+              />
+            </Field>
 
-            <FilterSearchSelect
-              label="Руководитель"
-              value={form.head_user_id}
-              placeholder="Без руководителя"
-              searchPlaceholder="Поиск пользователя"
-              options={(usersQuery.data ?? []).map((user) => ({
-                value: String(user.id),
-                label: user.fullName,
-                description: `@${user.username}`,
-              }))}
-              onChange={(head_user_id) => setForm((current) => ({ ...current, head_user_id }))}
-            />
+            <Field label="Руководитель">
+              <FilterSearchSelect
+                value={form.head_user_id}
+                placeholder="Без руководителя"
+                searchPlaceholder="Поиск пользователя"
+                options={(usersQuery.data ?? []).map((user) => ({
+                  value: String(user.id),
+                  label: user.fullName,
+                  description: `@${user.username}`,
+                }))}
+                onChange={(head_user_id) => setForm((current) => ({ ...current, head_user_id }))}
+              />
+            </Field>
           </div>
 
           <Field label="Статус">

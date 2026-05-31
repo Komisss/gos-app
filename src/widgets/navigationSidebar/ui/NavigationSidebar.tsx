@@ -39,7 +39,7 @@ export function NavigationSidebar() {
         {sidebarSections.map((section, index) => {
           return (
             <SidebarGroup key={index}>
-              {section.title && <SidebarGroupLabel>{section.title ? (<div className="px-4">{section.title}</div>) : ''}</SidebarGroupLabel>}
+              {section.title && <SidebarGroupLabel>{section.title ? (<div className="px-4 text-sm">{section.title}</div>) : ''}</SidebarGroupLabel>}
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0">
                   {section.items
@@ -61,7 +61,7 @@ export function NavigationSidebar() {
                             onClick={() => setOpenItems((current) => ({ ...current, [itemKey]: !isOpen }))}
                           >
                             {Icon && <Icon size={16} />}
-                            <span className="text-[13px] text-white">{item.label}</span>
+                            <span className="text-[15px] text-white">{item.label}</span>
                             <ChevronDown
                               size={14}
                               className={clsx(
@@ -80,7 +80,7 @@ export function NavigationSidebar() {
                                     className={clsx(location.pathname === child.href ? "bg-[#465cd3]" : "")}
                                   >
                                     <NavLink to={child.href}>
-                                      <span className="text-[13px] text-white">{child.label}</span>
+                                      <span className="text-[15px] text-white">{child.label}</span>
                                     </NavLink>
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
@@ -100,7 +100,7 @@ export function NavigationSidebar() {
                         >
                           <NavLink to={item.href}>
                             {Icon && <Icon size={16} />}
-                            <span className="text-[13px] text-white">{item.label}</span>
+                            <span className="text-[15px] text-white">{item.label}</span>
                           </NavLink>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
