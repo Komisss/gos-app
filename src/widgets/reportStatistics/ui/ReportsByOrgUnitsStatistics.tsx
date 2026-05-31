@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -18,6 +18,7 @@ import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/rep
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -122,7 +123,7 @@ export function ReportsByOrgUnitsStatistics() {
     mutationFn: getReportsByOrgUnits,
   });
 
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -142,8 +143,18 @@ export function ReportsByOrgUnitsStatistics() {
     reportsMutation.mutate(nextFilters);
   }
 
+  useEffect(() => {
+    handleSubmit();
+  }, []);
+
   function updateFilters(patch: Partial<ReportsByOrgUnitsPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function applyFilters(patch: Partial<ReportsByOrgUnitsPayload>) {
+    const nextFilters = { ...filters, ...patch };
+    setFilters(nextFilters);
+    handleSubmit(nextFilters);
   }
 
   function goToPage(page: number) {
@@ -199,24 +210,6 @@ export function ReportsByOrgUnitsStatistics() {
               updateFilters({ period_type: period_type as DashboardPeriodType })
             }
           />
-          <MultiSearchSelect
-            label="Регионы"
-            values={filters.region_ids.map(String)}
-            placeholder="Все регионы"
-            searchPlaceholder="Поиск региона"
-            options={regionOptions}
-            onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })}
-          />
-          <MultiSearchSelect
-            label="Оргструктуры"
-            values={filters.org_unit_ids.map(String)}
-            placeholder="Все оргструктуры"
-            searchPlaceholder="Поиск оргструктуры"
-            options={orgUnitOptions}
-            onChange={(org_unit_ids) =>
-              updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
-            }
-          />
           <NumberFilter
             label="Глубина оргструктуры"
             value={filters.org_unit_depth}
@@ -247,18 +240,6 @@ export function ReportsByOrgUnitsStatistics() {
             options={taskScopeOptions}
             onChange={(task_scope) =>
               updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })
-            }
-          />
-          <MultiSelect
-            label="Статус задачи"
-            values={filters.task_statuses}
-            placeholder="Все статусы"
-            options={taskStatusOptions}
-            onChange={(task_statuses) =>
-              updateFilters({
-                task_statuses: task_statuses as ReportAnalyticsTaskStatus[],
-                page: 1,
-              })
             }
           />
           <MultiSelect
@@ -384,7 +365,14 @@ export function ReportsByOrgUnitsStatistics() {
       )}
 
       {result ? (
-        <ReportsByOrgUnitsResult result={result} onPageChange={goToPage} />
+        <ReportsByOrgUnitsResult
+          result={result}
+          filters={filters}
+          regionOptions={regionOptions}
+          orgUnitOptions={orgUnitOptions}
+          onFiltersChange={applyFilters}
+          onPageChange={goToPage}
+        />
       ) : (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
           Настройте фильтры и нажмите «Получить статистику».
@@ -402,9 +390,17 @@ export function ReportsByOrgUnitsStatistics() {
 
 function ReportsByOrgUnitsResult({
   result,
+  filters,
+  regionOptions,
+  orgUnitOptions,
+  onFiltersChange,
   onPageChange,
 }: {
   result: ReportsByOrgUnitsResponse;
+  filters: ReportsByOrgUnitsPayload;
+  regionOptions: SelectOption[];
+  orgUnitOptions: SelectOption[];
+  onFiltersChange: (patch: Partial<ReportsByOrgUnitsPayload>) => void;
   onPageChange: (page: number) => void;
 }) {
   return (
@@ -432,9 +428,56 @@ function ReportsByOrgUnitsResult({
         <p className="text-sm text-slate-500">Обновлено: {formatDateTime(result.updated_at)}</p>
       </div>
 
-      <TableScrollArea headerHeight="3rem" height="58vh">
+      <TableScrollArea headerHeight="6rem" height="58vh">
         <Table className="min-w-[1100px] whitespace-nowrap">
           <TableHeader>
+            <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+              <TableHead className="min-w-[260px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Оргструктуры"
+                    values={filters.org_unit_ids.map(String)}
+                    placeholder="Все оргструктуры"
+                    searchPlaceholder="Поиск оргструктуры"
+                    options={orgUnitOptions}
+                    onChange={(org_unit_ids) =>
+                      onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[220px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Статус задачи"
+                    values={filters.task_statuses}
+                    placeholder="Все статусы"
+                    options={taskStatusOptions}
+                    onChange={(task_statuses) =>
+                      onFiltersChange({
+                        task_statuses: task_statuses as ReportAnalyticsTaskStatus[],
+                        page: 1,
+                      })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[240px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Регионы"
+                    values={filters.region_ids.map(String)}
+                    placeholder="Все регионы"
+                    searchPlaceholder="Поиск региона"
+                    options={regionOptions}
+                    onChange={(region_ids) =>
+                      onFiltersChange({ region_ids: toNumbers(region_ids), page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead colSpan={tableColumns.length - 3} />
+            </TableRow>
             <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
               {tableColumns.map((column) => (
                 <TableHead key={column.key}>{column.label}</TableHead>
@@ -524,6 +567,10 @@ function createInitialFilters(): ReportsByOrgUnitsPayload {
     page: 1,
     page_size: 50,
   };
+}
+
+function TableFilterCell({ children }: { children: React.ReactNode }) {
+  return <div className="w-full min-w-[220px] py-2">{children}</div>;
 }
 
 function MultiSearchSelect({

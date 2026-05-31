@@ -1,16 +1,36 @@
 export type OrgUnitDto = {
   id: number;
   name: string;
+  type?: OrgUnitType;
   parent_id: number | null;
   region_id: number | null;
+  region_name?: string | null;
+  is_active?: boolean;
+  head_user?: OrgUnitHeadUserDto | null;
   children: Array<OrgUnitDto | string>;
+};
+
+export type OrgUnitHeadUserDto = {
+  user_id: number;
+  full_name: string;
+  username: string;
+  status: string;
+  role: {
+    role_id: number;
+    code: string;
+    name: string;
+  } | null;
 };
 
 export type OrgUnit = {
   id: number;
   name: string;
+  type?: OrgUnitType;
   parentId: number | null;
   regionId: number | null;
+  regionName?: string | null;
+  isActive?: boolean;
+  headUser?: OrgUnitHeadUserDto | null;
   depth: number;
 };
 

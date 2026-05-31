@@ -66,7 +66,7 @@ export function ReportsReturnedForRevisionExportPopover({
         { kind: 'multi-search', key: 'region_ids', label: 'Регионы', placeholder: 'Все регионы', searchPlaceholder: 'Поиск региона', options: regionOptions, valueType: 'number' },
         { kind: 'multi-search', key: 'user_ids', label: 'Пользователи', placeholder: 'Все пользователи', searchPlaceholder: 'Поиск пользователя', options: userOptions, valueType: 'number' },
         { kind: 'multi-search', key: 'task_ids', label: 'Задачи', placeholder: 'Все задачи', searchPlaceholder: 'Поиск по id или названию', options: taskOptions, valueType: 'number' },
-        { kind: 'multi', key: 'task_scope', label: 'Масштаб задачи', placeholder: 'Любой масштаб', options: taskScopeOptions },
+        { kind: 'multi', key: 'task_scope', label: 'Уровень задачи', placeholder: 'Любой уровень', options: taskScopeOptions },
         { kind: 'multi', key: 'report_types', label: 'Тип отчета', placeholder: 'Все типы отчетов', options: reportTypeOptions },
         { kind: 'boolean', key: 'include_archived_tasks', label: 'Включать архивные задачи' },
         { kind: 'boolean', key: 'include_removed_assignments', label: 'Включать удаленные назначения' },

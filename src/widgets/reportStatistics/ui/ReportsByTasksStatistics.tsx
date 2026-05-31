@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -18,6 +18,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -104,7 +105,7 @@ export function ReportsByTasksStatistics() {
   const usersQuery = useQuery({ queryKey: ['users', 'reports-by-tasks-filter'], queryFn: () => getUsers() });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-by-tasks-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsByTasks });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -129,8 +130,18 @@ export function ReportsByTasksStatistics() {
     reportsMutation.mutate(nextFilters);
   }
 
+  useEffect(() => {
+    handleSubmit();
+  }, []);
+
   function updateFilters(patch: Partial<ReportsByTasksPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function applyFilters(patch: Partial<ReportsByTasksPayload>) {
+    const nextFilters = { ...filters, ...patch };
+    setFilters(nextFilters);
+    handleSubmit(nextFilters);
   }
 
   function goToPage(page: number) {
@@ -196,18 +207,6 @@ export function ReportsByTasksStatistics() {
             options={(usersQuery.data ?? []).map((user) => ({ value: String(user.id), label: user.fullName, description: `@${user.username}` }))}
             onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids), page: 1 })}
           />
-          <MultiSearchSelect
-            label="Задачи"
-            values={filters.task_ids.map(String)}
-            placeholder="Все задачи"
-            searchPlaceholder="Поиск по id или названию"
-            options={(tasksQuery.data ?? []).map((task) => ({ value: String(task.id), label: `#${task.id} ${task.title}`, description: task.statusLabel }))}
-            onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids), page: 1 })}
-          />
-          <MultiSelect label="Тип задачи" values={filters.task_types} placeholder="Все типы" options={taskTypeOptions} onChange={(task_types) => updateFilters({ task_types: task_types as ReportTaskType[], page: 1 })} />
-          <MultiSelect label="Масштаб задачи" values={filters.task_scope} placeholder="Любой масштаб" options={taskScopeOptions} onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })} />
-          <MultiSelect label="Статус задачи" values={filters.task_statuses} placeholder="Все статусы" options={taskStatusOptions} onChange={(task_statuses) => updateFilters({ task_statuses: task_statuses as ReportAnalyticsTaskStatus[], page: 1 })} />
-          <MultiSelect label="Тип отчета" values={filters.report_types} placeholder="Все типы отчетов" options={reportTypeOptions} onChange={(report_types) => updateFilters({ report_types: report_types as ReportType[], page: 1 })} />
           <FilterSelect
             label="Сортировка"
             value={filters.sort_by}
@@ -257,7 +256,13 @@ export function ReportsByTasksStatistics() {
       )}
 
       {result ? (
-        <ReportsByTasksResult result={result} onPageChange={goToPage} />
+        <ReportsByTasksResult
+          result={result}
+          filters={filters}
+          taskOptions={taskOptions}
+          onFiltersChange={applyFilters}
+          onPageChange={goToPage}
+        />
       ) : (
         <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
           Настройте фильтры и нажмите «Получить статистику».
@@ -273,7 +278,19 @@ export function ReportsByTasksStatistics() {
   );
 }
 
-function ReportsByTasksResult({ result, onPageChange }: { result: ReportsByTasksResponse; onPageChange: (page: number) => void }) {
+function ReportsByTasksResult({
+  result,
+  filters,
+  taskOptions,
+  onFiltersChange,
+  onPageChange,
+}: {
+  result: ReportsByTasksResponse;
+  filters: ReportsByTasksPayload;
+  taskOptions: SelectOption[];
+  onFiltersChange: (patch: Partial<ReportsByTasksPayload>) => void;
+  onPageChange: (page: number) => void;
+}) {
   return (
     <section className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-2">
@@ -288,9 +305,79 @@ function ReportsByTasksResult({ result, onPageChange }: { result: ReportsByTasks
         <p className="text-sm text-slate-500">Обновлено: {formatDateTime(result.updated_at)}</p>
       </div>
 
-      <TableScrollArea headerHeight="3rem" height="58vh">
+      <TableScrollArea headerHeight="6rem" height="58vh">
         <Table className="min-w-[1100px] whitespace-nowrap">
           <TableHeader>
+            <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+              <TableHead className="min-w-[260px] align-top" colSpan={2}>
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Задачи"
+                    values={filters.task_ids.map(String)}
+                    placeholder="Все задачи"
+                    searchPlaceholder="Поиск по id или названию"
+                    options={taskOptions}
+                    onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids), page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[200px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Уровень задачи"
+                    values={filters.task_scope}
+                    placeholder="Любой уровень"
+                    options={taskScopeOptions}
+                    onChange={(task_scope) =>
+                      onFiltersChange({ task_scope: task_scope as ReportTaskScope[], page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[200px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Тип задачи"
+                    values={filters.task_types}
+                    placeholder="Все типы"
+                    options={taskTypeOptions}
+                    onChange={(task_types) =>
+                      onFiltersChange({ task_types: task_types as ReportTaskType[], page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[200px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Статус задачи"
+                    values={filters.task_statuses}
+                    placeholder="Все статусы"
+                    options={taskStatusOptions}
+                    onChange={(task_statuses) =>
+                      onFiltersChange({
+                        task_statuses: task_statuses as ReportAnalyticsTaskStatus[],
+                        page: 1,
+                      })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[200px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Формат отчета"
+                    values={filters.report_types}
+                    placeholder="Все форматы"
+                    options={reportTypeOptions}
+                    onChange={(report_types) =>
+                      onFiltersChange({ report_types: report_types as ReportType[], page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead colSpan={tableColumns.length - 6} />
+            </TableRow>
             <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
               {tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}
             </TableRow>
@@ -345,6 +432,10 @@ function createInitialFilters(): ReportsByTasksPayload {
     page: 1,
     page_size: 50,
   };
+}
+
+function TableFilterCell({ children }: { children: React.ReactNode }) {
+  return <div className="w-full min-w-[190px] py-2">{children}</div>;
 }
 
 function MultiSearchSelect({ label, values, placeholder, searchPlaceholder, options, onChange }: { label: string; values: string[]; placeholder: string; searchPlaceholder: string; options: SelectOption[]; onChange: (values: string[]) => void }) {
@@ -496,7 +587,7 @@ function formatAppliedFilters(filters: ReportsByTasksResponse['filters_applied']
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },
-    { label: 'Масштаб', value: formatOptions(taskScopeOptions, filters.task_scope) },
+    { label: 'Уровень задачи', value: formatOptions(taskScopeOptions, filters.task_scope) },
     { label: 'Статусы задач', value: formatOptions(taskStatusOptions, filters.task_statuses) },
     { label: 'Типы отчетов', value: formatOptions(reportTypeOptions, filters.report_types) },
     { label: 'Архивные задачи', value: filters.include_archived_tasks ? 'Да' : 'Нет' },

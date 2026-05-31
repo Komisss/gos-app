@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import type { ReportTaskScope, ReportType } from '@/entities/report/model/types'
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -23,7 +24,10 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
-import { formatAssignmentStatus } from '@/widgets/reportStatistics/lib/formatReportStatisticsValue';
+import {
+  formatAssignmentStatus,
+  formatReportStatus,
+} from '@/widgets/reportStatistics/lib/formatReportStatisticsValue';
 import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
 import { ReportsDeadlinesExportPopover } from './ReportsDeadlinesExportPopover';
 
@@ -75,7 +79,7 @@ export function ReportsDeadlinesStatistics() {
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-deadlines-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsDeadlines });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -94,6 +98,10 @@ export function ReportsDeadlinesStatistics() {
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);
   }
+
+  useEffect(() => {
+    handleSubmit();
+  }, []);
 
   function goToPage(page: number) {
     const nextFilters = { ...filters, page };

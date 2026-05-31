@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -17,6 +17,7 @@ import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/rep
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -110,7 +111,7 @@ export function ReportsByRegionsStatistics() {
     mutationFn: getReportsByRegions,
   });
 
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -129,6 +130,10 @@ export function ReportsByRegionsStatistics() {
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);
   }
+
+  useEffect(() => {
+    handleSubmit();
+  }, []);
 
   function updateFilters(patch: Partial<ReportsByRegionsPayload>) {
     setFilters((current) => ({ ...current, ...patch }));

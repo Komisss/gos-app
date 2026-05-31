@@ -13,6 +13,7 @@ import type { ReportTaskScope, ReportType } from '@/entities/report/model/types'
 import { getRegions } from '@/entities/region/api/regions';
 import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -67,7 +68,7 @@ export function ReportsByUserStatistics() {
   const regionsQuery = useQuery({ queryKey: ['regions'], queryFn: getRegions });
   const usersQuery = useQuery({ queryKey: ['users', 'reports-by-user-filter'], queryFn: () => getUsers() });
   const reportsMutation = useMutation({ mutationFn: getReportsByUser });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
 
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);

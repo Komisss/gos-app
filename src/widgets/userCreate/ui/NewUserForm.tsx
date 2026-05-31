@@ -80,6 +80,7 @@ export function NewUserForm() {
       phone: form.phone.trim(),
       birthday: form.birthday,
       region: form.role === 1 ? null : form.region,
+      org_unit: canSelectOrgUnit(form.role) ? form.org_unit || null : null,
     });
   }
 
@@ -147,21 +148,23 @@ export function NewUserForm() {
             </Field>
           </div>
 
-          <Field label="Оргструктура">
-            <SearchSelect
-              placeholder={getOrgUnitPlaceholder(form.role, form.region)}
-              searchPlaceholder="Поиск оргструктуры"
-              loading={orgUnitsQuery.isLoading}
-              disabled={requiresScopedOrgUnit(form.role) && !form.region}
-              value={form.org_unit}
-              options={availableOrgUnits.map((orgUnit) => ({
-                id: orgUnit.id,
-                label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                description: getOrgUnitDescription(orgUnit),
-              }))}
-              onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
-            />
-          </Field>
+          {canSelectOrgUnit(form.role) && (
+            <Field label="Оргструктура">
+              <SearchSelect
+                placeholder={getOrgUnitPlaceholder(form.role, form.region)}
+                searchPlaceholder="Поиск оргструктуры"
+                loading={orgUnitsQuery.isLoading}
+                disabled={!form.region}
+                value={form.org_unit}
+                options={availableOrgUnits.map((orgUnit) => ({
+                  id: orgUnit.id,
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                  description: getOrgUnitDescription(orgUnit),
+                }))}
+                onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
+              />
+            </Field>
+          )}
 
           <Field label="ФИО">
             <Input
@@ -360,46 +363,66 @@ function SearchSelect({
 }
 
 function getOrgUnitDescription(orgUnit: OrgUnit) {
-  return orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined;
+  return [
+    orgUnit.regionName,
+    orgUnit.headUser ? `Руководитель: ${orgUnit.headUser.full_name}` : null,
+    orgUnit.headUser?.role?.name,
+  ]
+    .filter(Boolean)
+    .join(' • ');
 }
 
 function getAvailableOrgUnits(orgUnits: OrgUnit[], role: RegisterUserRoleId, regionId: number | null) {
-  const targetDepth = getOrgUnitDepthForRole(role);
-
-  if (targetDepth === null) {
-    return orgUnits;
-  }
-
   if (!regionId) {
     return [];
   }
 
-  return orgUnits.filter((orgUnit) => orgUnit.depth === targetDepth && orgUnit.regionId === regionId);
+  const targetHeadRoleCode = getOrgUnitHeadRoleCodeForRole(role);
+
+  return orgUnits.filter((orgUnit) => {
+    if (orgUnit.regionId !== regionId || orgUnit.isActive === false) {
+      return false;
+    }
+
+    if (!targetHeadRoleCode) {
+      return true;
+    }
+
+    return orgUnit.headUser?.role?.code === targetHeadRoleCode;
+  });
 }
 
-function getOrgUnitDepthForRole(role: RegisterUserRoleId) {
+function getOrgUnitHeadRoleCodeForRole(role: RegisterUserRoleId) {
   if (role === 4) {
-    return 0;
+    return 'regional_manager';
   }
 
   if (role === 6) {
-    return 1;
+    return 'main_manager';
   }
 
   if (role === 7) {
-    return 2;
+    return 'unit_head';
+  }
+
+  if (role === 8) {
+    return 'department_head';
   }
 
   return null;
 }
 
-function requiresScopedOrgUnit(role: RegisterUserRoleId) {
-  return getOrgUnitDepthForRole(role) !== null;
+function canSelectOrgUnit(role: RegisterUserRoleId) {
+  return role !== 1 && role !== 2;
 }
 
 function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null) {
-  if (requiresScopedOrgUnit(role) && !regionId) {
+  if (!regionId) {
     return 'Сначала выберите регион';
+  }
+
+  if (getOrgUnitHeadRoleCodeForRole(role)) {
+    return 'Выберите доступную подгруппу';
   }
 
   return 'Выберите оргструктуру';

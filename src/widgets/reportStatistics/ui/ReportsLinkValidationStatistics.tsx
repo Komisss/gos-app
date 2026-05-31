@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -18,6 +18,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -134,7 +135,7 @@ export function ReportsLinkValidationStatistics() {
   const usersQuery = useQuery({ queryKey: ['users', 'reports-link-validation-filter'], queryFn: () => getUsers() });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-link-validation-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsLinkValidation });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -162,6 +163,10 @@ export function ReportsLinkValidationStatistics() {
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);
   }
+
+  useEffect(() => {
+    handleSubmit();
+  }, []);
 
   function goToPage(page: number) {
     const nextFilters = { ...filters, page };

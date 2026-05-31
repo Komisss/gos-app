@@ -90,7 +90,7 @@ export function ReportsLinkValidationExportPopover({
         { kind: 'multi', key: 'task_types', label: 'Тип задачи', placeholder: 'Все типы', options: taskTypeOptions },
         { kind: 'multi', key: 'report_statuses', label: 'Статус отчета', placeholder: 'Все статусы', options: reportStatusOptions },
         { kind: 'multi', key: 'validation_statuses', label: 'Статусы валидации', placeholder: 'Все статусы', options: validationStatusOptions },
-        { kind: 'text-list', key: 'domains', label: 'Домены', placeholder: 'Например: vk.com, t.me' },
+        { kind: 'text-list', key: 'domains', label: 'Домены', placeholder: '' },
         {
           kind: 'select',
           key: 'sort_by',

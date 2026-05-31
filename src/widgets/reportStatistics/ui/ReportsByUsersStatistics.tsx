@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -19,6 +19,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -110,7 +111,7 @@ export function ReportsByUsersStatistics() {
   const usersQuery = useQuery({ queryKey: ['users', 'reports-by-users-filter'], queryFn: () => getUsers() });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-by-users-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsByUsers });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -135,8 +136,18 @@ export function ReportsByUsersStatistics() {
     reportsMutation.mutate(nextFilters);
   }
 
+  useEffect(() => {
+    handleSubmit();
+  }, []);
+
   function updateFilters(patch: Partial<ReportsByUsersPayload>) {
     setFilters((current) => ({ ...current, ...patch }));
+  }
+
+  function applyFilters(patch: Partial<ReportsByUsersPayload>) {
+    const nextFilters = { ...filters, ...patch };
+    setFilters(nextFilters);
+    handleSubmit(nextFilters);
   }
 
   function goToPage(page: number) {
@@ -180,14 +191,9 @@ export function ReportsByUsersStatistics() {
           <DateFilter label="Дата с" value={filters.date_from} onChange={(date_from) => updateFilters({ date_from })} />
           <DateFilter label="Дата по" value={filters.date_to} onChange={(date_to) => updateFilters({ date_to })} />
           <FilterSelect label="Тип периода" value={filters.period_type} options={periodTypeOptions} onChange={(period_type) => updateFilters({ period_type: period_type as DashboardPeriodType })} />
-          <MultiSearchSelect label="Регионы" values={filters.region_ids.map(String)} placeholder="Все регионы" searchPlaceholder="Поиск региона" options={(regionsQuery.data ?? []).map((region) => ({ value: String(region.id), label: region.name, description: region.code }))} onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })} />
-          <MultiSearchSelect label="Оргструктуры" values={filters.org_unit_ids.map(String)} placeholder="Все оргструктуры" searchPlaceholder="Поиск оргструктуры" options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({ value: String(orgUnit.id), label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}` }))} onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })} />
-          <MultiSearchSelect label="Пользователи" values={filters.user_ids.map(String)} placeholder="Все пользователи" searchPlaceholder="Поиск пользователя" options={(usersQuery.data ?? []).map((user) => ({ value: String(user.id), label: user.fullName, description: `@${user.username}` }))} onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids), page: 1 })} />
-          <MultiSelect label="Роли" values={filters.role_ids.map(String)} placeholder="Все роли" options={roleOptions} onChange={(role_ids) => updateFilters({ role_ids: toNumbers(role_ids), page: 1 })} />
           <MultiSearchSelect label="Задачи" values={filters.task_ids.map(String)} placeholder="Все задачи" searchPlaceholder="Поиск по id или названию" options={(tasksQuery.data ?? []).map((task) => ({ value: String(task.id), label: `#${task.id} ${task.title}`, description: task.statusLabel }))} onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids), page: 1 })} />
           <MultiSelect label="Тип задачи" values={filters.task_types} placeholder="Все типы" options={taskTypeOptions} onChange={(task_types) => updateFilters({ task_types: task_types as ReportTaskType[], page: 1 })} />
-          <MultiSelect label="Масштаб задачи" values={filters.task_scope} placeholder="Любой масштаб" options={taskScopeOptions} onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })} />
-          <MultiSelect label="Статус задачи" values={filters.task_statuses} placeholder="Все статусы" options={taskStatusOptions} onChange={(task_statuses) => updateFilters({ task_statuses: task_statuses as ReportAnalyticsTaskStatus[], page: 1 })} />
+          <MultiSelect label="Уровень задачи" values={filters.task_scope} placeholder="Любой уровень" options={taskScopeOptions} onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })} />
           <MultiSelect label="Тип отчета" values={filters.report_types} placeholder="Все типы отчетов" options={reportTypeOptions} onChange={(report_types) => updateFilters({ report_types: report_types as ReportType[], page: 1 })} />
           <FilterSelect label="Сортировка" value={filters.sort_by} options={[{ value: 'not_completed_rate', label: 'Доля невыполненных' }, { value: 'completion_rate', label: 'Выполнение' }]} onChange={(sort_by) => updateFilters({ sort_by: sort_by as ReportsByUsersPayload['sort_by'], page: 1 })} />
           <FilterSelect label="Направление" value={filters.sort_direction} options={[{ value: 'desc', label: 'По убыванию' }, { value: 'asc', label: 'По возрастанию' }]} onChange={(sort_direction) => updateFilters({ sort_direction: sort_direction as SortDirection })} />
@@ -212,7 +218,21 @@ export function ReportsByUsersStatistics() {
       )}
 
       {reportsMutation.isError && <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Не удалось загрузить статистику по исполнителям.</div>}
-      {result ? <ReportsByUsersResult result={result} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
+      {result ? (
+        <ReportsByUsersResult
+          result={result}
+          filters={filters}
+          userOptions={userOptions}
+          regionOptions={regionOptions}
+          orgUnitOptions={orgUnitOptions}
+          onFiltersChange={applyFilters}
+          onPageChange={goToPage}
+        />
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+          Настройте фильтры и нажмите «Получить статистику».
+        </div>
+      )}
       <AnalyticsExportStatusToast
         exportJob={exportJob}
         title="Экспорт статистики по исполнителям"
@@ -223,7 +243,23 @@ export function ReportsByUsersStatistics() {
   );
 }
 
-function ReportsByUsersResult({ result, onPageChange }: { result: ReportsByUsersResponse; onPageChange: (page: number) => void }) {
+function ReportsByUsersResult({
+  result,
+  filters,
+  userOptions,
+  regionOptions,
+  orgUnitOptions,
+  onFiltersChange,
+  onPageChange,
+}: {
+  result: ReportsByUsersResponse;
+  filters: ReportsByUsersPayload;
+  userOptions: SelectOption[];
+  regionOptions: SelectOption[];
+  orgUnitOptions: SelectOption[];
+  onFiltersChange: (patch: Partial<ReportsByUsersPayload>) => void;
+  onPageChange: (page: number) => void;
+}) {
   return (
     <section className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-2">
@@ -235,9 +271,82 @@ function ReportsByUsersResult({ result, onPageChange }: { result: ReportsByUsers
         <p className="text-sm text-slate-500">Найдено: {result.total}, страница {result.page}</p>
         <p className="text-sm text-slate-500">Обновлено: {formatDateTime(result.updated_at)}</p>
       </div>
-      <TableScrollArea headerHeight="3rem" height="58vh">
+      <TableScrollArea headerHeight="6rem" height="58vh">
         <Table className="min-w-[1100px] whitespace-nowrap">
-          <TableHeader><TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">{tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader>
+            <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+              <TableHead />
+              <TableHead className="min-w-[260px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Пользователи"
+                    values={filters.user_ids.map(String)}
+                    placeholder="Все пользователи"
+                    searchPlaceholder="Поиск пользователя"
+                    options={userOptions}
+                    onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids), page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[220px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Статус задачи"
+                    values={filters.task_statuses}
+                    placeholder="Все статусы"
+                    options={taskStatusOptions}
+                    onChange={(task_statuses) =>
+                      onFiltersChange({
+                        task_statuses: task_statuses as ReportAnalyticsTaskStatus[],
+                        page: 1,
+                      })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[220px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Роли"
+                    values={filters.role_ids.map(String)}
+                    placeholder="Все роли"
+                    options={roleOptions}
+                    onChange={(role_ids) => onFiltersChange({ role_ids: toNumbers(role_ids), page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[240px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Регионы"
+                    values={filters.region_ids.map(String)}
+                    placeholder="Все регионы"
+                    searchPlaceholder="Поиск региона"
+                    options={regionOptions}
+                    onChange={(region_ids) => onFiltersChange({ region_ids: toNumbers(region_ids), page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead className="min-w-[260px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Оргструктуры"
+                    values={filters.org_unit_ids.map(String)}
+                    placeholder="Все оргструктуры"
+                    searchPlaceholder="Поиск оргструктуры"
+                    options={orgUnitOptions}
+                    onChange={(org_unit_ids) =>
+                      onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
+                    }
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead colSpan={tableColumns.length - 6} />
+            </TableRow>
+            <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+              {tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {result.items.length === 0 ? <TableRow><TableCell colSpan={tableColumns.length} className="py-10 text-center text-sm text-slate-500">Нет данных.</TableCell></TableRow> : result.items.map((item, index) => (
               <TableRow key={index} className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
@@ -284,6 +393,10 @@ function createInitialFilters(): ReportsByUsersPayload {
     page: 1,
     page_size: 50,
   };
+}
+
+function TableFilterCell({ children }: { children: React.ReactNode }) {
+  return <div className="w-full min-w-[210px] py-2">{children}</div>;
 }
 
 function MultiSearchSelect({ label, values, placeholder, searchPlaceholder, options, onChange }: { label: string; values: string[]; placeholder: string; searchPlaceholder: string; options: SelectOption[]; onChange: (values: string[]) => void }) {
@@ -376,7 +489,7 @@ function formatAppliedFilters(filters: ReportsByUsersResponse['filters_applied']
     { label: 'Роли', value: formatOptions(roleOptions, filters.role_ids.map(String)) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },
-    { label: 'Масштаб', value: formatOptions(taskScopeOptions, filters.task_scope) },
+    { label: 'Уровень задачи', value: formatOptions(taskScopeOptions, filters.task_scope) },
     { label: 'Статусы задач', value: formatOptions(taskStatusOptions, filters.task_statuses) },
     { label: 'Типы отчетов', value: formatOptions(reportTypeOptions, filters.report_types) },
     { label: 'Неактивные пользователи', value: filters.include_inactive_users ? 'Да' : 'Нет' },

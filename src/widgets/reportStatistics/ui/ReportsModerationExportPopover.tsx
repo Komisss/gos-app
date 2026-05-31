@@ -61,7 +61,7 @@ export function ReportsModerationExportPopover({
         { kind: 'select', key: 'period_type', label: 'Тип периода', options: periodTypeOptions },
         { kind: 'multi-search', key: 'region_ids', label: 'Регионы', placeholder: 'Все регионы', searchPlaceholder: 'Поиск региона', options: regionOptions, valueType: 'number' },
         { kind: 'multi-search', key: 'task_ids', label: 'Задачи', placeholder: 'Все задачи', searchPlaceholder: 'Поиск по id или названию', options: taskOptions, valueType: 'number' },
-        { kind: 'multi', key: 'task_scope', label: 'Масштаб задачи', placeholder: 'Любой масштаб', options: taskScopeOptions },
+        { kind: 'multi', key: 'task_scope', label: 'Уровень задачи', placeholder: 'Любой уровень', options: taskScopeOptions },
         { kind: 'multi', key: 'report_types', label: 'Тип отчета', placeholder: 'Все типы отчетов', options: reportTypeOptions },
         { kind: 'number', key: 'page', label: 'Страница', min: 1 },
         { kind: 'number', key: 'page_size', label: 'Размер страницы', min: 1 },

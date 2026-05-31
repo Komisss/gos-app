@@ -80,7 +80,7 @@ export function ReportsNotCompletedExportPopover({
         { kind: 'multi', key: 'task_types', label: 'Тип задачи', placeholder: 'Все типы', options: taskTypeOptions },
         { kind: 'multi', key: 'task_scope', label: 'Масштаб задачи', placeholder: 'Любой масштаб', options: taskScopeOptions },
         { kind: 'multi', key: 'assignment_statuses', label: 'Статус назначения', placeholder: 'Все статусы', options: assignmentStatusOptions },
-        { kind: 'text-list', key: 'not_completed_reason_codes', label: 'Причины невыполнения', placeholder: 'Например: NO_REPORT_SUBMITTED_BEFORE_DEADLINE' },
+        { kind: 'text-list', key: 'not_completed_reason_codes', label: 'Причины невыполнения', placeholder: '' },
         {
           kind: 'select',
           key: 'sort_by',

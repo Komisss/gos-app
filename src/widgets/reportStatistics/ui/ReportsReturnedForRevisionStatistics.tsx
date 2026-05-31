@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search } from 'lucide-react';
 
@@ -14,6 +14,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
+import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -70,7 +71,7 @@ export function ReportsReturnedForRevisionStatistics() {
   const usersQuery = useQuery({ queryKey: ['users', 'reports-returned-for-revision-filter'], queryFn: () => getUsers() });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-returned-for-revision-filter'], queryFn: () => getTasks() });
   const reportsMutation = useMutation({ mutationFn: getReportsReturnedForRevision });
-  const result = reportsMutation.data;
+  const result = useRetainedValue(reportsMutation.data);
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,
@@ -91,9 +92,19 @@ export function ReportsReturnedForRevisionStatistics() {
     setFilters((current) => ({ ...current, ...patch }));
   }
 
+  function applyFilters(patch: Partial<ReportsReturnedForRevisionPayload>) {
+    const nextFilters = { ...filters, ...patch };
+    setFilters(nextFilters);
+    handleSubmit(nextFilters);
+  }
+
   function handleSubmit(nextFilters = filters) {
     reportsMutation.mutate(nextFilters);
   }
+
+  useEffect(() => {
+    handleSubmit();
+  }, []);
 
   function goToPage(page: number) {
     const nextFilters = { ...filters, page };
@@ -131,9 +142,7 @@ export function ReportsReturnedForRevisionStatistics() {
           <DateFilter label="Дата по" value={filters.date_to} onChange={(date_to) => updateFilters({ date_to })} />
           <MultiSearchSelect label="Регионы" values={filters.region_ids.map(String)} placeholder="Все регионы" searchPlaceholder="Поиск региона" options={(regionsQuery.data ?? []).map((region) => ({ value: String(region.id), label: region.name, description: region.code }))} onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })} />
           <MultiSearchSelect label="Пользователи" values={filters.user_ids.map(String)} placeholder="Все пользователи" searchPlaceholder="Поиск пользователя" options={(usersQuery.data ?? []).map((user) => ({ value: String(user.id), label: user.fullName, description: `@${user.username}` }))} onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids), page: 1 })} />
-          <MultiSearchSelect label="Задачи" values={filters.task_ids.map(String)} placeholder="Все задачи" searchPlaceholder="Поиск по id или названию" options={(tasksQuery.data ?? []).map((task) => ({ value: String(task.id), label: `#${task.id} ${task.title}`, description: task.statusLabel }))} onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids), page: 1 })} />
-          <MultiSelect label="Масштаб задачи" values={filters.task_scope} placeholder="Любой масштаб" options={taskScopeOptions} onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })} />
-          <MultiSelect label="Тип отчета" values={filters.report_types} placeholder="Все типы отчетов" options={reportTypeOptions} onChange={(report_types) => updateFilters({ report_types: report_types as ReportType[], page: 1 })} />
+          <MultiSelect label="Уровень задачи" values={filters.task_scope} placeholder="Любой уровень" options={taskScopeOptions} onChange={(task_scope) => updateFilters({ task_scope: task_scope as ReportTaskScope[], page: 1 })} />
           <NumberFilter label="Страница" value={filters.page} min={1} onChange={(page) => updateFilters({ page })} />
           <FilterSelect label="Размер страницы" value={String(filters.page_size)} options={[{ value: '25', label: '25' }, { value: '50', label: '50' }, { value: '100', label: '100' }]} onChange={(pageSize) => updateFilters({ page_size: Math.min(Number(pageSize), 100), page: 1 })} />
         </div>
@@ -154,7 +163,7 @@ export function ReportsReturnedForRevisionStatistics() {
       )}
 
       {reportsMutation.isError && <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">Не удалось загрузить статистику по возвращенным на доработку отчетам.</div>}
-      {result ? <ReportsReturnedForRevisionResult result={result} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
+      {result ? <ReportsReturnedForRevisionResult result={result} filters={filters} taskOptions={taskOptions} onFiltersChange={applyFilters} onPageChange={goToPage} /> : <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Настройте фильтры и нажмите «Получить статистику».</div>}
       <AnalyticsExportStatusToast
         exportJob={exportJob}
         title="Экспорт статистики по возвращенным на доработку"
@@ -165,7 +174,19 @@ export function ReportsReturnedForRevisionStatistics() {
   );
 }
 
-function ReportsReturnedForRevisionResult({ result, onPageChange }: { result: ReportsReturnedForRevisionResponse; onPageChange: (page: number) => void }) {
+function ReportsReturnedForRevisionResult({
+  result,
+  filters,
+  taskOptions,
+  onFiltersChange,
+  onPageChange,
+}: {
+  result: ReportsReturnedForRevisionResponse;
+  filters: ReportsReturnedForRevisionPayload;
+  taskOptions: SelectOption[];
+  onFiltersChange: (patch: Partial<ReportsReturnedForRevisionPayload>) => void;
+  onPageChange: (page: number) => void;
+}) {
   return (
     <section className="space-y-4">
       <div className="grid gap-4 xl:grid-cols-2">
@@ -177,9 +198,42 @@ function ReportsReturnedForRevisionResult({ result, onPageChange }: { result: Re
         <p className="text-sm text-slate-500">Найдено: {result.total}, страница {result.page}</p>
         <p className="text-sm text-slate-500">Обновлено: {formatDateTime(result.updated_at)}</p>
       </div>
-      <TableScrollArea headerHeight="3rem" height="58vh">
+      <TableScrollArea headerHeight="6rem" height="58vh">
         <Table className="min-w-[1100px] whitespace-nowrap">
-          <TableHeader><TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">{tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}</TableRow></TableHeader>
+          <TableHeader>
+            <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+              <TableHead />
+              <TableHead className="min-w-[260px] align-top">
+                <TableFilterCell>
+                  <MultiSearchSelect
+                    label="Задачи"
+                    values={filters.task_ids.map(String)}
+                    placeholder="Все задачи"
+                    searchPlaceholder="Поиск по id или названию"
+                    options={taskOptions}
+                    onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids), page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead />
+              <TableHead />
+              <TableHead className="min-w-[220px] align-top">
+                <TableFilterCell>
+                  <MultiSelect
+                    label="Тип отчета"
+                    values={filters.report_types}
+                    placeholder="Все типы отчетов"
+                    options={reportTypeOptions}
+                    onChange={(report_types) => onFiltersChange({ report_types: report_types as ReportType[], page: 1 })}
+                  />
+                </TableFilterCell>
+              </TableHead>
+              <TableHead colSpan={tableColumns.length - 5} />
+            </TableRow>
+            <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+              {tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}
+            </TableRow>
+          </TableHeader>
           <TableBody>
             {result.items.length === 0 ? <TableRow><TableCell colSpan={tableColumns.length} className="py-10 text-center text-sm text-slate-500">Нет данных.</TableCell></TableRow> : result.items.map((item, index) => (
               <TableRow key={index} className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
@@ -219,6 +273,10 @@ function createInitialFilters(): ReportsReturnedForRevisionPayload {
     page: 1,
     page_size: 50,
   };
+}
+
+function TableFilterCell({ children }: { children: React.ReactNode }) {
+  return <div className="w-full min-w-[210px] py-2">{children}</div>;
 }
 
 function MultiSearchSelect({ label, values, placeholder, searchPlaceholder, options, onChange }: { label: string; values: string[]; placeholder: string; searchPlaceholder: string; options: SelectOption[]; onChange: (values: string[]) => void }) {
@@ -294,7 +352,7 @@ function formatAppliedFilters(filters: ReportsReturnedForRevisionResponse['filte
     { label: 'Регионы', value: formatArray(filters.region_ids) },
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
-    { label: 'Масштаб', value: formatOptions(taskScopeOptions, filters.task_scope) },
+    { label: 'Уровень задачи', value: formatOptions(taskScopeOptions, filters.task_scope) },
     { label: 'Типы отчетов', value: formatOptions(reportTypeOptions, filters.report_types) },
     { label: 'Архивные задачи', value: filters.include_archived_tasks ? 'Да' : 'Нет' },
     { label: 'Удаленные назначения', value: filters.include_removed_assignments ? 'Да' : 'Нет' },

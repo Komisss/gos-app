@@ -29,8 +29,12 @@ function flattenOrgUnits(items: OrgUnitDto[], depth = 0): OrgUnit[] {
       {
         id: item.id,
         name: item.name,
+        type: item.type,
         parentId: item.parent_id,
         regionId: item.region_id,
+        regionName: item.region_name,
+        isActive: item.is_active,
+        headUser: item.head_user,
         depth,
       },
       ...flattenOrgUnits(children, depth + 1),
