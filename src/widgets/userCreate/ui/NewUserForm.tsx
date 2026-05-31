@@ -377,39 +377,39 @@ function getAvailableOrgUnits(orgUnits: OrgUnit[], role: RegisterUserRoleId, reg
     return [];
   }
 
-  const targetHeadRoleCode = getOrgUnitHeadRoleCodeForRole(role);
+  const targetHeadRoleCodes = getOrgUnitHeadRoleCodesForRole(role);
 
   return orgUnits.filter((orgUnit) => {
     if (orgUnit.regionId !== regionId || orgUnit.isActive === false) {
       return false;
     }
 
-    if (!targetHeadRoleCode) {
+    if (targetHeadRoleCodes.length === 0) {
       return true;
     }
 
-    return orgUnit.headUser?.role?.code === targetHeadRoleCode;
+    return targetHeadRoleCodes.includes(orgUnit.headUser?.role?.code ?? '');
   });
 }
 
-function getOrgUnitHeadRoleCodeForRole(role: RegisterUserRoleId) {
+function getOrgUnitHeadRoleCodesForRole(role: RegisterUserRoleId) {
   if (role === 4) {
-    return 'regional_manager';
+    return ['federal_manager', 'regional_manager'];
   }
 
-  if (role === 6) {
-    return 'main_manager';
+  if (role === 5 || role === 6) {
+    return ['main_manager'];
   }
 
   if (role === 7) {
-    return 'unit_head';
+    return ['unit_head'];
   }
 
   if (role === 8) {
-    return 'department_head';
+    return ['department_head'];
   }
 
-  return null;
+  return [];
 }
 
 function canSelectOrgUnit(role: RegisterUserRoleId) {
@@ -421,7 +421,7 @@ function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null
     return 'Сначала выберите регион';
   }
 
-  if (getOrgUnitHeadRoleCodeForRole(role)) {
+  if (getOrgUnitHeadRoleCodesForRole(role).length > 0) {
     return 'Выберите доступную подгруппу';
   }
 
