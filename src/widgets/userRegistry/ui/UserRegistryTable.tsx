@@ -1,4 +1,5 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { getUserStatusLabel, type UserFilters } from '@/entities/user/api/users';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
@@ -44,6 +45,10 @@ export const UserRegistryTable = memo(function UserRegistryTable({
   onRegionClick,
 }: Props) {
   const showFilters = tableFilterMode !== 'none';
+  const navigate = useNavigate();
+  const handleUserClick = useCallback((userId: number) => {
+    navigate(`/users/${userId}`);
+  }, [navigate]);
 
   return (
     <TableScrollArea headerHeight={showFilters ? '5rem' : '3rem'} height="68vh">
@@ -55,7 +60,7 @@ export const UserRegistryTable = memo(function UserRegistryTable({
           tableFilterMode={tableFilterMode}
           onFiltersChange={onFiltersChange}
         />
-        <UserRegistryTableBody users={users} onRegionClick={onRegionClick} />
+        <UserRegistryTableBody users={users} onRegionClick={onRegionClick} onUserClick={handleUserClick} />
       </Table>
     </TableScrollArea>
   );
@@ -82,6 +87,19 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
       {showFilters && (
         <TableRow className="border-b-slate-200 bg-white hover:bg-white">
           <TableHead className="w-24" />
+            <TableHead className="min-w-[220px] align-bottom">
+            <FilterSearchSelect
+              label=""
+              value={filters.region}
+              placeholder="Все регионы"
+              searchPlaceholder="Поиск региона"
+              options={regions.map((region) => ({
+                value: String(region.id),
+                label: region.name,
+              }))}
+              onChange={(region) => onFiltersChange({ region })}
+            />
+          </TableHead>
           <TableHead className="min-w-[240px] align-bottom">
             {showAllFilters && (
               <HeaderSearchInput
@@ -101,25 +119,12 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
             )}
           </TableHead>
           <TableHead className="min-w-[220px] align-bottom">
-            <FilterSearchSelect
-              label=""
-              value={filters.region}
-              placeholder="Все регионы"
-              searchPlaceholder="Поиск региона"
-              options={regions.map((region) => ({
-                value: String(region.id),
-                label: region.name,
-              }))}
-              onChange={(region) => onFiltersChange({ region })}
-            />
-          </TableHead>
-          <TableHead className="min-w-[220px] align-bottom">
             {showAllFilters && (
               <FilterSearchSelect
                 label=""
                 value={filters.org_unit}
-                placeholder="Все оргструктуры"
-                searchPlaceholder="Поиск оргструктуры"
+                placeholder="Все структуры подчинения"
+                searchPlaceholder="Поиск структуры подчинения"
                 options={orgUnits.map((orgUnit) => ({
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
@@ -142,10 +147,10 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
       )}
       <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
         <TableHead className="w-24">#</TableHead>
+        <TableHead className="min-w-[220px]">Регион</TableHead>
         <TableHead className="min-w-[240px]">Пользователь</TableHead>
         <TableHead className="min-w-[180px]">Роль</TableHead>
-        <TableHead className="min-w-[220px]">Регион</TableHead>
-        <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+        <TableHead className="min-w-[220px]">Структура подчинения</TableHead>
         <TableHead className="w-32">Статус</TableHead>
       </TableRow>
     </TableHeader>
@@ -155,9 +160,11 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
 const UserRegistryTableBody = memo(function UserRegistryTableBody({
   users,
   onRegionClick,
+  onUserClick,
 }: {
   users: UserListItem[];
   onRegionClick?: (region: Region) => void;
+  onUserClick: (userId: number) => void;
 }) {
   return (
     <TableBody>
@@ -174,16 +181,9 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({
             className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
               index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
             }`}
-            onClick={() => openInNewTab(`/users/${user.id}`)}
+            onClick={() => onUserClick(user.id)}
           >
             <TableCell className="text-slate-700">{user.id}</TableCell>
-            <TableCell className="min-w-[240px]">
-              <div className="space-y-1 whitespace-normal">
-                <div className="text-sm font-medium text-slate-900">{user.fullName}</div>
-                <div className="text-xs text-slate-500">@{user.username}</div>
-              </div>
-            </TableCell>
-            <TableCell className="text-slate-700">{user.role?.name ?? 'Не указана'}</TableCell>
             <TableCell className="text-slate-700">
               {user.region ? (
                 <button
@@ -200,6 +200,13 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({
                 'Не указан'
               )}
             </TableCell>
+            <TableCell className="min-w-[240px]">
+              <div className="space-y-1 whitespace-normal">
+                <div className="text-sm font-medium text-slate-900">{user.fullName}</div>
+                <div className="text-xs text-slate-500">@{user.username}</div>
+              </div>
+            </TableCell>
+            <TableCell className="text-slate-700">{user.role?.name ?? 'Не указана'}</TableCell>
             <TableCell className="min-w-[220px] whitespace-normal text-slate-700">
               {user.orgUnit?.name ?? 'Не указана'}
             </TableCell>
@@ -262,11 +269,4 @@ function HeaderSelect({
       </SelectContent>
     </Select>
   );
-}
-
-function openInNewTab(path: string) {
-  const openedWindow = window.open(path, '_blank', 'noopener,noreferrer');
-  if (openedWindow) {
-    openedWindow.opener = null;
-  }
 }

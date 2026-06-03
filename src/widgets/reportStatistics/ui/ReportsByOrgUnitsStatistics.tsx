@@ -82,7 +82,7 @@ const tableColumns: Array<{
   label: string;
   kind?: 'percent' | 'number';
 }> = [
-  { key: 'org_unit_name', label: 'Оргструктура' },
+  { key: 'org_unit_name', label: 'Структура подчинения' },
   { key: 'org_unit_status', label: 'Статус' },
   { key: 'region_name', label: 'Регион' },
   { key: 'total_assignments', label: 'Назначения', kind: 'number' },
@@ -211,7 +211,7 @@ export function ReportsByOrgUnitsStatistics() {
             }
           />
           <NumberFilter
-            label="Глубина оргструктуры"
+            label="Глубина структуры подчинения"
             value={filters.org_unit_depth}
             min={0}
             onChange={(org_unit_depth) => updateFilters({ org_unit_depth, page: 1 })}
@@ -302,14 +302,14 @@ export function ReportsByOrgUnitsStatistics() {
 
         <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2 xl:grid-cols-5">
           <BooleanFilter
-            label="Включать дочерние оргструктуры"
+            label="Включать дочерние структуры подчинения"
             checked={filters.include_child_org_units}
             onChange={(include_child_org_units) =>
               updateFilters({ include_child_org_units, page: 1 })
             }
           />
           <BooleanFilter
-            label="Включать неактивные оргструктуры"
+            label="Включать неактивные структуры подчинения"
             checked={filters.include_inactive_org_units}
             onChange={(include_inactive_org_units) =>
               updateFilters({ include_inactive_org_units, page: 1 })
@@ -360,7 +360,7 @@ export function ReportsByOrgUnitsStatistics() {
 
       {reportsMutation.isError && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-          Не удалось загрузить статистику по оргструктурам.
+          Не удалось загрузить статистику по структурам подчинения.
         </div>
       )}
 
@@ -380,7 +380,7 @@ export function ReportsByOrgUnitsStatistics() {
       )}
       <AnalyticsExportStatusToast
         exportJob={exportJob}
-        title="Экспорт статистики по оргструктуре"
+        title="Экспорт статистики по структуре подчинения"
         defaultFileName="analytics-by-org-units.xlsx"
         onClose={() => setExportJob(null)}
       />
@@ -435,10 +435,10 @@ function ReportsByOrgUnitsResult({
               <TableHead className="min-w-[260px] align-top">
                 <TableFilterCell>
                   <MultiSearchSelect
-                    label="Оргструктуры"
+                    label="Структуры подчинения"
                     values={filters.org_unit_ids.map(String)}
-                    placeholder="Все оргструктуры"
-                    searchPlaceholder="Поиск оргструктуры"
+                    placeholder="Все структуры подчинения"
+                    searchPlaceholder="Поиск структуры подчинения"
                     options={orgUnitOptions}
                     onChange={(org_unit_ids) =>
                       onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
@@ -834,7 +834,7 @@ function BooleanFilter({
 
 function TotalsGrid({ totals }: { totals: ReportsByOrgUnitsResponse['totals'] }) {
   const items = [
-    { label: 'Оргструктур', value: totals.total_org_units },
+    { label: 'Структур подчинения', value: totals.total_org_units },
     { label: 'Назначений', value: totals.total_assignments },
     { label: 'С отчетами', value: totals.assignments_with_reports },
     { label: 'Без отчетов', value: totals.assignments_without_reports },
@@ -917,8 +917,8 @@ function formatAppliedFilters(filters: ReportsByOrgUnitsResponse['filters_applie
     { label: 'Дата по', value: formatDateTime(filters.date_to) },
     { label: 'Тип периода', value: getOptionLabel(periodTypeOptions, filters.period_type) },
     { label: 'Регионы', value: formatArray(filters.region_ids) },
-    { label: 'Оргструктуры', value: formatArray(filters.org_unit_ids) },
-    { label: 'Дочерние оргструктуры', value: filters.include_child_org_units ? 'Да' : 'Нет' },
+    { label: 'Структуры подчинения', value: formatArray(filters.org_unit_ids) },
+    { label: 'Дочерние структуры подчинения', value: filters.include_child_org_units ? 'Да' : 'Нет' },
     { label: 'Глубина', value: filters.org_unit_depth },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },
@@ -929,7 +929,7 @@ function formatAppliedFilters(filters: ReportsByOrgUnitsResponse['filters_applie
       label: 'Статусы назначений',
       value: formatOptions(assignmentStatusOptions, filters.assignment_statuses),
     },
-    { label: 'Неактивные оргструктуры', value: filters.include_inactive_org_units ? 'Да' : 'Нет' },
+    { label: 'Неактивные структуры подчинения', value: filters.include_inactive_org_units ? 'Да' : 'Нет' },
     { label: 'Архивные задачи', value: filters.include_archived_tasks ? 'Да' : 'Нет' },
     { label: 'Удаленные назначения', value: filters.include_removed_assignments ? 'Да' : 'Нет' },
     { label: 'Только текущая версия', value: filters.only_current_report_version ? 'Да' : 'Нет' },

@@ -10,6 +10,7 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 export type FilterSearchSelectOption = {
   value: string;
   label: string;
+  labelMeta?: string;
   description?: string;
 };
 
@@ -41,7 +42,7 @@ export function FilterSearchSelect({
     }
 
     return options.filter((option) =>
-      `${option.label} ${option.description ?? ''}`.toLowerCase().includes(normalizedQuery),
+      `${option.label} ${option.labelMeta ?? ''} ${option.description ?? ''}`.toLowerCase().includes(normalizedQuery),
     );
   }, [options, query]);
 
@@ -108,7 +109,12 @@ export function FilterSearchSelect({
                       )}
                     />
                     <span className="min-w-0">
-                      <span className="block font-medium text-slate-900">{option.label}</span>
+                      <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+                        <span className="font-medium text-slate-900">{option.label}</span>
+                        {option.labelMeta && (
+                          <span className="text-xs text-slate-500">{option.labelMeta}</span>
+                        )}
+                      </span>
                       {option.description && (
                         <span className="block text-xs text-slate-500">{option.description}</span>
                       )}

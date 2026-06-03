@@ -192,10 +192,10 @@ export function ReportsByTasksStatistics() {
             onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })}
           />
           <MultiSearchSelect
-            label="Оргструктуры"
+            label="Структуры подчинения"
             values={filters.org_unit_ids.map(String)}
-            placeholder="Все оргструктуры"
-            searchPlaceholder="Поиск оргструктуры"
+            placeholder="Все структуры подчинения"
+            searchPlaceholder="Поиск структуры подчинения"
             options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({ value: String(orgUnit.id), label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}` }))}
             onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })}
           />
@@ -583,7 +583,7 @@ function formatAppliedFilters(filters: ReportsByTasksResponse['filters_applied']
     { label: 'Дата по', value: formatDateTime(filters.date_to) },
     { label: 'Тип периода', value: getOptionLabel(periodTypeOptions, filters.period_type) },
     { label: 'Регионы', value: formatArray(filters.region_ids) },
-    { label: 'Оргструктуры', value: formatArray(filters.org_unit_ids) },
+    { label: 'Структуры подчинения', value: formatArray(filters.org_unit_ids) },
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },

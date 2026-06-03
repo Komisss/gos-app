@@ -85,7 +85,7 @@ const tableColumns: Array<{ key: keyof ReportsByUsersItem; label: string; kind?:
   { key: 'user_status', label: 'Статус' },
   { key: 'role_name', label: 'Роль' },
   { key: 'region_name', label: 'Регион' },
-  { key: 'org_unit_name', label: 'Оргструктура' },
+  { key: 'org_unit_name', label: 'Структура подчинения' },
   { key: 'total_assignments', label: 'Назначения', kind: 'number' },
   { key: 'assignments_with_reports', label: 'С отчетами', kind: 'number' },
   { key: 'assignments_without_reports', label: 'Без отчетов', kind: 'number' },
@@ -330,10 +330,10 @@ function ReportsByUsersResult({
               <TableHead className="min-w-[260px] align-top">
                 <TableFilterCell>
                   <MultiSearchSelect
-                    label="Оргструктуры"
+                    label="Структуры подчинения"
                     values={filters.org_unit_ids.map(String)}
-                    placeholder="Все оргструктуры"
-                    searchPlaceholder="Поиск оргструктуры"
+                    placeholder="Все структуры подчинения"
+                    searchPlaceholder="Поиск структуры подчинения"
                     options={orgUnitOptions}
                     onChange={(org_unit_ids) =>
                       onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })
@@ -484,7 +484,7 @@ function formatAppliedFilters(filters: ReportsByUsersResponse['filters_applied']
     { label: 'Дата по', value: formatDateTime(filters.date_to) },
     { label: 'Тип периода', value: getOptionLabel(periodTypeOptions, filters.period_type) },
     { label: 'Регионы', value: formatArray(filters.region_ids) },
-    { label: 'Оргструктуры', value: formatArray(filters.org_unit_ids) },
+    { label: 'Структуры подчинения', value: formatArray(filters.org_unit_ids) },
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Роли', value: formatOptions(roleOptions, filters.role_ids.map(String)) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },

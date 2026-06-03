@@ -198,10 +198,10 @@ export function ReportsDashboard() {
               }
             />
             <MultiSearchSelect
-              label="Оргструктуры"
+              label="Структуры подчинения"
               values={filters.org_unit_ids.map(String)}
-              placeholder="Все оргструктуры"
-              searchPlaceholder="Поиск оргструктуры"
+              placeholder="Все структуры подчинения"
+              searchPlaceholder="Поиск структуры подчинения"
               options={orgUnitOptions}
               onChange={(org_unit_ids) =>
                 setFilters((current) => ({ ...current, org_unit_ids: toNumbers(org_unit_ids) }))
@@ -735,7 +735,7 @@ function formatFilters(filters: AnalyticsDashboardResponse['filters_applied']) {
     { label: 'Тип периода', value: getOptionLabel(periodTypeOptions, filters.period_type) },
     { label: 'Регионы', value: formatArray(filters.region_ids) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
-    { label: 'Оргструктуры', value: formatArray(filters.org_unit_ids) },
+    { label: 'Структуры подчинения', value: formatArray(filters.org_unit_ids) },
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },
     { label: 'Масштаб', value: formatOptions(taskScopeOptions, filters.task_scope) },

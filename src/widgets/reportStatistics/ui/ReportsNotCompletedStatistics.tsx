@@ -71,7 +71,7 @@ const exportAssignmentStatusOptions: Array<{
 const groupByOptions: Array<{ value: NotCompletedGroupBy; label: string }> = [
   { value: 'region', label: 'Регион' },
   { value: 'task', label: 'Задача' },
-  { value: 'org_unit', label: 'Оргструктура' },
+  { value: 'org_unit', label: 'Структура подчинения' },
   { value: 'user', label: 'Пользователь' },
   { value: 'reason', label: 'Причина' },
   { value: 'day', label: 'День' },
@@ -178,7 +178,7 @@ export function ReportsNotCompletedStatistics() {
           <FilterSelect label="Тип периода" value={filters.period_type} options={periodTypeOptions} onChange={(period_type) => updateFilters({ period_type: period_type as DashboardPeriodType })} />
           <FilterSelect label="Группировка" value={filters.group_by} options={groupByOptions} onChange={(group_by) => updateFilters({ group_by: group_by as NotCompletedGroupBy, page: 1 })} />
           <MultiSearchSelect label="Регионы" values={filters.region_ids.map(String)} placeholder="Все регионы" searchPlaceholder="Поиск региона" options={(regionsQuery.data ?? []).map((region) => ({ value: String(region.id), label: region.name, description: region.code }))} onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids), page: 1 })} />
-          <MultiSearchSelect label="Оргструктуры" values={filters.org_unit_ids.map(String)} placeholder="Все оргструктуры" searchPlaceholder="Поиск оргструктуры" options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({ value: String(orgUnit.id), label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}` }))} onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })} />
+          <MultiSearchSelect label="Структуры подчинения" values={filters.org_unit_ids.map(String)} placeholder="Все структуры подчинения" searchPlaceholder="Поиск структуры подчинения" options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({ value: String(orgUnit.id), label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}` }))} onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids), page: 1 })} />
           <MultiSearchSelect label="Пользователи" values={filters.user_ids.map(String)} placeholder="Все пользователи" searchPlaceholder="Поиск пользователя" options={(usersQuery.data ?? []).map((user) => ({ value: String(user.id), label: user.fullName, description: `@${user.username}` }))} onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids), page: 1 })} />
           <MultiSearchSelect label="Задачи" values={filters.task_ids.map(String)} placeholder="Все задачи" searchPlaceholder="Поиск по id или названию" options={(tasksQuery.data ?? []).map((task) => ({ value: String(task.id), label: `#${task.id} ${task.title}`, description: task.statusLabel }))} onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids), page: 1 })} />
           <MultiSelect label="Тип задачи" values={filters.task_types} placeholder="Все типы" options={taskTypeOptions} onChange={(task_types) => updateFilters({ task_types: task_types as ReportTaskType[], page: 1 })} />
@@ -354,7 +354,7 @@ function formatAppliedFilters(filters: ReportsNotCompletedResponse['filters_appl
     { label: 'Тип периода', value: getOptionLabel(periodTypeOptions, filters.period_type) },
     { label: 'Группировка', value: getOptionLabel(groupByOptions, filters.group_by) },
     { label: 'Регионы', value: formatArray(filters.region_ids) },
-    { label: 'Оргструктуры', value: formatArray(filters.org_unit_ids) },
+    { label: 'Структуры подчинения', value: formatArray(filters.org_unit_ids) },
     { label: 'Пользователи', value: formatArray(filters.user_ids) },
     { label: 'Задачи', value: formatArray(filters.task_ids) },
     { label: 'Типы задач', value: formatOptions(taskTypeOptions, filters.task_types) },

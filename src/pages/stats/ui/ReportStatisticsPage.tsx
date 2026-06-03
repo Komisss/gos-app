@@ -11,7 +11,7 @@ import { ReportsNotCompletedStatistics } from '@/widgets/reportStatistics/ui/Rep
 import { ReportsReturnedForRevisionStatistics } from '@/widgets/reportStatistics/ui/ReportsReturnedForRevisionStatistics';
 
 const reportStatisticsTitles: Record<string, string> = {
-  'org-units': 'По оргструктуре',
+  'org-units': 'По структуре подчинения',
   regions: 'По регионам',
   tasks: 'По задачам',
   executors: 'По исполнителям',

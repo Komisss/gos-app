@@ -10,7 +10,7 @@ export const sidebarSections = [
         label: 'Статистика отчетов',
         icon: BarChart,
         items: [
-          { label: 'По оргструктуре', href: '/stats/reports/org-units' },
+          { label: 'По структуре подчинения', href: '/stats/reports/org-units' },
           { label: 'По регионам', href: '/stats/reports/regions' },
           { label: 'По задачам', href: '/stats/reports/tasks' },
           { label: 'По исполнителям', href: '/stats/reports/executors' },
@@ -34,7 +34,7 @@ export const sidebarSections = [
     title: 'Пользователи',
     items: [
       { label: 'Новый пользователь', icon: UserPlus, href: '/users/new' },
-      { label: 'Новая оргструктура', icon: Building2, href: '/org-units/new' },
+      { label: 'Новая структура подчинения', icon: Building2, href: '/org-units/new' },
       { label: 'Список пользователей', icon: Users, href: '/users' },
       { label: 'Регионы с управляющими', icon: Users, href: '/users/region-managers', roles: ['federal_manager'] },
     ],

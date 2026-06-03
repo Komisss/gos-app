@@ -180,6 +180,7 @@ function mapUserListDto(user: UserListDto): UserListItem {
     status: user.active ? 'active' : 'inactive',
     username: user.username,
     fullName: user.full_name,
+    maxUserId: user.max_user_id,
     role: user.role,
     region: user.region,
     orgUnit: user.org_unit,

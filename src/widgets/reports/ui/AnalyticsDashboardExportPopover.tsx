@@ -127,10 +127,10 @@ export function AnalyticsDashboardExportPopover({
               onChange={(task_ids) => updateFilters({ task_ids: toNumbers(task_ids) })}
             />
             <MultiSearchSelect
-              label="Оргструктуры"
+              label="Структуры подчинения"
               values={filters.org_unit_ids.map(String)}
-              placeholder="Все оргструктуры"
-              searchPlaceholder="Поиск оргструктуры"
+              placeholder="Все структуры подчинения"
+              searchPlaceholder="Поиск структуры подчинения"
               options={orgUnitOptions}
               onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids) })}
             />

@@ -103,7 +103,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
           </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
-              <Link to={reportPageLink} target="_blank" rel="noreferrer">
+              <Link to={reportPageLink}>
                 <ExternalLink />
                 Открыть страницу
               </Link>
@@ -117,7 +117,7 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <InfoItem label="Исполнитель" value={report.executorName} hint={`${report.executorRole} • ${report.executorStatus}`} />
         <InfoItem label="Регион" value={report.regionName} />
-        <InfoItem label="Оргструктура" value={report.orgUnitName} />
+        <InfoItem label="Структура подчинения" value={report.orgUnitName} />
         <InfoItem label="Формат" value={getReportFormatLabel(report.requiredReportFormat)} />
         <InfoItem label="Статус назначения" value={getAssignmentStatusLabel(report.assignmentStatus)} />
         <InfoItem label="Версия" value={report.versionNumber ?? 'Не указана'} hint={report.isCurrentVersion ? 'Текущая версия' : 'Не текущая версия'} />

@@ -112,7 +112,7 @@ export function ReportsByOrgUnitsExportPopover({
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-slate-900">
-              Экспорт статистики по оргструктуре
+              Экспорт статистики по структуре подчинения
             </h3>
             <p className="mt-1 text-xs text-slate-500">
               Фильтры экспорта открываются пустыми. Можно заполнить их вручную или перенести фильтры
@@ -148,15 +148,15 @@ export function ReportsByOrgUnitsExportPopover({
               onChange={(region_ids) => updateFilters({ region_ids: toNumbers(region_ids) })}
             />
             <MultiSearchSelect
-              label="Оргструктуры"
+              label="Структуры подчинения"
               values={filters.org_unit_ids.map(String)}
-              placeholder="Все оргструктуры"
-              searchPlaceholder="Поиск оргструктуры"
+              placeholder="Все структуры подчинения"
+              searchPlaceholder="Поиск структуры подчинения"
               options={orgUnitOptions}
               onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids) })}
             />
             <NumberFilter
-              label="Глубина оргструктуры"
+              label="Глубина структуры подчинения"
               value={filters.org_unit_depth}
               onChange={(org_unit_depth) => updateFilters({ org_unit_depth })}
             />
@@ -236,12 +236,12 @@ export function ReportsByOrgUnitsExportPopover({
 
           <div className="grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-2 xl:grid-cols-5">
             <BooleanFilter
-              label="Включать дочерние оргструктуры"
+              label="Включать дочерние структуры подчинения"
               checked={filters.include_child_org_units}
               onChange={(include_child_org_units) => updateFilters({ include_child_org_units })}
             />
             <BooleanFilter
-              label="Включать неактивные оргструктуры"
+              label="Включать неактивные структуры подчинения"
               checked={filters.include_inactive_org_units}
               onChange={(include_inactive_org_units) =>
                 updateFilters({ include_inactive_org_units })

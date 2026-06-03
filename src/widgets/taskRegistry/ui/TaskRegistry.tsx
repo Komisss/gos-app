@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListFilter, Plus } from 'lucide-react';
 
@@ -48,6 +48,7 @@ const emptyUsers: Awaited<ReturnType<typeof getUsers>> = [];
 
 export function TaskRegistry() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
@@ -139,8 +140,8 @@ export function TaskRegistry() {
   }, []);
 
   const openTaskPage = useCallback((task: Task) => {
-    window.open(`/tasks/${task.id}`, '_blank', 'noopener,noreferrer');
-  }, []);
+    navigate(`/tasks/${task.id}`);
+  }, [navigate]);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -183,10 +184,10 @@ export function TaskRegistry() {
                 onChange={(created_to) => updateFilters({ created_to })}
               />
               <FilterSearchSelect
-                label="Оргструктура"
+                label="Структура подчинения"
                 value={filters.org_unit}
-                placeholder="Все оргструктуры"
-                searchPlaceholder="Поиск оргструктуры"
+                placeholder="Все структуры подчинения"
+                searchPlaceholder="Поиск структуры подчинения"
                 options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,

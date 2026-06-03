@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search, ThumbsDown, ThumbsUp } from 'lucide-react';
 
@@ -124,7 +125,7 @@ type ReportRegistryProps = {
 
 export function ReportRegistry({
   title = 'Отчеты',
-  description = 'Реестр отчетов по задачам, пользователям, регионам и оргструктурам.',
+  description = 'Реестр отчетов по задачам, пользователям, регионам и структурам подчинения.',
   initialFilters,
   autoLoad = false,
   statusFilterOnly = false,
@@ -133,6 +134,7 @@ export function ReportRegistry({
   emptyStateText = 'Настройте фильтры и нажмите «Получить отчеты».',
   tableVariant = 'default',
 }: ReportRegistryProps = {}) {
+  const navigate = useNavigate();
   const initialFiltersKey = JSON.stringify(initialFilters ?? {});
   const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters(initialFilters));
   const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(() =>
@@ -312,8 +314,8 @@ export function ReportRegistry({
       return;
     }
 
-    window.open(`/reports/${reportId}`, '_blank', 'noopener,noreferrer');
-  }, []);
+    navigate(`/reports/${reportId}`);
+  }, [navigate]);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -743,6 +745,7 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
       <TableRow className="border-b-slate-200 bg-white hover:bg-white">
         <TableHead className="w-12" />
         <TableHead className="w-28" />
+            <TableHead className="min-w-[220px]" />
         <TableHead className="w-28" />
         <TableHead className="min-w-[300px] align-bottom">
           <MultiSearchSelect
@@ -778,8 +781,8 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
           <MultiSearchSelect
             label=""
             values={filters.org_unit_ids.map(String)}
-            placeholder="Все оргструктуры"
-            searchPlaceholder="Поиск оргструктуры"
+            placeholder="Все структуры подчинения"
+            searchPlaceholder="Поиск структуры подчинения"
             options={orgUnitOptions}
             onChange={(org_unit_ids) => onFiltersChange({ org_unit_ids: toNumbers(org_unit_ids) })}
           />
@@ -840,7 +843,7 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
         <TableHead className="min-w-[300px]">Задача</TableHead>
         <TableHead className="min-w-[240px]">Исполнитель</TableHead>
         <TableHead className="min-w-[220px]">Регион</TableHead>
-        <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+        <TableHead className="min-w-[220px]">Структура подчинения</TableHead>
         <TableHead className="w-40">Тип задачи</TableHead>
         <TableHead className="w-40">Формат отчета</TableHead>
         <TableHead className="w-40">Статус отчета</TableHead>
@@ -969,11 +972,12 @@ function TaskRegionReportsTable({
 }) {
   return (
     <TableScrollArea headerHeight="6rem" height="70vh">
-      <Table className="min-w-[980px] whitespace-nowrap">
+      <Table className="min-w-[1120px] whitespace-nowrap">
         <TableHeader>
           <TableRow className="border-b-slate-200 bg-white hover:bg-white">
             <TableHead className="w-24" />
             <TableHead className="w-28" />
+            <TableHead className="min-w-[220px]" />
             <TableHead className="min-w-[320px] align-bottom">
               <MultiSearchSelect
                 label=""
@@ -999,6 +1003,7 @@ function TaskRegionReportsTable({
           <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
             <TableHead className="w-24">Действия</TableHead>
             <TableHead className="w-28">ID отчета</TableHead>
+            <TableHead className="min-w-[220px]">Статус отчета</TableHead>
             <TableHead className="min-w-[320px]">Задача</TableHead>
             <TableHead className="min-w-[280px]">Отчет</TableHead>
             <TableHead className="min-w-[240px]">Исполнитель</TableHead>
@@ -1007,7 +1012,7 @@ function TaskRegionReportsTable({
         <TableBody>
           {reports.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="py-10 text-center text-sm text-slate-500">
+              <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                 Отчетов пока нет.
               </TableCell>
             </TableRow>
@@ -1051,6 +1056,12 @@ function TaskRegionReportsTable({
                   ) : (
                     'n/a'
                   )}
+                </TableCell>
+                <TableCell>
+                  <StatusBadge
+                    value={report.reportStatus ?? 'not_completed'}
+                    label={getTaskRegionReportStatusLabel(report)}
+                  />
                 </TableCell>
                 <TableCell className="min-w-[320px]">
                   <div className="space-y-1 whitespace-normal">
@@ -1543,7 +1554,7 @@ function StatusBadge({ value, label }: { value: string; label: string }) {
       ? 'bg-emerald-100 text-emerald-700'
       : value === 'revision_requested' || value === 'not_completed'
         ? 'bg-red-100 text-red-700'
-        : value === 'pending'
+        : value === 'pending' || value === 'under_review'
           ? 'bg-sky-100 text-sky-700'
           : 'bg-slate-200 text-slate-700';
 
@@ -1590,6 +1601,24 @@ function getReportStatusLabel(status: string) {
   }
 
   return reportStatusOptions.find((option) => option.value === status)?.label ?? status;
+}
+
+function getTaskRegionReportStatusLabel(report: CrmReport) {
+  if (report.reportStatus === 'accepted') {
+    return report.raw.last_moderation?.moderation_level === 'regional'
+      ? 'Одобрен региональным руководителем'
+      : 'Одобрен';
+  }
+
+  if (report.reportStatus === 'pending' || report.reportStatus === 'under_review') {
+    return 'На проверке';
+  }
+
+  if (report.reportStatus === 'revision_requested' || report.reportStatus === 'not_completed') {
+    return 'Отклонен';
+  }
+
+  return 'Не указан';
 }
 
 function getTaskScopeLabel(scope: string) {

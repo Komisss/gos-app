@@ -113,8 +113,17 @@ export type CrmReportDto = {
     checked_at: string | null;
     system_comment: string | null;
   } | null;
-  last_moderation: unknown;
+  last_moderation: ReportLastModeration | null;
   available_actions: string[];
+};
+
+export type ReportLastModeration = {
+  moderation_action_id: number;
+  action_type: string;
+  moderation_level: string;
+  reason_id: number | null;
+  comment: string | null;
+  created_at: string;
 };
 
 export type ReportDetailsDto = CrmReportDto & {
@@ -194,7 +203,7 @@ export type ReportDetails = CrmReport & {
     displayValue: string | null;
   } | null;
   linkValidation: unknown;
-  lastModeration: unknown;
+  lastModeration: ReportLastModeration | null;
 };
 
 export type ReportVersionsFilters = {

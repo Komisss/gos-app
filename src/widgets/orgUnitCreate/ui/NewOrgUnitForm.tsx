@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -48,6 +48,18 @@ export function NewOrgUnitForm() {
     queryKey: ['users'],
     queryFn: () => getUsers(),
   });
+  const headUserOptions = useMemo(() => {
+    const headRoleCode = getHeadRoleCodeForOrgUnitType(form.type);
+
+    return (usersQuery.data ?? [])
+      .filter((user) => user.role?.code === headRoleCode)
+      .map((user) => ({
+        value: String(user.id),
+        label: user.fullName,
+        labelMeta: user.role?.name,
+        description: user.username || 'Не указан',
+      }));
+  }, [form.type, usersQuery.data]);
 
   const createMutation = useMutation({
     mutationFn: createOrgUnit,
@@ -56,6 +68,12 @@ export function NewOrgUnitForm() {
       navigate('/users');
     },
   });
+
+  useEffect(() => {
+    if (form.head_user_id && !headUserOptions.some((user) => user.value === form.head_user_id)) {
+      setForm((current) => ({ ...current, head_user_id: '' }));
+    }
+  }, [form.head_user_id, headUserOptions]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,7 +84,7 @@ export function NewOrgUnitForm() {
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-6 py-6">
         <div className="space-y-1">
-          <h1 className="text-3xl font-semibold !text-slate-900">Новая оргструктура</h1>
+          <h1 className="text-3xl font-semibold !text-slate-900">Новая структура подчинения</h1>
           <p className="text-sm text-slate-500">
             Заполните данные подразделения и его связь с регионом, родителем и руководителем.
           </p>
@@ -76,7 +94,7 @@ export function NewOrgUnitForm() {
           className="space-y-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
           onSubmit={handleSubmit}
         >
-          <Field label="Название оргструктуры">
+          <Field label="Название структуры подчинения">
             <Input
               className="border-slate-200"
               placeholder="Введите название"
@@ -110,20 +128,20 @@ export function NewOrgUnitForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
-                  <SelectItem value="main_branch">Главная ветка</SelectItem>
-                  <SelectItem value="unit">Управление</SelectItem>
-                  <SelectItem value="department">Отдел</SelectItem>
+                  <SelectItem value="main_branch">Б3</SelectItem>
+                  <SelectItem value="unit">Б2</SelectItem>
+                  <SelectItem value="department">Б1</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Родительская оргструктура">
+            <Field label="Родительская структура подчинения">
               <FilterSearchSelect
                 value={form.parent_id}
                 placeholder="Без родителя"
-                searchPlaceholder="Поиск оргструктуры"
+                searchPlaceholder="Поиск структуры подчинения"
                 options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
@@ -138,11 +156,7 @@ export function NewOrgUnitForm() {
                 value={form.head_user_id}
                 placeholder="Без руководителя"
                 searchPlaceholder="Поиск пользователя"
-                options={(usersQuery.data ?? []).map((user) => ({
-                  value: String(user.id),
-                  label: user.fullName,
-                  description: `@${user.username}`,
-                }))}
+                options={headUserOptions}
                 onChange={(head_user_id) => setForm((current) => ({ ...current, head_user_id }))}
               />
             </Field>
@@ -167,7 +181,7 @@ export function NewOrgUnitForm() {
 
           {createMutation.isError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              Не удалось создать оргструктуру.
+              Не удалось создать структуру подчинения.
             </div>
           )}
 
@@ -179,13 +193,25 @@ export function NewOrgUnitForm() {
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
               disabled={createMutation.isPending || !form.region_id}
             >
-              {createMutation.isPending ? 'Создание...' : 'Создать оргструктуру'}
+              {createMutation.isPending ? 'Создание...' : 'Создать структуру подчинения'}
             </Button>
           </div>
         </form>
       </div>
     </div>
   );
+}
+
+function getHeadRoleCodeForOrgUnitType(type: OrgUnitType) {
+  if (type === 'main_branch') {
+    return 'main_manager';
+  }
+
+  if (type === 'unit') {
+    return 'unit_head';
+  }
+
+  return 'department_head';
 }
 
 function toPayload(form: FormState): CreateOrgUnitPayload {

@@ -15,9 +15,10 @@ type Props = {
   onChange?: (date?: Date) => void
   placeholder?: string
   disabled?: boolean
+  maxDate?: Date
 }
 
-export function DatePicker({ value, onChange, placeholder, disabled = false }: Props) {
+export function DatePicker({ value, onChange, placeholder, disabled = false, maxDate }: Props) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -39,6 +40,8 @@ export function DatePicker({ value, onChange, placeholder, disabled = false }: P
           mode="single"
           selected={value}
           onSelect={onChange}
+          disabled={maxDate ? { after: maxDate } : undefined}
+          endMonth={maxDate}
           initialFocus
         />
       </PopoverContent>

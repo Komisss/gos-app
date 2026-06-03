@@ -8,6 +8,7 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { DatePicker } from '@/shared/ui/date-picker';
@@ -42,7 +43,15 @@ const initialForm: RegisterUserPayload = {
 export function NewUserForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const isFederalManager = session?.role?.code === 'federal_manager';
   const [form, setForm] = useState<RegisterUserPayload>(initialForm);
+  const credentialsDisabled = !shouldUseCredentials(form.role);
+  const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
+  const availableRoleOptions = useMemo(
+    () => (isFederalManager ? roleOptions : roleOptions.filter((role) => role.code !== 'federal_manager')),
+    [isFederalManager],
+  );
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -73,15 +82,34 @@ export function NewUserForm() {
     }
   }, [availableOrgUnits, form.org_unit]);
 
+  useEffect(() => {
+    if (!isFederalManager && form.role === 1) {
+      setForm((current) => ({ ...current, role: 2, region: current.region, org_unit: 0 }));
+    }
+  }, [form.role, isFederalManager]);
+
+  useEffect(() => {
+    if (credentialsDisabled && (form.username || form.password)) {
+      setForm((current) => ({ ...current, username: '', password: '' }));
+    }
+  }, [credentialsDisabled, form.password, form.username]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    createMutation.mutate({
+    const payload: RegisterUserPayload = {
       ...form,
       phone: form.phone.trim(),
       birthday: form.birthday,
       region: form.role === 1 ? null : form.region,
       org_unit: canSelectOrgUnit(form.role) ? form.org_unit || null : null,
-    });
+    };
+
+    if (!shouldUseCredentials(form.role)) {
+      delete payload.username;
+      delete payload.password;
+    }
+
+    createMutation.mutate(payload);
   }
 
   return (
@@ -90,7 +118,7 @@ export function NewUserForm() {
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold !text-slate-900">Новый пользователь</h1>
           <p className="text-sm text-slate-500">
-            Заполните данные учетной записи и привязку к региону или оргструктуре.
+            Заполните данные учетной записи и привязку к региону или структуре подчинения.
           </p>
         </div>
 
@@ -101,25 +129,6 @@ export function NewUserForm() {
           onSubmit={handleSubmit}
         >
           <div className="grid gap-5 md:grid-cols-2">
-            {form.role !== 1 && (
-              <Field label="Регион">
-                <SearchSelect
-                  placeholder="Выберите регион"
-                  searchPlaceholder="Поиск региона"
-                  loading={regionsQuery.isLoading}
-                  value={form.region}
-                  options={(regionsQuery.data ?? []).map((region) => ({
-                    id: region.id,
-                    label: region.name,
-                    description: region.code,
-                  }))}
-                  onChange={(region) =>
-                    setForm((current) => ({ ...current, region, org_unit: 0 }))
-                  }
-                />
-              </Field>
-            )}
-
             <Field label="Роль">
               <Select
                 value={String(form.role)}
@@ -138,7 +147,7 @@ export function NewUserForm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="start">
-                  {roleOptions.map((role) => (
+                  {availableRoleOptions.map((role) => (
                     <SelectItem key={role.id} value={String(role.id)}>
                       {role.label}
                     </SelectItem>
@@ -146,13 +155,32 @@ export function NewUserForm() {
                 </SelectContent>
               </Select>
             </Field>
+
+            {form.role !== 1 && (
+              <Field label="Регион">
+                <SearchSelect
+                  placeholder="Выберите регион"
+                  searchPlaceholder="Поиск региона"
+                  loading={regionsQuery.isLoading}
+                  value={form.region}
+                  options={(regionsQuery.data ?? []).map((region) => ({
+                    id: region.id,
+                    label: region.name,
+                    description: region.code,
+                  }))}
+                  onChange={(region) =>
+                    setForm((current) => ({ ...current, region, org_unit: 0 }))
+                  }
+                />
+              </Field>
+            )}
           </div>
 
           {canSelectOrgUnit(form.role) && (
-            <Field label="Оргструктура">
+            <Field label="Структура подчинения">
               <SearchSelect
                 placeholder={getOrgUnitPlaceholder(form.role, form.region)}
-                searchPlaceholder="Поиск оргструктуры"
+                searchPlaceholder="Поиск структуры подчинения"
                 loading={orgUnitsQuery.isLoading}
                 disabled={!form.region}
                 value={form.org_unit}
@@ -181,10 +209,10 @@ export function NewUserForm() {
               <Input
                 className="border-slate-200"
                 inputMode="tel"
-                placeholder="+79990000000"
+                placeholder="+7 (999) 999-99-99"
                 value={form.phone}
                 onChange={(event) =>
-                  setForm((current) => ({ ...current, phone: normalizePhone(event.target.value) }))
+                  setForm((current) => ({ ...current, phone: formatRussianPhone(event.target.value) }))
                 }
               />
             </Field>
@@ -192,6 +220,7 @@ export function NewUserForm() {
             <Field label="День рождения">
               <DatePicker
                 value={parseDateOnly(form.birthday)}
+                maxDate={maxBirthdayDate}
                 placeholder="Выберите день рождения"
                 onChange={(birthday) =>
                   setForm((current) => ({ ...current, birthday: toDateOnly(birthday) }))
@@ -205,9 +234,10 @@ export function NewUserForm() {
               <Input
                 className="border-slate-200"
                 placeholder="Введите логин"
-                value={form.username}
+                value={form.username ?? ''}
                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-                required
+                disabled={credentialsDisabled}
+                required={!credentialsDisabled}
               />
             </Field>
 
@@ -216,9 +246,10 @@ export function NewUserForm() {
                 type="password"
                 className="border-slate-200"
                 placeholder="Введите пароль"
-                value={form.password}
+                value={form.password ?? ''}
                 onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                required
+                disabled={credentialsDisabled}
+                required={!credentialsDisabled}
               />
             </Field>
           </div>
@@ -425,14 +456,67 @@ function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null
     return 'Выберите доступную подгруппу';
   }
 
-  return 'Выберите оргструктуру';
+  return 'Выберите структуру подчинения';
 }
 
-function normalizePhone(value: string) {
-  const trimmedValue = value.trimStart();
+function shouldUseCredentials(role: RegisterUserRoleId) {
+  return role === 1 || role === 2;
+}
+
+function getAdultMaxBirthdayDate() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - 18);
+  date.setHours(0, 0, 0, 0);
+
+  return date;
+}
+
+function formatRussianPhone(value: string) {
   const digits = value.replace(/\D/g, '');
 
-  return trimmedValue.startsWith('+') ? `+${digits}` : digits;
+  if (!digits) {
+    return '';
+  }
+
+  const nationalDigits = normalizeRussianPhoneDigits(digits).slice(0, 10);
+  const parts = [
+    nationalDigits.slice(0, 3),
+    nationalDigits.slice(3, 6),
+    nationalDigits.slice(6, 8),
+    nationalDigits.slice(8, 10),
+  ];
+
+  let result = '+7';
+
+  if (parts[0]) {
+    result += ` (${parts[0]}`;
+  }
+
+  if (parts[0].length === 3) {
+    result += ')';
+  }
+
+  if (parts[1]) {
+    result += ` ${parts[1]}`;
+  }
+
+  if (parts[2]) {
+    result += `-${parts[2]}`;
+  }
+
+  if (parts[3]) {
+    result += `-${parts[3]}`;
+  }
+
+  return result;
+}
+
+function normalizeRussianPhoneDigits(digits: string) {
+  if (digits.startsWith('7') || digits.startsWith('8')) {
+    return digits.slice(1);
+  }
+
+  return digits;
 }
 
 function parseDateOnly(value: string) {

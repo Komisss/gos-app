@@ -32,7 +32,7 @@ export default function TaskDetailsPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-6 py-6">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
         {taskQuery.isLoading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
             Загружаем задачу...

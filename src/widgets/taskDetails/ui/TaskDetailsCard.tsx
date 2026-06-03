@@ -100,6 +100,7 @@ export function TaskDetailsCard({
     regions: regionsQuery.data ?? [],
     orgUnits: orgUnitsQuery.data ?? [],
   });
+  const isActiveTask = task.status === 'active';
 
   const updateMutation = useMutation({
     mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) =>
@@ -155,13 +156,19 @@ export function TaskDetailsCard({
           </Button>
           {showOpenPageLink && (
             <Button asChild variant="outline" className="border-slate-200">
-              <Link to={`/tasks/${task.id}`} target="_blank" rel="noreferrer">
+              <Link to={`/tasks/${task.id}`}>
                 <ExternalLink />
                 Открыть страницу
               </Link>
             </Button>
           )}
-          <Button type="button" variant="outline" className="border-slate-200" onClick={() => setEditOpen(true)}>
+          <Button
+            type="button"
+            variant="outline"
+            className="border-slate-200"
+            disabled={isActiveTask}
+            onClick={() => setEditOpen(true)}
+          >
             <Pencil />
             Редактировать
           </Button>
@@ -185,17 +192,22 @@ export function TaskDetailsCard({
         <InfoItem label="Уровень" value={getScopeLabel(task.scope ?? '')} />
         <InfoItem label="Тип задачи" value={getTaskTypeLabel(task.taskType ?? task.type)} />
         <InfoItem label="Формат отчета" value={getReportFormatLabel(task.reportFormat ?? '')} />
-        <InfoItem label="Исполнители" value={task.isMaterialized ? 'Назначены' : 'Не назначены'} />
-        <InfoItem label="Дедлайн" value={formatDateTime(task.deadlineAt)} />
-        <InfoItem label="Запланирована на" value={formatDateTime(task.scheduledAt)} />
-        <InfoItem label="Создана" value={formatDateTime(task.createdAt)} />
-        <InfoItem label="Автор" value={<AuthorLink author={authorQuery.data} authorId={task.createdByUserId} />} />
-        <InfoItem label="Роль автора" value={formatRole(task.createdByRole)} />
+        <InfoItem
+          label="Период выполнения"
+          value={<TaskPeriod scheduledAt={task.scheduledAt} deadlineAt={task.deadlineAt} />}
+        />
+        <InfoItem
+          label="Автор"
+          value={
+            <AuthorLink
+              author={authorQuery.data}
+              authorId={task.createdByUserId}
+              role={task.createdByRole}
+            />
+          }
+        />
         <InfoItem label="Назначений" value={formatNumber(task.assignmentsCount)} />
-        <InfoItem label="Уведомлений" value={formatNumber(task.notificationsCount)} />
         <InfoItem label="Ожидают проверки" value={formatNumber(task.pendingNotificationsCount)} />
-        <InfoItem label="Отправлено" value={formatNumber(task.sentNotificationsCount)} />
-        <InfoItem label="Ошибок отправки" value={formatNumber(task.failedNotificationsCount)} />
         <InfoItem
           label="Адресаты"
           value={<TargetsPopover targets={targetItems} />}
@@ -284,7 +296,7 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
             <TableHead>ID</TableHead>
             <TableHead>Исполнитель</TableHead>
             <TableHead>Регион</TableHead>
-            <TableHead>Оргструктура</TableHead>
+            <TableHead>Структура подчинения</TableHead>
             <TableHead>Статус</TableHead>
             <TableHead>Назначено</TableHead>
             <TableHead>Дедлайн</TableHead>
@@ -300,8 +312,6 @@ function TaskAssignmentsTable({ assignments }: { assignments: NonNullable<Task['
               <TableCell>
                 <Link
                   to={`/users/${assignment.user_id}`}
-                  target="_blank"
-                  rel="noreferrer"
                   className="text-[#465cd3] hover:underline"
                 >
                   {assignment.user_full_name || `Пользователь #${assignment.user_id}`}
@@ -447,7 +457,7 @@ function TaskRegionReportsDialog({
                     <TableHead className="min-w-[300px]">Задача</TableHead>
                     <TableHead className="min-w-[240px]">Исполнитель</TableHead>
                     <TableHead className="min-w-[220px]">Регион</TableHead>
-                    <TableHead className="min-w-[220px]">Оргструктура</TableHead>
+                    <TableHead className="min-w-[220px]">Структура подчинения</TableHead>
                     <TableHead className="w-40">Тип задачи</TableHead>
                     <TableHead className="w-40">Формат отчета</TableHead>
                     <TableHead className="w-40">Статус отчета</TableHead>
@@ -576,7 +586,7 @@ function TaskReportsTable({
             <TableHead>Отправлен</TableHead>
             <TableHead>Исполнитель</TableHead>
             <TableHead>Регион</TableHead>
-            <TableHead>Оргструктура</TableHead>
+            <TableHead>Структура подчинения</TableHead>
             <TableHead>Ссылка / файл</TableHead>
           </TableRow>
         </TableHeader>
@@ -641,15 +651,26 @@ function TaskDataSection({ title, children }: { title: string; children: React.R
   );
 }
 
-function AuthorLink({ author, authorId }: { author?: UserDetails; authorId?: number }) {
+function AuthorLink({
+  author,
+  authorId,
+  role,
+}: {
+  author?: UserDetails;
+  authorId?: number;
+  role?: string | null;
+}) {
   if (!authorId) {
     return <>Не указан</>;
   }
 
   return (
-    <Link to={`/users/${authorId}`} target="_blank" rel="noreferrer" className="text-[#465cd3] hover:underline">
-      {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
-    </Link>
+    <div className="space-y-1">
+      <Link to={`/users/${authorId}`} className="text-[#465cd3] hover:underline">
+        {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
+      </Link>
+      <div className="text-xs font-normal text-slate-500">{formatRole(role)}</div>
+    </div>
   );
 }
 
@@ -745,7 +766,7 @@ function TargetsPopover({ targets }: { targets: TargetItem[] }) {
               );
 
               return target.href ? (
-                <Link key={target.key} to={target.href} target="_blank" rel="noreferrer">
+                <Link key={target.key} to={target.href}>
                   {content}
                 </Link>
               ) : (
@@ -772,6 +793,21 @@ function InfoItem({
     <div className={className}>
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400">{label}</p>
       <div className="mt-1 text-sm font-medium text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function TaskPeriod({
+  scheduledAt,
+  deadlineAt,
+}: {
+  scheduledAt?: string | null;
+  deadlineAt?: string | null;
+}) {
+  return (
+    <div className="space-y-1">
+      {scheduledAt && <div>С {formatDateTime(scheduledAt)}</div>}
+      <div>До {formatDateTime(deadlineAt)}</div>
     </div>
   );
 }
@@ -811,7 +847,7 @@ function buildTargetItems(
 
     return {
       key: `${target.target_type}-${target.target_id}`,
-      title: orgUnit?.name ?? `Оргструктура #${target.target_id}`,
+      title: orgUnit?.name ?? `Структура подчинения #${target.target_id}`,
       description: region ? `Регион: ${region.name}` : 'Регион не указан',
     };
   });
@@ -907,5 +943,3 @@ function formatDateTime(value?: string | null) {
     timeStyle: 'short',
   }).format(date);
 }
-
-

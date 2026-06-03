@@ -142,7 +142,6 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
             <TableCell className="min-w-[320px]">
               <div className="space-y-1 whitespace-normal">
                 <div className="text-sm leading-5 font-medium text-slate-900">{task.title}</div>
-                {task.subtitle && <div className="text-xs leading-4 text-slate-500">{task.subtitle}</div>}
               </div>
             </TableCell>
             <TableCell className="align-top">
@@ -153,11 +152,27 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
             </TableCell>
             <TableCell className="align-top text-slate-700">{getScopeLabel(task.scope ?? task.region)}</TableCell>
             <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
-            <TableCell className="align-top text-slate-700">{task.deadlineLabel}</TableCell>
+            <TableCell className="align-top text-slate-700">
+              <div className="space-y-1">
+                <div>{task.deadlineLabel}</div>
+                {task.createdAt && (
+                  <div className="text-xs leading-4 text-slate-500">
+                    Создана: {formatDateTime(task.createdAt)}
+                  </div>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="align-top">
-              <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
-                {task.statusLabel ?? getStatusLabel(task.status)}
-              </Badge>
+              <div className="space-y-1">
+                <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
+                  {task.statusLabel ?? getStatusLabel(task.status)}
+                </Badge>
+                {task.status === 'scheduled' && task.scheduledAt && (
+                  <div className="text-xs leading-4 text-slate-500">
+                    {formatDateTime(task.scheduledAt)}
+                  </div>
+                )}
+              </div>
             </TableCell>
           </TableRow>
         ))
@@ -212,6 +227,23 @@ function getTaskAuthorMeta(task: Task, users: UserListItem[]) {
   }
 
   return task.createdByUserId ? `Автор #${task.createdByUserId}` : 'n/a';
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) {
+    return 'Не указано';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(date);
 }
 
 export function getStatusClassName(status: Task['status']) {

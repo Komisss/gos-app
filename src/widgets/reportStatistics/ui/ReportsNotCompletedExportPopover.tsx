@@ -74,7 +74,7 @@ export function ReportsNotCompletedExportPopover({
         { kind: 'select', key: 'period_type', label: 'Тип периода', options: periodTypeOptions },
         { kind: 'select', key: 'group_by', label: 'Группировка', options: groupByOptions },
         { kind: 'multi-search', key: 'region_ids', label: 'Регионы', placeholder: 'Все регионы', searchPlaceholder: 'Поиск региона', options: regionOptions, valueType: 'number' },
-        { kind: 'multi-search', key: 'org_unit_ids', label: 'Оргструктуры', placeholder: 'Все оргструктуры', searchPlaceholder: 'Поиск оргструктуры', options: orgUnitOptions, valueType: 'number' },
+        { kind: 'multi-search', key: 'org_unit_ids', label: 'Структуры подчинения', placeholder: 'Все структуры подчинения', searchPlaceholder: 'Поиск структуры подчинения', options: orgUnitOptions, valueType: 'number' },
         { kind: 'multi-search', key: 'user_ids', label: 'Пользователи', placeholder: 'Все пользователи', searchPlaceholder: 'Поиск пользователя', options: userOptions, valueType: 'number' },
         { kind: 'multi-search', key: 'task_ids', label: 'Задачи', placeholder: 'Все задачи', searchPlaceholder: 'Поиск по id или названию', options: taskOptions, valueType: 'number' },
         { kind: 'multi', key: 'task_types', label: 'Тип задачи', placeholder: 'Все типы', options: taskTypeOptions },

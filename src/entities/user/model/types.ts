@@ -30,6 +30,7 @@ export type UserListDto = {
   active: boolean;
   username: string;
   full_name: string;
+  max_user_id?: string | null;
   role: UserRole | null;
   region: UserRegion | null;
   org_unit: UserOrgUnit | null;
@@ -57,6 +58,7 @@ export type UserListItem = {
   status: UserStatus;
   username: string;
   fullName: string;
+  maxUserId?: string | null;
   role: UserRole | null;
   region: UserRegion | null;
   orgUnit: UserOrgUnit | null;
@@ -101,8 +103,8 @@ export type UserPatchPayload = Partial<{
 export type RegisterUserRoleId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export type RegisterUserPayload = {
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
   full_name: string;
   phone: string;
   birthday: string;

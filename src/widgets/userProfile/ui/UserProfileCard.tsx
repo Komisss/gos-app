@@ -297,11 +297,11 @@ export function UserProfileCard() {
                   />
                 </Field>
 
-                <Field label="Оргструктура">
+                <Field label="Структура подчинения">
                   <FilterSearchSelect
                     value={form.org_unit}
-                    placeholder="Оргструктура не указана"
-                    searchPlaceholder="Поиск оргструктуры"
+                    placeholder="Структура подчинения не указана"
+                    searchPlaceholder="Поиск структуры подчинения"
                     options={orgUnitOptions}
                     disabled={isLockedFederalManager}
                     onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
