@@ -73,10 +73,10 @@ export function UserExportPopover({
               onChange={(created_to) => onExportFiltersChange((current) => ({ ...current, created_to }))}
             />
             <FilterSearchSelect
-              label="Оргструктура"
+              label="Структура подчинения"
               value={exportFilters.org_unit}
-              placeholder="Все оргструктуры"
-              searchPlaceholder="Поиск оргструктуры"
+              placeholder="Все структуры подчинения"
+              searchPlaceholder="Поиск структуры подчинения"
               options={orgUnits.map((orgUnit) => ({
                 value: String(orgUnit.id),
                 label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
