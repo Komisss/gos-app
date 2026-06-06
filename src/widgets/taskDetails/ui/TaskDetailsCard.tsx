@@ -364,8 +364,6 @@ function TaskRegionsStatisticsTable({
               <TableCell>
                 <Link
                   to={getRegionHref(item)}
-                  target="_blank"
-                  rel="noreferrer"
                   className="font-medium text-[#465cd3] hover:underline"
                 >
                   {item.region_name}

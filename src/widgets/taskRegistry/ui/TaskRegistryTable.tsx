@@ -142,6 +142,11 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
             <TableCell className="min-w-[320px]">
               <div className="space-y-1 whitespace-normal">
                 <div className="text-sm leading-5 font-medium text-slate-900">{task.title}</div>
+                {task.createdAt && (
+                  <div className="text-xs leading-4 text-slate-500">
+                    Создана: {formatDateTime(task.createdAt)}
+                  </div>
+                )}
               </div>
             </TableCell>
             <TableCell className="align-top">
@@ -155,24 +160,17 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
             <TableCell className="align-top text-slate-700">
               <div className="space-y-1">
                 <div>{task.deadlineLabel}</div>
-                {task.createdAt && (
+                {getTaskActivationDate(task) && (
                   <div className="text-xs leading-4 text-slate-500">
-                    Создана: {formatDateTime(task.createdAt)}
+                    Активация: {formatDateTime(getTaskActivationDate(task))}
                   </div>
                 )}
               </div>
             </TableCell>
             <TableCell className="align-top">
-              <div className="space-y-1">
-                <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
+              <Badge className={`rounded-md border-0 px-2.5 py-1 text-xs font-medium ${getStatusClassName(task.status)}`}>
                   {task.statusLabel ?? getStatusLabel(task.status)}
                 </Badge>
-                {task.status === 'scheduled' && task.scheduledAt && (
-                  <div className="text-xs leading-4 text-slate-500">
-                    {formatDateTime(task.scheduledAt)}
-                  </div>
-                )}
-              </div>
             </TableCell>
           </TableRow>
         ))
@@ -227,6 +225,14 @@ function getTaskAuthorMeta(task: Task, users: UserListItem[]) {
   }
 
   return task.createdByUserId ? `Автор #${task.createdByUserId}` : 'n/a';
+}
+
+function getTaskActivationDate(task: Task) {
+  if (task.scheduledAt) {
+    return task.scheduledAt;
+  }
+
+  return task.status === 'active' ? task.createdAt : null;
 }
 
 function formatDateTime(value?: string | null) {

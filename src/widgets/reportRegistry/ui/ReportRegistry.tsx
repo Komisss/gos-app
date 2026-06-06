@@ -22,6 +22,7 @@ import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
@@ -970,128 +971,142 @@ function TaskRegionReportsTable({
   onFiltersChange: (filters: Partial<ReportFilters>) => void;
   onReportClick: (reportId: number) => void;
 }) {
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
   return (
-    <TableScrollArea headerHeight="6rem" height="70vh">
-      <Table className="min-w-[1120px] whitespace-nowrap">
-        <TableHeader>
-          <TableRow className="border-b-slate-200 bg-white hover:bg-white">
-            <TableHead className="w-24" />
-            <TableHead className="w-28" />
-            <TableHead className="min-w-[220px]" />
-            <TableHead className="min-w-[320px] align-bottom">
-              <MultiSearchSelect
-                label=""
-                values={filters.task_ids.map(String)}
-                placeholder="Все задачи"
-                searchPlaceholder="Поиск задачи"
-                options={taskOptions}
-                onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
-              />
-            </TableHead>
-            <TableHead className="min-w-[280px]" />
-            <TableHead className="min-w-[240px] align-bottom">
-              <MultiSearchSelect
-                label=""
-                values={filters.user_ids.map(String)}
-                placeholder="Все исполнители"
-                searchPlaceholder="Поиск исполнителя"
-                options={userOptions}
-                onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids) })}
-              />
-            </TableHead>
-          </TableRow>
-          <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
-            <TableHead className="w-24">Действия</TableHead>
-            <TableHead className="w-28">ID отчета</TableHead>
-            <TableHead className="min-w-[220px]">Статус отчета</TableHead>
-            <TableHead className="min-w-[320px]">Задача</TableHead>
-            <TableHead className="min-w-[280px]">Отчет</TableHead>
-            <TableHead className="min-w-[240px]">Исполнитель</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {reports.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
-                Отчетов пока нет.
-              </TableCell>
+    <>
+      <TableScrollArea headerHeight="6rem" height="70vh">
+        <Table className="min-w-[1120px] whitespace-nowrap">
+          <TableHeader>
+            <TableRow className="border-b-slate-200 bg-white hover:bg-white">
+              <TableHead className="w-28" />
+              <TableHead className="min-w-[320px] align-bottom">
+                <MultiSearchSelect
+                  label=""
+                  values={filters.task_ids.map(String)}
+                  placeholder="Все задачи"
+                  searchPlaceholder="Поиск задачи"
+                  options={taskOptions}
+                  onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
+                />
+              </TableHead>
+              <TableHead className="min-w-[280px]" />
+              <TableHead className="min-w-[240px] align-bottom">
+                <MultiSearchSelect
+                  label=""
+                  values={filters.user_ids.map(String)}
+                  placeholder="Все исполнители"
+                  searchPlaceholder="Поиск исполнителя"
+                  options={userOptions}
+                  onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids) })}
+                />
+              </TableHead>
+              <TableHead className="w-24" />
+              <TableHead className="min-w-[220px]" />
             </TableRow>
-          ) : (
-            reports.map((report, index) => (
-              <TableRow
-                key={`${report.id}-${index}`}
-                className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${
-                  index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
-                }`}
-              >
-                <TableCell>
-                  {report.reportId ? (
-                    <ReportModerationActions
-                      reportId={report.reportId}
-                      iconOnly
-                      acceptIcon={<ThumbsUp />}
-                      revisionIcon={<ThumbsDown />}
-                      acceptButtonLabel="Принять отчет"
-                      acceptTitle="Принять отчет"
-                      revisionButtonLabel="Вернуть на доработку"
-                      revisionTitle="Вернуть на доработку"
-                    />
-                  ) : (
-                    <span className="text-xs text-slate-500">n/a</span>
-                  )}
-                </TableCell>
-                <TableCell className="font-medium text-slate-700">
-                  {report.reportId ? (
-                    <button
-                      type="button"
-                      className="font-medium text-[#465cd3] hover:underline"
-                      onClick={() => {
-                        if (report.reportId) {
-                          onReportClick(report.reportId);
-                        }
-                      }}
-                    >
-                      #{report.reportId}
-                    </button>
-                  ) : (
-                    'n/a'
-                  )}
-                </TableCell>
-                <TableCell>
-                  <StatusBadge
-                    value={report.reportStatus ?? 'not_completed'}
-                    label={getTaskRegionReportStatusLabel(report)}
-                  />
-                </TableCell>
-                <TableCell className="min-w-[320px]">
-                  <div className="space-y-1 whitespace-normal">
-                    <div className="font-medium text-slate-900">{report.taskTitle}</div>
-                    <div className="text-xs text-slate-500">
-                      ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="min-w-[280px]">
-                  <ReportPreviewLink report={report} />
-                </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="font-medium text-slate-900">{report.executorName}</div>
-                    <div className="text-xs text-slate-500">
-                      ID: {report.executorId ?? 'n/a'} • {report.executorRole}
-                    </div>
-                  </div>
+            <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
+              <TableHead className="w-28">ID отчета</TableHead>
+              <TableHead className="min-w-[320px]">Задача</TableHead>
+              <TableHead className="min-w-[280px]">Отчет</TableHead>
+              <TableHead className="min-w-[240px]">Исполнитель</TableHead>
+              <TableHead className="w-24">Действия</TableHead>
+              <TableHead className="min-w-[220px]">Статус отчета</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {reports.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
+                  Отчетов пока нет.
                 </TableCell>
               </TableRow>
-            ))
+            ) : (
+              reports.map((report, index) => (
+                <TableRow
+                  key={`${report.id}-${index}`}
+                  className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${
+                    index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
+                  }`}
+                >
+                  <TableCell className="font-medium text-slate-700">
+                    {report.reportId ? (
+                      <button
+                        type="button"
+                        className="font-medium text-[#465cd3] hover:underline"
+                        onClick={() => onReportClick(report.reportId ?? 0)}
+                      >
+                        #{report.reportId}
+                      </button>
+                    ) : (
+                      'n/a'
+                    )}
+                  </TableCell>
+                  <TableCell className="min-w-[320px]">
+                    <div className="space-y-1 whitespace-normal">
+                      <div className="font-medium text-slate-900">{report.taskTitle}</div>
+                      <div className="text-xs text-slate-500">
+                        ID задачи: {report.taskId} • {getTaskScopeLabel(report.taskScope)}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="min-w-[280px]">
+                    <ReportPreviewLink report={report} onImageClick={setPreviewImageUrl} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="font-medium text-slate-900">{report.executorName}</div>
+                      <div className="text-xs text-slate-500">
+                        ID: {report.executorId ?? 'n/a'} • {report.executorRole}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {report.reportId ? (
+                      <ReportModerationActions
+                        reportId={report.reportId}
+                        iconOnly
+                        acceptIcon={<ThumbsUp />}
+                        revisionIcon={<ThumbsDown />}
+                        acceptButtonLabel="Принять отчет"
+                        acceptTitle="Принять отчет"
+                        revisionButtonLabel="Вернуть на доработку"
+                        revisionTitle="Вернуть на доработку"
+                      />
+                    ) : (
+                      <span className="text-xs text-slate-500">n/a</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge
+                      value={report.reportStatus ?? 'not_completed'}
+                      label={getTaskRegionReportStatusLabel(report)}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableScrollArea>
+
+      <Dialog open={previewImageUrl !== null} onOpenChange={(open) => !open && setPreviewImageUrl(null)}>
+        <DialogContent className="max-h-[92vh] w-[min(1100px,calc(100vw-2rem))] max-w-none overflow-auto p-4">
+          {previewImageUrl && (
+            <img src={previewImageUrl} alt="Изображение отчета" className="mx-auto max-h-[80vh] max-w-full object-contain" />
           )}
-        </TableBody>
-      </Table>
-    </TableScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-function ReportPreviewLink({ report }: { report: CrmReport }) {
+function ReportPreviewLink({
+  report,
+  onImageClick,
+}: {
+  report: CrmReport;
+  onImageClick: (imageUrl: string) => void;
+}) {
   const previewUrl = report.linkPreview?.url ?? report.linkPreview?.linkUrl;
   const imageUrl = report.linkPreview?.imageUrl;
   const displayUrl = report.linkPreview?.displayUrl ?? previewUrl;
@@ -1102,13 +1117,13 @@ function ReportPreviewLink({ report }: { report: CrmReport }) {
     }
 
     return (
-      <a href={imageUrl} target="_blank" rel="noreferrer" className="block w-fit">
+      <button type="button" className="block w-fit" onClick={() => onImageClick(imageUrl)}>
         <img
           src={imageUrl}
           alt={report.linkPreview?.title ?? `Отчет #${report.reportId ?? report.id}`}
-          className="h-20 w-32 rounded-md border border-slate-200 object-cover"
+          className="h-20 w-32 rounded-md border border-slate-200 object-cover transition-opacity hover:opacity-80"
         />
-      </a>
+      </button>
     );
   }
 

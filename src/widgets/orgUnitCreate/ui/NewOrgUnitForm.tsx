@@ -60,6 +60,20 @@ export function NewOrgUnitForm() {
         description: user.username || 'Не указан',
       }));
   }, [form.type, usersQuery.data]);
+  const parentHeadRoleId = getParentHeadRoleId(form.type);
+  const parentOrgUnitOptions = useMemo(() => {
+    if (!form.region_id) {
+      return [];
+    }
+
+    const regionId = Number(form.region_id);
+
+    return (orgUnitsQuery.data ?? []).filter(
+      (orgUnit) =>
+        orgUnit.regionId === regionId &&
+        orgUnit.headUser?.role?.role_id === parentHeadRoleId,
+    );
+  }, [form.region_id, orgUnitsQuery.data, parentHeadRoleId]);
 
   const createMutation = useMutation({
     mutationFn: createOrgUnit,
@@ -74,6 +88,12 @@ export function NewOrgUnitForm() {
       setForm((current) => ({ ...current, head_user_id: '' }));
     }
   }, [form.head_user_id, headUserOptions]);
+
+  useEffect(() => {
+    if (form.parent_id && !parentOrgUnitOptions.some((orgUnit) => String(orgUnit.id) === form.parent_id)) {
+      setForm((current) => ({ ...current, parent_id: '' }));
+    }
+  }, [form.parent_id, parentOrgUnitOptions]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,12 +160,13 @@ export function NewOrgUnitForm() {
             <Field label="Родительская структура подчинения">
               <FilterSearchSelect
                 value={form.parent_id}
-                placeholder="Без родителя"
+                placeholder={getParentOrgUnitPlaceholder(form.type, form.region_id)}
                 searchPlaceholder="Поиск структуры подчинения"
-                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
+                disabled={!form.region_id}
+                options={parentOrgUnitOptions.map((orgUnit) => ({
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                  description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
+                  description: orgUnit.regionName ?? undefined,
                 }))}
                 onChange={(parent_id) => setForm((current) => ({ ...current, parent_id }))}
               />
@@ -212,6 +233,32 @@ function getHeadRoleCodeForOrgUnitType(type: OrgUnitType) {
   }
 
   return 'department_head';
+}
+
+function getParentHeadRoleId(type: OrgUnitType) {
+  if (type === 'department') {
+    return 6;
+  }
+
+  if (type === 'unit') {
+    return 4;
+  }
+
+  return 2;
+}
+
+function getParentOrgUnitPlaceholder(type: OrgUnitType, regionId: string) {
+  if (!regionId) {
+    return 'Сначала выберите регион';
+  }
+
+  if (type === 'main_branch') {
+    return 'Выберите структуру регионального руководителя';
+  }
+
+  return type === 'unit'
+    ? 'Выберите родительскую структуру Б3'
+    : 'Выберите родительскую структуру Б2';
 }
 
 function toPayload(form: FormState): CreateOrgUnitPayload {
