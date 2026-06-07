@@ -1,4 +1,4 @@
-import { BarChart, Building2, ClipboardList, LayoutDashboard, UserPlus, Users } from 'lucide-react';
+import { BarChart, ClipboardList, LayoutDashboard, UserPlus, Users } from 'lucide-react';
 
 export const sidebarSections = [
   {
@@ -34,7 +34,7 @@ export const sidebarSections = [
     title: 'Пользователи',
     items: [
       { label: 'Новый пользователь', icon: UserPlus, href: '/users/new' },
-      { label: 'Новая структура подчинения', icon: Building2, href: '/org-units/new' },
+      // { label: 'Новая структура подчинения', icon: Building2, href: '/org-units/new' },
       { label: 'Список пользователей', icon: Users, href: '/users' },
       { label: 'Регионы с управляющими', icon: Users, href: '/users/region-managers', roles: ['federal_manager'] },
     ],

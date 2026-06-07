@@ -1,7 +1,7 @@
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@app/layouts/layout.tsx';
 import LoginPage from '@pages/login/ui/LoginPage';
-import NewOrgUnitPage from '@pages/newOrgUnit/ui/NewOrgUnitPage';
+// import NewOrgUnitPage from '@pages/newOrgUnit/ui/NewOrgUnitPage';
 import NewTaskPage from '@pages/newTask/ui/NewTaskPage';
 import NewUserPage from '@pages/newUser/ui/NewUserPage';
 import ProfilePage from '@pages/profile/ui/ProfilePage';
@@ -39,7 +39,7 @@ export const AppRouter = () => {
             <Route path="/users/region-managers" element={<RegionManagersPage />} />
             <Route path="/users/new" element={<NewUserPage />} />
             <Route path="/users/:userId" element={<UserProfilePage />} />
-            <Route path="/org-units/new" element={<NewOrgUnitPage />} />
+            {/* <Route path="/org-units/new" element={<NewOrgUnitPage />} /> */}
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/" element={<StatsPage />} />
           </Route>

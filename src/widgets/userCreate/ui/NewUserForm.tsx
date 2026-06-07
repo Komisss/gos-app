@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
@@ -45,13 +45,21 @@ export function NewUserForm() {
   const queryClient = useQueryClient();
   const { session } = useAuth();
   const isFederalManager = session?.role?.code === 'federal_manager';
+  const isRegionalManager = session?.role?.code === 'regional_manager';
   const [form, setForm] = useState<RegisterUserPayload>(initialForm);
-  const credentialsDisabled = !shouldUseCredentials(form.role);
+  const showCredentials = shouldUseCredentials(form.role);
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
-  const availableRoleOptions = useMemo(
-    () => (isFederalManager ? roleOptions : roleOptions.filter((role) => role.code !== 'federal_manager')),
-    [isFederalManager],
-  );
+  const availableRoleOptions = useMemo(() => {
+    if (isFederalManager) {
+      return roleOptions;
+    }
+
+    if (isRegionalManager) {
+      return roleOptions.filter((role) => role.id >= 4);
+    }
+
+    return roleOptions.filter((role) => role.code !== 'federal_manager');
+  }, [isFederalManager, isRegionalManager]);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -83,16 +91,21 @@ export function NewUserForm() {
   }, [availableOrgUnits, form.org_unit]);
 
   useEffect(() => {
-    if (!isFederalManager && form.role === 1) {
-      setForm((current) => ({ ...current, role: 2, region: current.region, org_unit: 0 }));
+    if (!availableRoleOptions.some((role) => role.id === form.role)) {
+      setForm((current) => ({
+        ...current,
+        role: availableRoleOptions[0]?.id ?? current.role,
+        region: current.region,
+        org_unit: 0,
+      }));
     }
-  }, [form.role, isFederalManager]);
+  }, [availableRoleOptions, form.role]);
 
   useEffect(() => {
-    if (credentialsDisabled && (form.username || form.password)) {
+    if (!showCredentials && (form.username || form.password)) {
       setForm((current) => ({ ...current, username: '', password: '' }));
     }
-  }, [credentialsDisabled, form.password, form.username]);
+  }, [form.password, form.username, showCredentials]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -214,6 +227,14 @@ export function NewUserForm() {
                 onChange={(event) =>
                   setForm((current) => ({ ...current, phone: formatRussianPhone(event.target.value) }))
                 }
+                onKeyDown={(event) => {
+                  const nextPhone = removePhoneDigitBeforeMask(event, form.phone);
+
+                  if (nextPhone !== null) {
+                    event.preventDefault();
+                    setForm((current) => ({ ...current, phone: nextPhone }));
+                  }
+                }}
               />
             </Field>
 
@@ -229,30 +250,30 @@ export function NewUserForm() {
             </Field>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field label="Логин">
-              <Input
-                className="border-slate-200"
-                placeholder="Введите логин"
-                value={form.username ?? ''}
-                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-                disabled={credentialsDisabled}
-                required={!credentialsDisabled}
-              />
-            </Field>
+          {showCredentials && (
+            <div className="grid gap-5 md:grid-cols-2">
+              <Field label="Логин">
+                <Input
+                  className="border-slate-200"
+                  placeholder="Введите логин"
+                  value={form.username ?? ''}
+                  onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                  required
+                />
+              </Field>
 
-            <Field label="Пароль">
-              <Input
-                type="password"
-                className="border-slate-200"
-                placeholder="Введите пароль"
-                value={form.password ?? ''}
-                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-                disabled={credentialsDisabled}
-                required={!credentialsDisabled}
-              />
-            </Field>
-          </div>
+              <Field label="Пароль">
+                <Input
+                  type="password"
+                  className="border-slate-200"
+                  placeholder="Введите пароль"
+                  value={form.password ?? ''}
+                  onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                  required
+                />
+              </Field>
+            </div>
+          )}
 
           <Field label="ID пользователя в MAX">
             <Input
@@ -509,6 +530,37 @@ function formatRussianPhone(value: string) {
   }
 
   return result;
+}
+
+function removePhoneDigitBeforeMask(event: KeyboardEvent<HTMLInputElement>, value: string) {
+  if (event.key !== 'Backspace') {
+    return null;
+  }
+
+  const selectionStart = event.currentTarget.selectionStart;
+  const selectionEnd = event.currentTarget.selectionEnd;
+
+  if (
+    selectionStart === null ||
+    selectionEnd === null ||
+    selectionStart !== selectionEnd ||
+    selectionStart === 0 ||
+    /\d/.test(value[selectionStart - 1] ?? '')
+  ) {
+    return null;
+  }
+
+  let digitIndex = selectionStart - 1;
+
+  while (digitIndex >= 0 && !/\d/.test(value[digitIndex] ?? '')) {
+    digitIndex -= 1;
+  }
+
+  if (digitIndex <= 1) {
+    return null;
+  }
+
+  return formatRussianPhone(`${value.slice(0, digitIndex)}${value.slice(digitIndex + 1)}`);
 }
 
 function normalizeRussianPhoneDigits(digits: string) {
