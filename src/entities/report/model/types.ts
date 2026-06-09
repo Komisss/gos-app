@@ -28,7 +28,7 @@ export type ReportSearchPayload = {
   deadline_to: string | null;
   created_from: string | null;
   created_to: string | null;
-  is_overdue: boolean | null;
+  overdue?: boolean;
   has_report: boolean | null;
   only_current_version: boolean;
   include_removed: boolean;

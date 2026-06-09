@@ -53,7 +53,7 @@ type ReportFilters = {
   deadline_to: string;
   created_from: string;
   created_to: string;
-  is_overdue: boolean;
+  overdue: '' | 'true' | 'false';
   has_report: boolean;
   only_current_version: boolean;
   include_removed: boolean;
@@ -463,13 +463,6 @@ export function ReportRegistry({
 
             <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 xl:grid-cols-4">
               <BooleanFilter
-                label="Просрочен"
-                checked={filters.is_overdue}
-                onChange={(is_overdue) =>
-                  setFilters((current) => ({ ...current, is_overdue, page: 1 }))
-                }
-              />
-              <BooleanFilter
                 label="Есть отчет"
                 checked={filters.has_report}
                 onChange={(has_report) =>
@@ -630,8 +623,11 @@ export function ReportRegistry({
 }
 
 function toReportPayload(filters: ReportFilters): ReportSearchPayload {
+  const { overdue, ...restFilters } = filters;
+
   return {
-    ...filters,
+    ...restFilters,
+    ...(overdue === '' ? {} : { overdue: overdue === 'true' }),
     submitted_from: filters.submitted_from || null,
     submitted_to: filters.submitted_to || null,
     deadline_from: filters.deadline_from || null,
@@ -746,7 +742,6 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
       <TableRow className="border-b-slate-200 bg-white hover:bg-white">
         <TableHead className="w-12" />
         <TableHead className="w-28" />
-            <TableHead className="min-w-[220px]" />
         <TableHead className="w-28" />
         <TableHead className="min-w-[300px] align-bottom">
           <MultiSearchSelect
@@ -826,10 +821,19 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
             }
           />
         </TableHead>
-        <TableHead className="w-32" />
         <TableHead className="w-44" />
         <TableHead className="w-44" />
-        <TableHead className="w-32" />
+        <TableHead className="w-32 align-bottom">
+          <HeaderSelect
+            value={filters.overdue}
+            placeholder="Все"
+            options={[
+              { value: 'true', label: 'Да' },
+              { value: 'false', label: 'Нет' },
+            ]}
+            onChange={(overdue) => onFiltersChange({ overdue: overdue as ReportFilters['overdue'] })}
+          />
+        </TableHead>
       </TableRow>
       <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
         <TableHead className="w-12">
@@ -849,7 +853,6 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
         <TableHead className="w-40">Формат отчета</TableHead>
         <TableHead className="w-40">Статус отчета</TableHead>
         <TableHead className="w-44">Статус назначения</TableHead>
-        <TableHead className="w-32">Правки</TableHead>
         <TableHead className="w-44">Отправлен</TableHead>
         <TableHead className="w-44">Дедлайн</TableHead>
         <TableHead className="w-32">Просрочен</TableHead>
@@ -873,7 +876,7 @@ const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
     <TableBody>
       {reports.length === 0 ? (
         <TableRow>
-          <TableCell colSpan={15} className="py-10 text-center text-sm text-slate-500">
+          <TableCell colSpan={14} className="py-10 text-center text-sm text-slate-500">
             Отчетов пока нет.
           </TableCell>
         </TableRow>
@@ -933,9 +936,6 @@ const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
               </TableCell>
               <TableCell>
                 <StatusBadge value={report.assignmentStatus} label={getAssignmentStatusLabel(report.assignmentStatus)} />
-              </TableCell>
-              <TableCell className="text-slate-700">
-                {report.revisionUsed} / {report.revisionLimit}
               </TableCell>
               <TableCell className="text-slate-700">{formatDateTime(report.submittedAt)}</TableCell>
               <TableCell className="text-slate-700">{formatDateTime(report.deadlineAt)}</TableCell>
@@ -1166,7 +1166,7 @@ function createInitialFilters(overrides: Partial<ReportFilters> = {}): ReportFil
     deadline_to: toApiDateTimeValue(dateTo),
     created_from: toApiDateTimeValue(dateFrom),
     created_to: toApiDateTimeValue(dateTo),
-    is_overdue: false,
+    overdue: '',
     has_report: true,
     only_current_version: true,
     include_removed: false,
@@ -1420,6 +1420,34 @@ function FilterSelect({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+function HeaderSelect({
+  value,
+  placeholder,
+  options,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
+      <SelectTrigger className="h-9 w-full border-slate-200 bg-white text-sm font-normal">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent align="start">
+        <SelectItem value="all">{placeholder}</SelectItem>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

@@ -73,6 +73,10 @@ const tableColumns: Array<{
   kind?: 'percent' | 'number';
 }> = [
   { key: 'region_name', label: 'Регион' },
+  { key: 'rank', label: 'Место', kind: 'number' },
+  { key: 'kpe', label: 'КПЭ региона', kind: 'number' },
+  { key: 'done', label: 'Выполнено', kind: 'number' },
+  { key: 'done_kpe_percent', label: 'Выполнение КПЭ', kind: 'percent' },
   { key: 'total_assignments', label: 'Назначения', kind: 'number' },
   { key: 'assignments_with_reports', label: 'С отчетами', kind: 'number' },
   { key: 'assignments_without_reports', label: 'Без отчетов', kind: 'number' },
@@ -747,6 +751,9 @@ function BooleanFilter({
 
 function TotalsGrid({ totals }: { totals: ReportsByRegionsResponse['totals'] }) {
   const items = [
+    { label: 'КПЭ регионов', value: formatNumber(totals.kpe) },
+    { label: 'Выполнено по КПЭ', value: formatNumber(totals.done) },
+    { label: 'Выполнение КПЭ', value: formatPercent(totals.done_kpe_percent) },
     { label: 'Назначений', value: totals.total_assignments },
     { label: 'С отчетами', value: totals.assignments_with_reports },
     { label: 'Без отчетов', value: totals.assignments_without_reports },

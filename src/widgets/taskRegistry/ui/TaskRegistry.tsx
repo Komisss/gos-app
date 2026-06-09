@@ -35,9 +35,13 @@ import { TaskEditDialog } from './TaskEditDialog';
 import { TaskRegistryTable } from './TaskRegistryTable';
 
 const emptyTaskFilters: TaskFilters = {
+  title: '',
+  task_type: '',
   created_by_user_id: '',
   created_from: '',
   created_to: '',
+  deadline_at_from: '',
+  deadline_at_to: '',
   org_unit: '',
   region_id: '',
   scope: '',
@@ -182,6 +186,18 @@ export function TaskRegistry() {
                 type="datetime"
                 value={filters.created_to}
                 onChange={(created_to) => updateFilters({ created_to })}
+              />
+              <FilterInput
+                label="Дедлайн от"
+                type="datetime"
+                value={filters.deadline_at_from}
+                onChange={(deadline_at_from) => updateFilters({ deadline_at_from })}
+              />
+              <FilterInput
+                label="Дедлайн до"
+                type="datetime"
+                value={filters.deadline_at_to}
+                onChange={(deadline_at_to) => updateFilters({ deadline_at_to })}
               />
               <FilterSearchSelect
                 label="Структура подчинения"

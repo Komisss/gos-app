@@ -321,6 +321,9 @@ export type ReportsByRegionsResponse = Omit<ReportsByOrgUnitsResponse, 'filters_
 export type ReportsByRegionsItem = {
   region_id: number | null;
   region_name: string | null;
+  kpe: number;
+  done: number;
+  done_kpe_percent: number;
   total_assignments: number;
   assignments_with_reports: number;
   assignments_without_reports: number;
@@ -337,10 +340,15 @@ export type ReportsByRegionsItem = {
   not_completed_rate: number;
   overdue_rate: number;
   moderation_acceptance_rate: number;
+  avg_revision_used: number;
+  rank: number;
   problem_level?: string;
 };
 
 export type ReportsByRegionsTotals = {
+  kpe: number;
+  done: number;
+  done_kpe_percent: number;
   total_assignments: number;
   assignments_with_reports: number;
   assignments_without_reports: number;

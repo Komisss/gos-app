@@ -5,9 +5,13 @@ import type { Task, TaskDto, TaskPayload } from '@/entities/task/model/types';
 const TASKS_ENDPOINT = '/api/v1/tasks';
 
 export type TaskFilters = Partial<{
+  title: string;
+  task_type: string;
   created_by_user_id: string;
   created_from: string;
   created_to: string;
+  deadline_at_from: string;
+  deadline_at_to: string;
   org_unit: string;
   region_id: string;
   scope: string;
@@ -90,7 +94,12 @@ function buildQueryString(filters: TaskFilters) {
 }
 
 function normalizeDateTimeFilter(key: string, value: string) {
-  if (key !== 'created_from' && key !== 'created_to') {
+  if (
+    key !== 'created_from' &&
+    key !== 'created_to' &&
+    key !== 'deadline_at_from' &&
+    key !== 'deadline_at_to'
+  ) {
     return value;
   }
 

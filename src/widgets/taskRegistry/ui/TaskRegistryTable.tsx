@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 
 import {
   getScopeLabel,
@@ -10,6 +10,7 @@ import type { Task } from '@/entities/task/model/types';
 import type { UserListItem } from '@/entities/user/model/types';
 import { Badge } from '@/shared/ui/badge';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
+import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
@@ -56,7 +57,13 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
     <TableHeader>
       <TableRow className="border-b-slate-200 bg-white hover:bg-white">
         <TableHead className="w-24" />
-        <TableHead className="min-w-[320px]" />
+        <TableHead className="min-w-[320px] align-bottom">
+          <HeaderSearchInput
+            value={filters.title}
+            placeholder="Поиск по названию"
+            onChange={(title) => onFiltersChange({ title })}
+          />
+        </TableHead>
         <TableHead className="min-w-[220px] align-bottom">
           <FilterSearchSelect
             label=""
@@ -82,7 +89,17 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
             onChange={(scope) => onFiltersChange({ scope })}
           />
         </TableHead>
-        <TableHead className="w-40" />
+        <TableHead className="w-40 align-bottom">
+          <HeaderSelect
+            value={filters.task_type}
+            placeholder="Все типы"
+            options={[
+              { value: 'online_action', label: 'Онлайн-акция' },
+              { value: 'street_action', label: 'Уличная акция' },
+            ]}
+            onChange={(task_type) => onFiltersChange({ task_type })}
+          />
+        </TableHead>
         <TableHead className="w-44" />
         <TableHead className="w-32 align-bottom">
           <HeaderSelect
@@ -204,6 +221,41 @@ function HeaderSelect({
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+function HeaderSearchInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value?: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState(value ?? '');
+
+  useEffect(() => {
+    setInputValue(value ?? '');
+  }, [value]);
+
+  useEffect(() => {
+    if (inputValue === (value ?? '')) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => onChange(inputValue), 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [inputValue, onChange, value]);
+
+  return (
+    <Input
+      className="h-9 border-slate-200 bg-white text-sm font-normal"
+      value={inputValue}
+      placeholder={placeholder}
+      onChange={(event) => setInputValue(event.target.value)}
+    />
   );
 }
 

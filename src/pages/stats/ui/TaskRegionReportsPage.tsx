@@ -23,7 +23,7 @@ export default function TaskRegionReportsPage() {
       deadline_to: dateRange.to,
       created_from: dateRange.from,
       created_to: dateRange.to,
-      is_overdue: false,
+      overdue: 'false',
       has_report: true,
       only_current_version: true,
       include_removed: false,
