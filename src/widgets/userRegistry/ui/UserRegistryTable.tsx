@@ -25,8 +25,13 @@ type Props = {
 };
 
 const roleOptions = [
-  { value: '2', label: 'Региональный' },
-  { value: '1', label: 'Федеральный' },
+  { value: '8', label: 'Активист' },
+  { value: '7', label: 'Б1' },
+  { value: '6', label: 'Б2' },
+  { value: '5', label: 'Помощник Б3' },
+  { value: '4', label: 'Б3' },
+  { value: '2', label: 'Региональный руководитель' },
+  { value: '1', label: 'Федеральный управляющий' },
 ];
 
 const statusOptions = [
@@ -81,6 +86,10 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
 }) {
   const showFilters = tableFilterMode !== 'none';
   const showAllFilters = tableFilterMode === 'all';
+  const selectedRegionId = Number(filters.region);
+  const availableOrgUnits = filters.region
+    ? orgUnits.filter((orgUnit) => orgUnit.regionId === selectedRegionId)
+    : orgUnits;
 
   return (
     <TableHeader>
@@ -97,7 +106,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
                 value: String(region.id),
                 label: region.name,
               }))}
-              onChange={(region) => onFiltersChange({ region })}
+              onChange={(region) => onFiltersChange({ region, org_unit: '' })}
             />
           </TableHead>
           <TableHead className="min-w-[240px] align-bottom">
@@ -125,9 +134,10 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
                 value={filters.org_unit}
                 placeholder="Все структуры подчинения"
                 searchPlaceholder="Поиск структуры подчинения"
-                options={orgUnits.map((orgUnit) => ({
+                options={availableOrgUnits.map((orgUnit) => ({
                   value: String(orgUnit.id),
                   label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                  description: orgUnit.regionName ?? undefined,
                 }))}
                 onChange={(org_unit) => onFiltersChange({ org_unit })}
               />

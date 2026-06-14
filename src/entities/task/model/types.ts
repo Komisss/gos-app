@@ -96,6 +96,7 @@ export interface TaskDto {
   full_description?: string;
   status: TaskStatus;
   task_type: TaskType;
+  online_task_subtype?: OnlineTaskSubtype | null;
   report_format: TaskReportFormat;
   scheduled_at?: string | null;
   deadline_at: string;
@@ -151,6 +152,7 @@ export interface Task {
   type: TaskType;
   scope?: TaskScope;
   taskType?: TaskType;
+  onlineTaskSubtype?: OnlineTaskSubtype | null;
   reportFormat?: TaskReportFormat;
   createdAt?: string;
   updatedAt?: string;

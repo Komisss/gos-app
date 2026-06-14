@@ -45,6 +45,7 @@ export function NewTaskForm() {
   const isFederalManager = session?.role?.code === 'federal_manager';
   const [form, setForm] = useState<TaskPayload>(initialForm);
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
+  const minActivationDate = useMemo(() => new Date(), []);
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -284,7 +285,7 @@ export function NewTaskForm() {
                 value={form.scheduled_at ?? undefined}
                 onChange={(scheduled_at) => setForm((current) => ({ ...current, scheduled_at }))}
                 placeholder="Выберите дату и время активации"
-                minDateTime={new Date()}
+                minDate={minActivationDate}
               />
             </Field>
           )}
@@ -517,7 +518,13 @@ function getAssignmentOptions(
     id: user.id,
     kind: 'user',
     label: user.fullName,
-    description: `@${user.username}${user.region?.name ? ` • ${user.region.name}` : ''}`,
+    description: [
+      user.role?.name ?? 'Роль не указана',
+      `@${user.username}`,
+      user.region?.name,
+    ]
+      .filter(Boolean)
+      .join(' • '),
   }));
 }
 

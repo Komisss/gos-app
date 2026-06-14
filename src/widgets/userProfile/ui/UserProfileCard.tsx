@@ -13,6 +13,7 @@ import {
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
@@ -43,7 +44,6 @@ type UserFormState = {
 const roleOptions = [
   { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
   { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: 3, code: 'executor', label: 'Исполнитель' },
   { id: 4, code: 'main_manager', label: 'Б3' },
   { id: 5, code: 'assistant', label: 'Помощник Б3' },
   { id: 6, code: 'unit_head', label: 'Б2' },
@@ -55,6 +55,8 @@ export function UserProfileCard() {
   const { userId } = useParams();
   const parsedUserId = Number(userId);
   const queryClient = useQueryClient();
+  const { session } = useAuth();
+  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
 
@@ -114,16 +116,22 @@ export function UserProfileCard() {
       return;
     }
 
-    updateMutation.mutate({
+    const payload: UserPatchPayload = {
       username: form.username,
       full_name: form.full_name,
       max_user_id: form.max_user_id,
       phone: form.phone,
       birthday: form.birthday || null,
-      role: parseOptionalNumber(form.role),
       region: parseOptionalNumber(form.region),
       org_unit: parseOptionalNumber(form.org_unit),
-    });
+    };
+    const selectedRole = parseOptionalNumber(form.role);
+
+    if (selectedRole !== 1 && (!isCurrentUserRegionalManager || selectedRole !== 2)) {
+      payload.role = selectedRole;
+    }
+
+    updateMutation.mutate(payload);
   }
 
   if (!Number.isFinite(parsedUserId)) {
@@ -140,6 +148,11 @@ export function UserProfileCard() {
 
   const user = userQuery.data;
   const isLockedFederalManager = isFederalManager(user);
+  const isRoleLockedForRegionalManager =
+    isCurrentUserRegionalManager && (user.role?.id === 1 || user.role?.id === 2);
+  const availableRoleOptions = roleOptions.filter(
+    (role) => role.id !== 1 && (!isCurrentUserRegionalManager || role.id !== 2),
+  );
   const regions = regionsQuery.data ?? [];
   const orgUnits = orgUnitsQuery.data ?? [];
   const regionOptions = regions.map((region) => ({
@@ -269,15 +282,15 @@ export function UserProfileCard() {
               <div className="grid gap-5 md:grid-cols-3">
                 <Field label="Роль">
                   <Select
-                    disabled={isLockedFederalManager}
+                    disabled={isLockedFederalManager || isRoleLockedForRegionalManager}
                     value={form.role || undefined}
                     onValueChange={(role) => setForm((current) => ({ ...current, role }))}
                   >
-                    <SelectTrigger className="h-9 w-full border-slate-200 bg-white">
+                    <SelectTrigger className="h-9 w-full border-slate-200 bg-white text-slate-900 data-placeholder:text-slate-900">
                       <SelectValue placeholder={user.role?.name ?? 'Роль не указана'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {roleOptions.map((role) => (
+                      {availableRoleOptions.map((role) => (
                         <SelectItem key={role.id} value={String(role.id)}>
                           {role.label}
                         </SelectItem>

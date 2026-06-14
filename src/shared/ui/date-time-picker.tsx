@@ -13,6 +13,7 @@ type Props = {
   placeholder?: string;
   className?: string;
   minDateTime?: Date;
+  minDate?: Date;
 };
 
 export function DateTimePicker({
@@ -21,12 +22,18 @@ export function DateTimePicker({
   placeholder = 'Выберите дату',
   className,
   minDateTime,
+  minDate,
 }: Props) {
+  const normalizedMinDateTime = minDateTime ? startOfMinute(minDateTime) : undefined;
   const selectedDate = parseApiDateTime(value);
-  const minDate = minDateTime ? startOfDay(minDateTime) : undefined;
+  const minimumDate = minDate
+    ? startOfDay(minDate)
+    : normalizedMinDateTime
+      ? startOfDay(normalizedMinDateTime)
+      : undefined;
   const isMinSelectedDay =
-    Boolean(minDateTime && selectedDate) &&
-    selectedDate?.toDateString() === minDateTime?.toDateString();
+    Boolean(normalizedMinDateTime && selectedDate) &&
+    selectedDate?.toDateString() === normalizedMinDateTime?.toDateString();
 
   function commitDateTime(date?: Date, time = toTimeInputValue(selectedDate)) {
     if (!date) {
@@ -37,7 +44,11 @@ export function DateTimePicker({
     const [hours = '0', minutes = '0'] = time.split(':');
     const nextDate = new Date(date);
     nextDate.setHours(Number(hours), Number(minutes), 0, 0);
-    onChange(toApiDateTime(minDateTime && nextDate < minDateTime ? minDateTime : nextDate));
+    onChange(
+      toApiDateTime(
+        normalizedMinDateTime && nextDate < normalizedMinDateTime ? normalizedMinDateTime : nextDate,
+      ),
+    );
   }
 
   return (
@@ -62,14 +73,14 @@ export function DateTimePicker({
           mode="single"
           selected={selectedDate}
           onSelect={(date) => commitDateTime(date)}
-          disabled={minDate ? { before: minDate } : undefined}
+          disabled={minimumDate ? { before: minimumDate } : undefined}
           initialFocus
         />
         <div className="border-t border-slate-200 p-3">
           <Input
             type="time"
             value={toTimeInputValue(selectedDate)}
-            min={isMinSelectedDay ? toTimeInputValue(minDateTime) : undefined}
+            min={isMinSelectedDay ? toTimeInputValue(normalizedMinDateTime) : undefined}
             onChange={(event) => commitDateTime(selectedDate ?? new Date(), event.target.value)}
           />
         </div>
@@ -81,6 +92,12 @@ export function DateTimePicker({
 function startOfDay(value: Date) {
   const date = new Date(value);
   date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function startOfMinute(value: Date) {
+  const date = new Date(value);
+  date.setSeconds(0, 0);
   return date;
 }
 

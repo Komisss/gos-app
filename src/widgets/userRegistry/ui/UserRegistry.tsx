@@ -195,7 +195,7 @@ export function UserRegistry({
               regions={regions}
               tableFilterMode={resolvedTableFilterMode}
               onFiltersChange={updateFilters}
-              onRegionClick={(region) => updateFilters({ region: String(region.id) })}
+              onRegionClick={(region) => updateFilters({ region: String(region.id), org_unit: '' })}
             />
             <UserPagination
               page={page}

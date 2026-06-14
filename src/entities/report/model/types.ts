@@ -113,6 +113,12 @@ export type CrmReportDto = {
     checked_at: string | null;
     system_comment: string | null;
   } | null;
+  report_content?: {
+    link_url: string | null;
+    file_id: number | null;
+    preview_url: string | null;
+    display_value: string | null;
+  } | null;
   last_moderation: ReportLastModeration | null;
   available_actions: string[];
 };

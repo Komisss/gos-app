@@ -21,6 +21,7 @@ import type { Region } from '@/entities/region/model/types';
 import type { Task } from '@/entities/task/model/types';
 import {
   getReportFormatLabel,
+  getOnlineTaskSubtypeLabel,
   getScopeLabel,
   getStatusLabel,
   getTaskTypeLabel,
@@ -191,6 +192,9 @@ export function TaskDetailsCard({
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <InfoItem label="Уровень" value={getScopeLabel(task.scope ?? '')} />
         <InfoItem label="Тип задачи" value={getTaskTypeLabel(task.taskType ?? task.type)} />
+        {task.taskType === 'online_action' && (
+          <InfoItem label="Подтип задачи" value={getOnlineTaskSubtypeLabel(task.onlineTaskSubtype)} />
+        )}
         <InfoItem label="Формат отчета" value={getReportFormatLabel(task.reportFormat ?? '')} />
         <InfoItem
           label="Период выполнения"

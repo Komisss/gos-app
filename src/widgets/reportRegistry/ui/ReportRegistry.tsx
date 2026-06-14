@@ -96,7 +96,6 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 ];
 
 const reportStatusOptions: Array<{ value: ReportStatus; label: string }> = [
-  { value: 'under_review', label: 'На проверке' },
   { value: 'pending', label: 'На проверке' },
   { value: 'accepted', label: 'Принят' },
   { value: 'revision_requested', label: 'Нужна доработка' },
@@ -627,6 +626,7 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
 
   return {
     ...restFilters,
+    report_statuses: normalizeReportStatusesForRequest(filters.report_statuses),
     ...(overdue === '' ? {} : { overdue: overdue === 'true' }),
     submitted_from: filters.submitted_from || null,
     submitted_to: filters.submitted_to || null,
@@ -635,6 +635,10 @@ function toReportPayload(filters: ReportFilters): ReportSearchPayload {
     created_from: filters.created_from || null,
     created_to: filters.created_to || null,
   };
+}
+
+function normalizeReportStatusesForRequest(statuses: ReportStatus[]) {
+  return Array.from(new Set(statuses.map((status) => (status === 'under_review' ? 'pending' : status))));
 }
 
 const ReportRegistryTable = memo(function ReportRegistryTable({
@@ -1107,9 +1111,26 @@ function ReportPreviewLink({
   report: CrmReport;
   onImageClick: (imageUrl: string) => void;
 }) {
-  const previewUrl = report.linkPreview?.url ?? report.linkPreview?.linkUrl;
-  const imageUrl = report.linkPreview?.imageUrl;
-  const displayUrl = report.linkPreview?.displayUrl ?? previewUrl;
+  const rawPreview = report.raw.link_preview;
+  const rawContent = report.raw.report_content;
+  const previewUrl =
+    report.linkPreview?.url ??
+    report.linkPreview?.linkUrl ??
+    rawPreview?.url ??
+    rawPreview?.link_url ??
+    rawContent?.link_url ??
+    rawContent?.display_value;
+  const imageUrl =
+    report.linkPreview?.imageUrl ??
+    report.linkPreview?.fileUrl ??
+    rawPreview?.image_url ??
+    rawPreview?.file_url ??
+    rawContent?.preview_url;
+  const displayUrl =
+    report.linkPreview?.displayUrl ??
+    rawPreview?.display_url ??
+    rawContent?.display_value ??
+    previewUrl;
 
   if (report.reportType === 'image') {
     if (!imageUrl) {

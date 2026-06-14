@@ -58,13 +58,16 @@ function toPositiveNumber(value: string | null) {
 function normalizeReportStatus(value: string | null): ReportStatus {
   const availableStatuses: ReportStatus[] = [
     'pending',
-    'under_review',
     'accepted',
     'revision_requested',
     'not_completed',
   ];
 
-  return availableStatuses.includes(value as ReportStatus) ? (value as ReportStatus) : 'under_review';
+  if (value === 'under_review') {
+    return 'pending';
+  }
+
+  return availableStatuses.includes(value as ReportStatus) ? (value as ReportStatus) : 'pending';
 }
 
 function createTenYearDateRange() {

@@ -167,6 +167,7 @@ export function mapTaskDtoToTask(task: TaskDto): Task {
     type: task.task_type,
     scope: task.scope,
     taskType: task.task_type,
+    onlineTaskSubtype: task.online_task_subtype,
     reportFormat: task.report_format,
     region: getScopeLabel(task.scope),
     assignee: `Автор #${task.created_by_user_id}`,
@@ -236,6 +237,18 @@ export function getTaskTypeLabel(type: string) {
   };
 
   return labels[type] ?? type;
+}
+
+export function getOnlineTaskSubtypeLabel(subtype?: string | null) {
+  const labels: Record<string, string> = {
+    like: 'Лайк',
+    comment: 'Комментарий',
+    repost: 'Репост',
+    post: 'Пост',
+    other: 'Другое',
+  };
+
+  return subtype ? labels[subtype] ?? subtype : 'Не указан';
 }
 
 export function getReportFormatLabel(format: string) {

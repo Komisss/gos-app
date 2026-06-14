@@ -160,7 +160,11 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                   setForm((current) => ({
                     ...current,
                     task_type,
-                    report_format: task_type === 'street_action' ? 'image' : current.report_format,
+                    report_format:
+                      task_type === 'street_action' ||
+                      (task_type === 'online_action' && (current.online_task_subtype ?? 'like') === 'like')
+                        ? 'image'
+                        : current.report_format,
                     online_task_subtype:
                       task_type === 'online_action' ? (current.online_task_subtype ?? 'like') : undefined,
                   }))
@@ -176,10 +180,36 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
               </Select>
             </Field>
 
+            {form.task_type === 'online_action' && (
+              <Field label="Подтип задачи">
+                <Select
+                  value={form.online_task_subtype ?? 'like'}
+                  onValueChange={(online_task_subtype) =>
+                    setForm((current) => ({
+                      ...current,
+                      online_task_subtype: online_task_subtype as TaskPayload['online_task_subtype'],
+                      report_format: online_task_subtype === 'like' ? 'image' : current.report_format,
+                    }))
+                  }
+                >
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="like">Лайк</SelectItem>
+                    <SelectItem value="comment">Комментарий</SelectItem>
+                    <SelectItem value="repost">Репост</SelectItem>
+                    <SelectItem value="post">Пост</SelectItem>
+                    <SelectItem value="other">Другое</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+
             <Field label="Формат отчета">
               <Select
                 value={form.report_format}
-                disabled={form.task_type === 'street_action'}
+                disabled={isReportFormatLocked(form)}
                 onValueChange={(report_format) =>
                   setForm((current) => ({ ...current, report_format }))
                 }
@@ -208,7 +238,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                 value={form.scheduled_at ?? undefined}
                 onChange={(scheduled_at) => setForm((current) => ({ ...current, scheduled_at }))}
                 placeholder="Выберите дату и время активации"
-                minDateTime={new Date()}
+                minDate={new Date()}
               />
             </Field>
           )}
@@ -483,6 +513,7 @@ function getInitialForm(task: Task | null): TaskPayload {
     scope: task?.scope === 'federal' ? 'federal' : 'regional',
     status: task?.status === 'scheduled' ? 'scheduled' : 'active',
     task_type: task?.taskType ?? 'online_action',
+    online_task_subtype: task?.taskType === 'online_action' ? (task.onlineTaskSubtype ?? 'like') : undefined,
     report_format: task?.reportFormat ?? 'link',
     deadline_at: task?.deadlineAt ?? null,
     scheduled_at: task?.scheduledAt ?? null,
@@ -496,7 +527,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
   const normalized: TaskPayload = {
     ...form,
     full_description: normalizeOptionalString(form.full_description),
-    report_format: form.task_type === 'street_action' ? 'image' : form.report_format,
+    report_format: isReportFormatLocked(form) ? 'image' : form.report_format,
     online_task_subtype: form.task_type === 'online_action' ? form.online_task_subtype : undefined,
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
@@ -525,6 +556,10 @@ function omitTargets(payload: TaskPayload): TaskPayload {
   const { targets: _targets, ...rest } = payload;
 
   return rest;
+}
+
+function isReportFormatLocked(form: TaskPayload) {
+  return form.task_type === 'street_action' || form.online_task_subtype === 'like';
 }
 
 function mapTargetsToPayload(task: Task | null): TaskTargetPayload[] | undefined {
