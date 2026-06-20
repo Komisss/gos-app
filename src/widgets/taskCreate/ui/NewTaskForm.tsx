@@ -283,7 +283,7 @@ export function NewTaskForm() {
               </Select>
             </Field>
 
-            <Field label={form.status === 'scheduled' ? 'Дедлайн *' : 'Дедлайн'}>
+            <Field label={form.status === 'scheduled' ? 'Дедлайн' : 'Дедлайн'}>
               <DateTimePicker
                 value={form.deadline_at ?? undefined}
                 onChange={(deadline_at) => {
