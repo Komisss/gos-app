@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, Power, PowerOff, Save } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import {
   updateUser,
 } from '@/entities/user/api/users';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import { filterOrgUnitsForUserRole } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
 import { getRegions } from '@/entities/region/api/regions';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
@@ -81,6 +82,28 @@ export function UserProfileCard() {
       setForm(getInitialForm(userQuery.data));
     }
   }, [userQuery.data]);
+
+  const selectedRoleId = parseOptionalNumber(form.role);
+  const selectedRegionId = parseOptionalNumber(form.region);
+  const availableOrgUnits = useMemo(
+    () =>
+      filterOrgUnitsForUserRole(
+        orgUnitsQuery.data ?? [],
+        selectedRoleId,
+        selectedRegionId,
+      ),
+    [orgUnitsQuery.data, selectedRegionId, selectedRoleId],
+  );
+
+  useEffect(() => {
+    if (!orgUnitsQuery.data || !form.org_unit) {
+      return;
+    }
+
+    if (!availableOrgUnits.some((orgUnit) => String(orgUnit.id) === form.org_unit)) {
+      setForm((current) => ({ ...current, org_unit: '' }));
+    }
+  }, [availableOrgUnits, form.org_unit, orgUnitsQuery.data]);
 
   const updateMutation = useMutation({
     mutationFn: (payload: UserPatchPayload) => updateUser(parsedUserId, payload),
@@ -154,13 +177,12 @@ export function UserProfileCard() {
     (role) => role.id !== 1 && (!isCurrentUserRegionalManager || role.id !== 2),
   );
   const regions = regionsQuery.data ?? [];
-  const orgUnits = orgUnitsQuery.data ?? [];
   const regionOptions = regions.map((region) => ({
     value: String(region.id),
     label: region.name,
     description: region.code,
   }));
-  const orgUnitOptions = orgUnits.map((orgUnit) => ({
+  const orgUnitOptions = availableOrgUnits.map((orgUnit) => ({
     value: String(orgUnit.id),
     label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
     description: orgUnit.regionId ? getRegionName(orgUnit.regionId, regions) : undefined,
@@ -313,10 +335,16 @@ export function UserProfileCard() {
                 <Field label="Структура подчинения">
                   <FilterSearchSelect
                     value={form.org_unit}
-                    placeholder="Структура подчинения не указана"
+                    placeholder={getOrgUnitPlaceholder(selectedRoleId, selectedRegionId)}
                     searchPlaceholder="Поиск структуры подчинения"
                     options={orgUnitOptions}
-                    disabled={isLockedFederalManager}
+                    disabled={
+                      isLockedFederalManager ||
+                      !selectedRoleId ||
+                      !selectedRegionId ||
+                      selectedRoleId === 1 ||
+                      selectedRoleId === 2
+                    }
                     onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
                   />
                 </Field>
@@ -474,6 +502,22 @@ function formatHeadUser(headUser: UserDetails['headUser']) {
 
 function getRegionName(regionId: number, regions: Array<{ id: number; name: string }>) {
   return regions.find((region) => region.id === regionId)?.name ?? `Регион #${regionId}`;
+}
+
+function getOrgUnitPlaceholder(roleId: number | null, regionId: number | null) {
+  if (!roleId) {
+    return 'Сначала выберите роль';
+  }
+
+  if (!regionId) {
+    return 'Сначала выберите регион';
+  }
+
+  if (roleId === 1 || roleId === 2) {
+    return 'Для выбранной роли оргструктура недоступна';
+  }
+
+  return 'Выберите доступную структуру подчинения';
 }
 
 function formatDateTime(value: string) {

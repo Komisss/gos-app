@@ -6,6 +6,7 @@ import { ListFilter, UserPlus } from 'lucide-react';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
 import { getUsersPage, type UserFilters } from '@/entities/user/api/users';
+import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
@@ -44,14 +45,24 @@ export function UserRegistry({
   showTableFilters = true,
   tableFilterMode,
 }: UserRegistryProps = {}) {
+  const {
+    isRegionalManager,
+    regionId: currentUserRegionId,
+    isLoading: isCurrentUserRegionLoading,
+  } = useCurrentUserRegion();
   const resolvedTableFilterMode = tableFilterMode ?? (showTableFilters ? 'all' : 'none');
-  const initialUserFilters = useMemo(
-    () => ({
+  const initialUserFilters = useMemo(() => {
+    const nextFilters = {
       ...emptyUserFilters,
       ...initialFilters,
-    }),
-    [initialFilters],
-  );
+    };
+
+    if (isRegionalManager && currentUserRegionId && !nextFilters.region) {
+      nextFilters.region = String(currentUserRegionId);
+    }
+
+    return nextFilters;
+  }, [currentUserRegionId, initialFilters, isRegionalManager]);
   const [filters, setFilters] = useState<UserFilters>(initialUserFilters);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
@@ -61,15 +72,31 @@ export function UserRegistry({
   const queryFilters = useMemo(
     () => ({
       ...filters,
+      region:
+        filters.region ||
+        (isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : ''),
       search: debouncedSearch,
     }),
-    [debouncedSearch, filters],
+    [currentUserRegionId, debouncedSearch, filters, isRegionalManager],
   );
+
+  useEffect(() => {
+    if (!isRegionalManager || !currentUserRegionId) {
+      return;
+    }
+
+    setFilters((current) =>
+      current.region
+        ? current
+        : { ...current, region: String(currentUserRegionId), org_unit: '' },
+    );
+  }, [currentUserRegionId, isRegionalManager]);
 
   const usersQuery = useQuery({
     queryKey: ['users', queryFilters, page, pageSize],
     queryFn: () => getUsersPage(queryFilters, page, pageSize),
     placeholderData: keepPreviousData,
+    enabled: !isCurrentUserRegionLoading,
   });
 
   const regionsQuery = useQuery({

@@ -4,9 +4,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import {
+  filterOrgUnitsForUserRole,
+  getOrgUnitHeadRoleCodesForUserRole,
+} from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
-import { registerUser } from '@/entities/user/api/users';
+import { getUserById, registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { cn } from '@/shared/lib/utils';
@@ -71,6 +75,12 @@ export function NewUserForm() {
     queryFn: getOrgUnitsTree,
   });
 
+  const currentUserQuery = useQuery({
+    queryKey: ['users', session?.userId],
+    queryFn: () => getUserById(session?.userId ?? 0),
+    enabled: isRegionalManager && Boolean(session?.userId),
+  });
+
   const createMutation = useMutation({
     mutationFn: registerUser,
     onSuccess: async () => {
@@ -80,7 +90,7 @@ export function NewUserForm() {
   });
 
   const availableOrgUnits = useMemo(
-    () => getAvailableOrgUnits(orgUnitsQuery.data ?? [], form.role, form.region),
+    () => filterOrgUnitsForUserRole(orgUnitsQuery.data ?? [], form.role, form.region),
     [form.region, form.role, orgUnitsQuery.data],
   );
 
@@ -106,6 +116,20 @@ export function NewUserForm() {
       setForm((current) => ({ ...current, username: '', password: '' }));
     }
   }, [form.password, form.username, showCredentials]);
+
+  useEffect(() => {
+    const managerRegionId = currentUserQuery.data?.region?.id;
+
+    if (!isRegionalManager || !managerRegionId) {
+      return;
+    }
+
+    setForm((current) =>
+      current.region === managerRegionId
+        ? current
+        : { ...current, region: managerRegionId, org_unit: 0 },
+    );
+  }, [currentUserQuery.data?.region?.id, isRegionalManager]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -424,46 +448,6 @@ function getOrgUnitDescription(orgUnit: OrgUnit) {
     .join(' • ');
 }
 
-function getAvailableOrgUnits(orgUnits: OrgUnit[], role: RegisterUserRoleId, regionId: number | null) {
-  if (!regionId) {
-    return [];
-  }
-
-  const targetHeadRoleCodes = getOrgUnitHeadRoleCodesForRole(role);
-
-  return orgUnits.filter((orgUnit) => {
-    if (orgUnit.regionId !== regionId || orgUnit.isActive === false) {
-      return false;
-    }
-
-    if (targetHeadRoleCodes.length === 0) {
-      return true;
-    }
-
-    return targetHeadRoleCodes.includes(orgUnit.headUser?.role?.code ?? '');
-  });
-}
-
-function getOrgUnitHeadRoleCodesForRole(role: RegisterUserRoleId) {
-  if (role === 4) {
-    return ['federal_manager', 'regional_manager'];
-  }
-
-  if (role === 5 || role === 6) {
-    return ['main_manager'];
-  }
-
-  if (role === 7) {
-    return ['unit_head'];
-  }
-
-  if (role === 8) {
-    return ['department_head'];
-  }
-
-  return [];
-}
-
 function canSelectOrgUnit(role: RegisterUserRoleId) {
   return role !== 1 && role !== 2;
 }
@@ -473,7 +457,7 @@ function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null
     return 'Сначала выберите регион';
   }
 
-  if (getOrgUnitHeadRoleCodesForRole(role).length > 0) {
+  if (getOrgUnitHeadRoleCodesForUserRole(role).length > 0) {
     return 'Выберите доступную подгруппу';
   }
 

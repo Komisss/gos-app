@@ -5,6 +5,7 @@ import { getUserStatusLabel, type UserFilters } from '@/entities/user/api/users'
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import type { Region } from '@/entities/region/model/types';
 import type { UserListItem } from '@/entities/user/model/types';
+import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Badge } from '@/shared/ui/badge';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
@@ -23,16 +24,6 @@ type Props = {
   onFiltersChange: (filters: UserFilters) => void;
   onRegionClick?: (region: Region) => void;
 };
-
-const roleOptions = [
-  { value: '8', label: 'Активист' },
-  { value: '7', label: 'Б1' },
-  { value: '6', label: 'Б2' },
-  { value: '5', label: 'Помощник Б3' },
-  { value: '4', label: 'Б3' },
-  { value: '2', label: 'Региональный руководитель' },
-  { value: '1', label: 'Федеральный управляющий' },
-];
 
 const statusOptions = [
   { value: 'active', label: 'Активен' },
@@ -122,7 +113,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
               <HeaderSelect
                 value={filters.role}
                 placeholder="Все роли"
-                options={roleOptions}
+                options={userRoleFilterOptions}
                 onChange={(role) => onFiltersChange({ role })}
               />
             )}

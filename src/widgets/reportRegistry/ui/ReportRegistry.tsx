@@ -17,6 +17,7 @@ import type {
 import { getRegions } from '@/entities/region/api/regions';
 import { getReportFormatLabel, getTaskTypeLabel, getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
+import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -135,11 +136,34 @@ export function ReportRegistry({
   tableVariant = 'default',
 }: ReportRegistryProps = {}) {
   const navigate = useNavigate();
+  const { isRegionalManager, regionId: currentUserRegionId } = useCurrentUserRegion();
   const initialFiltersKey = JSON.stringify(initialFilters ?? {});
-  const [filters, setFilters] = useState<ReportFilters>(() => createInitialFilters(initialFilters));
-  const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(() =>
-    autoLoad ? createInitialFilters(initialFilters) : null,
-  );
+  const [filters, setFilters] = useState<ReportFilters>(() => {
+    const nextFilters = createInitialFilters(initialFilters);
+
+    if (isRegionalManager && currentUserRegionId && nextFilters.region_ids.length === 0) {
+      nextFilters.region_ids = [currentUserRegionId];
+    }
+
+    return nextFilters;
+  });
+  const [appliedFilters, setAppliedFilters] = useState<ReportFilters | null>(() => {
+    if (!autoLoad) {
+      return null;
+    }
+
+    const nextFilters = createInitialFilters(initialFilters);
+
+    if (isRegionalManager && nextFilters.region_ids.length === 0) {
+      if (!currentUserRegionId) {
+        return null;
+      }
+
+      nextFilters.region_ids = [currentUserRegionId];
+    }
+
+    return nextFilters;
+  });
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [selectedReportIds, setSelectedReportIds] = useState<Set<number>>(() => new Set());
   const [filtersOpen, setFiltersOpen] = useState(true);
@@ -236,10 +260,18 @@ export function ReportRegistry({
 
   useEffect(() => {
     const nextFilters = createInitialFilters(initialFilters);
+
+    if (isRegionalManager && currentUserRegionId && nextFilters.region_ids.length === 0) {
+      nextFilters.region_ids = [currentUserRegionId];
+    }
+
+    const canAutoLoad =
+      !isRegionalManager || nextFilters.region_ids.length > 0 || Boolean(currentUserRegionId);
+
     setFilters(nextFilters);
-    setAppliedFilters(autoLoad ? nextFilters : null);
+    setAppliedFilters(autoLoad && canAutoLoad ? nextFilters : null);
     setSelectedReportIds(new Set());
-  }, [autoLoad, initialFiltersKey]);
+  }, [autoLoad, currentUserRegionId, initialFiltersKey, isRegionalManager]);
 
   function applyFilters(nextFilters: ReportFilters) {
     setFilters(nextFilters);
@@ -490,7 +522,13 @@ export function ReportRegistry({
                 variant="outline"
                 onClick={() => {
                   handleClearSelection();
-                  setFilters(createInitialFilters());
+                  const nextFilters = createInitialFilters();
+
+                  if (isRegionalManager && currentUserRegionId) {
+                    nextFilters.region_ids = [currentUserRegionId];
+                  }
+
+                  setFilters(nextFilters);
                 }}
               >
                 Сбросить фильтры

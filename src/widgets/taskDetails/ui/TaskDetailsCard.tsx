@@ -101,7 +101,6 @@ export function TaskDetailsCard({
     regions: regionsQuery.data ?? [],
     orgUnits: orgUnitsQuery.data ?? [],
   });
-  const isActiveTask = task.status === 'active';
 
   const updateMutation = useMutation({
     mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) =>
@@ -167,7 +166,6 @@ export function TaskDetailsCard({
             type="button"
             variant="outline"
             className="border-slate-200"
-            disabled={isActiveTask}
             onClick={() => setEditOpen(true)}
           >
             <Pencil />

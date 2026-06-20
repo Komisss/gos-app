@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListFilter, Plus } from 'lucide-react';
@@ -16,6 +16,7 @@ import {
 } from '@/entities/task/api/tasks';
 import type { Task, TaskPayload } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
+import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { Button } from '@/shared/ui/button';
 import { CardTitle } from '@/shared/ui/card';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
@@ -53,6 +54,11 @@ const emptyUsers: Awaited<ReturnType<typeof getUsers>> = [];
 export function TaskRegistry() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const {
+    isRegionalManager,
+    regionId: currentUserRegionId,
+    isLoading: isCurrentUserRegionLoading,
+  } = useCurrentUserRegion();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [deletingTask, setDeletingTask] = useState<Task | null>(null);
@@ -63,11 +69,34 @@ export function TaskRegistry() {
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
 
+  const taskQueryFilters = useMemo(
+    () => ({
+      ...filters,
+      region_id:
+        filters.region_id ||
+        (isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : ''),
+    }),
+    [currentUserRegionId, filters, isRegionalManager],
+  );
+
   const tasksQuery = useQuery({
-    queryKey: ['tasks', filters, page, size],
-    queryFn: () => getTasksPage(filters, page, size),
+    queryKey: ['tasks', taskQueryFilters, page, size],
+    queryFn: () => getTasksPage(taskQueryFilters, page, size),
     placeholderData: keepPreviousData,
+    enabled: !isCurrentUserRegionLoading,
   });
+
+  useEffect(() => {
+    if (!isRegionalManager || !currentUserRegionId) {
+      return;
+    }
+
+    setFilters((current) =>
+      current.region_id
+        ? current
+        : { ...current, region_id: String(currentUserRegionId) },
+    );
+  }, [currentUserRegionId, isRegionalManager]);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -228,7 +257,13 @@ export function TaskRegistry() {
                 variant="outline"
                 onClick={() => {
                   setPage(1);
-                  setFilters(emptyTaskFilters);
+                  setFilters({
+                    ...emptyTaskFilters,
+                    region_id:
+                      isRegionalManager && currentUserRegionId
+                        ? String(currentUserRegionId)
+                        : '',
+                  });
                 }}
               >
                 Сбросить фильтры

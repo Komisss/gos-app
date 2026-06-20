@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Download } from 'lucide-react';
 
 import type { UserFilters } from '@/entities/user/api/users';
+import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
@@ -95,10 +96,7 @@ export function UserExportPopover({
               label="Роль"
               value={exportFilters.role}
               placeholder="Все"
-              options={[
-                { value: '1', label: 'Региональный' },
-                { value: '2', label: 'Федеральный' },
-              ]}
+              options={userRoleFilterOptions}
               onChange={(role) => onExportFiltersChange((current) => ({ ...current, role }))}
             />
             <div className="space-y-1 md:col-span-2">
