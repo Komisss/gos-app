@@ -30,7 +30,7 @@ export function NavigationSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="flex flex-row items-center justify-between gap-2 px-3 py-3 [&>span:first-child]:truncate group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:[&>span:first-child]:hidden">
-        <span>Сеть</span>
+        <span>СУОМ</span>
         <SidebarTrigger className="h-8 w-8 shrink-0 text-white">
           <PanelLeft />
         </SidebarTrigger>
