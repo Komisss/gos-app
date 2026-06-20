@@ -65,7 +65,7 @@ export function TaskRegistry() {
   const [togglingTaskId, setTogglingTaskId] = useState<number | null>(null);
   const [deletingTaskId, setDeletingTaskId] = useState<number | null>(null);
   const [filters, setFilters] = useState<TaskFilters>(emptyTaskFilters);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [size, setSize] = useState(25);
 

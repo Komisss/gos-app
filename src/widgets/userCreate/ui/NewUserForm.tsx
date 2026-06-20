@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
@@ -246,19 +246,11 @@ export function NewUserForm() {
               <Input
                 className="border-slate-200"
                 inputMode="tel"
-                placeholder="+7 (999) 999-99-99"
+                placeholder="89999999999"
                 value={form.phone}
                 onChange={(event) =>
                   setForm((current) => ({ ...current, phone: formatRussianPhone(event.target.value) }))
                 }
-                onKeyDown={(event) => {
-                  const nextPhone = removePhoneDigitBeforeMask(event, form.phone);
-
-                  if (nextPhone !== null) {
-                    event.preventDefault();
-                    setForm((current) => ({ ...current, phone: nextPhone }));
-                  }
-                }}
               />
             </Field>
 
@@ -483,76 +475,11 @@ function formatRussianPhone(value: string) {
     return '';
   }
 
-  const nationalDigits = normalizeRussianPhoneDigits(digits).slice(0, 10);
-  const parts = [
-    nationalDigits.slice(0, 3),
-    nationalDigits.slice(3, 6),
-    nationalDigits.slice(6, 8),
-    nationalDigits.slice(8, 10),
-  ];
+  const nationalDigits = digits.startsWith('7') || digits.startsWith('8')
+    ? digits.slice(1)
+    : digits;
 
-  let result = '+7';
-
-  if (parts[0]) {
-    result += ` (${parts[0]}`;
-  }
-
-  if (parts[0].length === 3) {
-    result += ')';
-  }
-
-  if (parts[1]) {
-    result += ` ${parts[1]}`;
-  }
-
-  if (parts[2]) {
-    result += `-${parts[2]}`;
-  }
-
-  if (parts[3]) {
-    result += `-${parts[3]}`;
-  }
-
-  return result;
-}
-
-function removePhoneDigitBeforeMask(event: KeyboardEvent<HTMLInputElement>, value: string) {
-  if (event.key !== 'Backspace') {
-    return null;
-  }
-
-  const selectionStart = event.currentTarget.selectionStart;
-  const selectionEnd = event.currentTarget.selectionEnd;
-
-  if (
-    selectionStart === null ||
-    selectionEnd === null ||
-    selectionStart !== selectionEnd ||
-    selectionStart === 0 ||
-    /\d/.test(value[selectionStart - 1] ?? '')
-  ) {
-    return null;
-  }
-
-  let digitIndex = selectionStart - 1;
-
-  while (digitIndex >= 0 && !/\d/.test(value[digitIndex] ?? '')) {
-    digitIndex -= 1;
-  }
-
-  if (digitIndex <= 1) {
-    return null;
-  }
-
-  return formatRussianPhone(`${value.slice(0, digitIndex)}${value.slice(digitIndex + 1)}`);
-}
-
-function normalizeRussianPhoneDigits(digits: string) {
-  if (digits.startsWith('7') || digits.startsWith('8')) {
-    return digits.slice(1);
-  }
-
-  return digits;
+  return `8${nationalDigits.slice(0, 10)}`;
 }
 
 function parseDateOnly(value: string) {

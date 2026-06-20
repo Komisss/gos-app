@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { refreshAccessToken, requestAuthTokens } from '@/shared/api/auth';
 import { clearSession, readSession, saveSession, type SessionSnapshot } from './tokenStorage';
 
@@ -18,6 +19,7 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<SessionSnapshot | null>(() => readSession());
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -70,9 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: authUser.role,
     };
 
+    queryClient.clear();
     saveSession(nextSession);
     setSession(nextSession);
-  }, []);
+  }, [queryClient]);
 
   const logout = useCallback(() => {
     clearSession();

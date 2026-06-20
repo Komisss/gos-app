@@ -245,7 +245,7 @@ export function ReportRegistry({
       (usersQuery.data ?? []).map((user) => ({
         value: String(user.id),
         label: user.fullName,
-        description: `@${user.username}`,
+        description: [user.role?.name, `@${user.username}`].filter(Boolean).join(' • '),
       })),
     [usersQuery.data],
   );

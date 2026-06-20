@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, Power, PowerOff, Save } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -10,16 +10,11 @@ import {
   getUserStatusLabel,
   updateUser,
 } from '@/entities/user/api/users';
-import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
-import { filterOrgUnitsForUserRole } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
-import { getRegions } from '@/entities/region/api/regions';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
-import { useAuth } from '@/features/auth/model/AuthContext';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
 import { DatePicker } from '@/shared/ui/date-picker';
-import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import {
   Dialog,
@@ -29,7 +24,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
 type UserFormState = {
   username: string;
@@ -37,27 +31,12 @@ type UserFormState = {
   max_user_id: string;
   phone: string;
   birthday: string;
-  role: string;
-  region: string;
-  org_unit: string;
 };
-
-const roleOptions = [
-  { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
-  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: 4, code: 'main_manager', label: 'Б3' },
-  { id: 5, code: 'assistant', label: 'Помощник Б3' },
-  { id: 6, code: 'unit_head', label: 'Б2' },
-  { id: 7, code: 'department_head', label: 'Б1' },
-  { id: 8, code: 'employee', label: 'Активист' },
-];
 
 export function UserProfileCard() {
   const { userId } = useParams();
   const parsedUserId = Number(userId);
   const queryClient = useQueryClient();
-  const { session } = useAuth();
-  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
 
@@ -67,43 +46,11 @@ export function UserProfileCard() {
     enabled: Number.isFinite(parsedUserId),
   });
 
-  const regionsQuery = useQuery({
-    queryKey: ['regions'],
-    queryFn: getRegions,
-  });
-
-  const orgUnitsQuery = useQuery({
-    queryKey: ['org-units-tree'],
-    queryFn: getOrgUnitsTree,
-  });
-
   useEffect(() => {
     if (userQuery.data) {
       setForm(getInitialForm(userQuery.data));
     }
   }, [userQuery.data]);
-
-  const selectedRoleId = parseOptionalNumber(form.role);
-  const selectedRegionId = parseOptionalNumber(form.region);
-  const availableOrgUnits = useMemo(
-    () =>
-      filterOrgUnitsForUserRole(
-        orgUnitsQuery.data ?? [],
-        selectedRoleId,
-        selectedRegionId,
-      ),
-    [orgUnitsQuery.data, selectedRegionId, selectedRoleId],
-  );
-
-  useEffect(() => {
-    if (!orgUnitsQuery.data || !form.org_unit) {
-      return;
-    }
-
-    if (!availableOrgUnits.some((orgUnit) => String(orgUnit.id) === form.org_unit)) {
-      setForm((current) => ({ ...current, org_unit: '' }));
-    }
-  }, [availableOrgUnits, form.org_unit, orgUnitsQuery.data]);
 
   const updateMutation = useMutation({
     mutationFn: (payload: UserPatchPayload) => updateUser(parsedUserId, payload),
@@ -145,14 +92,7 @@ export function UserProfileCard() {
       max_user_id: form.max_user_id,
       phone: form.phone,
       birthday: form.birthday || null,
-      region: parseOptionalNumber(form.region),
-      org_unit: parseOptionalNumber(form.org_unit),
     };
-    const selectedRole = parseOptionalNumber(form.role);
-
-    if (selectedRole !== 1 && (!isCurrentUserRegionalManager || selectedRole !== 2)) {
-      payload.role = selectedRole;
-    }
 
     updateMutation.mutate(payload);
   }
@@ -171,22 +111,6 @@ export function UserProfileCard() {
 
   const user = userQuery.data;
   const isLockedFederalManager = isFederalManager(user);
-  const isRoleLockedForRegionalManager =
-    isCurrentUserRegionalManager && (user.role?.id === 1 || user.role?.id === 2);
-  const availableRoleOptions = roleOptions.filter(
-    (role) => role.id !== 1 && (!isCurrentUserRegionalManager || role.id !== 2),
-  );
-  const regions = regionsQuery.data ?? [];
-  const regionOptions = regions.map((region) => ({
-    value: String(region.id),
-    label: region.name,
-    description: region.code,
-  }));
-  const orgUnitOptions = availableOrgUnits.map((orgUnit) => ({
-    value: String(orgUnit.id),
-    label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-    description: orgUnit.regionId ? getRegionName(orgUnit.regionId, regions) : undefined,
-  }));
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -302,52 +226,12 @@ export function UserProfileCard() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-3">
-                <Field label="Роль">
-                  <Select
-                    disabled={isLockedFederalManager || isRoleLockedForRegionalManager}
-                    value={form.role || undefined}
-                    onValueChange={(role) => setForm((current) => ({ ...current, role }))}
-                  >
-                    <SelectTrigger className="h-9 w-full border-slate-200 bg-white text-slate-900 data-placeholder:text-slate-900">
-                      <SelectValue placeholder={user.role?.name ?? 'Роль не указана'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRoleOptions.map((role) => (
-                        <SelectItem key={role.id} value={String(role.id)}>
-                          {role.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-
-                <Field label="Регион">
-                  <FilterSearchSelect
-                    value={form.region}
-                    placeholder="Регион не указан"
-                    searchPlaceholder="Поиск региона"
-                    options={regionOptions}
-                    disabled={isLockedFederalManager}
-                    onChange={(region) => setForm((current) => ({ ...current, region }))}
-                  />
-                </Field>
-
-                <Field label="Структура подчинения">
-                  <FilterSearchSelect
-                    value={form.org_unit}
-                    placeholder={getOrgUnitPlaceholder(selectedRoleId, selectedRegionId)}
-                    searchPlaceholder="Поиск структуры подчинения"
-                    options={orgUnitOptions}
-                    disabled={
-                      isLockedFederalManager ||
-                      !selectedRoleId ||
-                      !selectedRegionId ||
-                      selectedRoleId === 1 ||
-                      selectedRoleId === 2
-                    }
-                    onChange={(org_unit) => setForm((current) => ({ ...current, org_unit }))}
-                  />
-                </Field>
+                <ReadonlyField label="Роль" value={user.role?.name ?? 'Не указана'} />
+                <ReadonlyField label="Регион" value={user.region?.name ?? 'Не указан'} />
+                <ReadonlyField
+                  label="Структура подчинения"
+                  value={user.orgUnit?.name ?? 'Не указана'}
+                />
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
@@ -461,9 +345,6 @@ function getInitialForm(user: UserDetails): UserFormState {
     max_user_id: user.maxUserId ?? '',
     phone: user.phone ?? '',
     birthday: user.birthday ?? '',
-    role: user.role ? String(user.role.id) : '',
-    region: user.region ? String(user.region.id) : '',
-    org_unit: user.orgUnit ? String(user.orgUnit.id) : '',
   };
 }
 
@@ -473,20 +354,7 @@ const emptyForm: UserFormState = {
   max_user_id: '',
   phone: '',
   birthday: '',
-  role: '',
-  region: '',
-  org_unit: '',
 };
-
-function parseOptionalNumber(value: string) {
-  if (!value) {
-    return null;
-  }
-
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : null;
-}
 
 function formatHeadUser(headUser: UserDetails['headUser']) {
   if (!headUser) {
@@ -498,26 +366,6 @@ function formatHeadUser(headUser: UserDetails['headUser']) {
   }
 
   return headUser.full_name;
-}
-
-function getRegionName(regionId: number, regions: Array<{ id: number; name: string }>) {
-  return regions.find((region) => region.id === regionId)?.name ?? `Регион #${regionId}`;
-}
-
-function getOrgUnitPlaceholder(roleId: number | null, regionId: number | null) {
-  if (!roleId) {
-    return 'Сначала выберите роль';
-  }
-
-  if (!regionId) {
-    return 'Сначала выберите регион';
-  }
-
-  if (roleId === 1 || roleId === 2) {
-    return 'Для выбранной роли оргструктура недоступна';
-  }
-
-  return 'Выберите доступную структуру подчинения';
 }
 
 function formatDateTime(value: string) {

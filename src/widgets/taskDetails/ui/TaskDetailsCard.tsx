@@ -30,6 +30,7 @@ import {
 import type { TaskPayload } from '@/entities/task/model/types';
 import { getUserById, getUsers } from '@/entities/user/api/users';
 import type { UserDetails, UserListItem } from '@/entities/user/model/types';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { copyToClipboard } from '@/shared/lib/copyToClipboard';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
@@ -68,6 +69,7 @@ export function TaskDetailsCard({
   onToggleArchive,
 }: Props) {
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
   const [toggleArchiveConfirmOpen, setToggleArchiveConfirmOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
@@ -101,6 +103,29 @@ export function TaskDetailsCard({
     regions: regionsQuery.data ?? [],
     orgUnits: orgUnitsQuery.data ?? [],
   });
+  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
+  const taskAuthorRole = task.createdByRole ?? authorQuery.data?.role?.code;
+  const isFederalTaskAuthor = taskAuthorRole === 'federal_manager';
+  const isDifferentTaskAuthor =
+    authorQuery.data?.username && session?.username
+      ? authorQuery.data.username !== session.username
+      : Boolean(
+          task.createdByUserId &&
+          session?.userId &&
+          task.createdByUserId !== session.userId,
+        );
+  const isDifferentRegionalTaskAuthor =
+    taskAuthorRole === 'regional_manager' && isDifferentTaskAuthor;
+  const isAuthorRoleLoading =
+    isCurrentUserRegionalManager &&
+    Boolean(task.createdByUserId) &&
+    !task.createdByRole &&
+    authorQuery.isLoading;
+  const areTaskActionsRestricted =
+    isCurrentUserRegionalManager &&
+    (isFederalTaskAuthor || isDifferentRegionalTaskAuthor || isAuthorRoleLoading);
+  const shouldHideAuthorIdentity =
+    isCurrentUserRegionalManager && (isFederalTaskAuthor || isAuthorRoleLoading);
 
   const updateMutation = useMutation({
     mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) =>
@@ -166,6 +191,7 @@ export function TaskDetailsCard({
             type="button"
             variant="outline"
             className="border-slate-200"
+            disabled={areTaskActionsRestricted}
             onClick={() => setEditOpen(true)}
           >
             <Pencil />
@@ -175,7 +201,7 @@ export function TaskDetailsCard({
             <Button
               type="button"
               variant={task.status === 'archived' ? 'outline' : 'destructive'}
-              disabled={isTogglingArchive}
+              disabled={isTogglingArchive || areTaskActionsRestricted}
               onClick={() => setToggleArchiveConfirmOpen(true)}
             >
               {task.status === 'archived' ? <ArchiveRestore /> : <Archive />}
@@ -205,6 +231,7 @@ export function TaskDetailsCard({
               author={authorQuery.data}
               authorId={task.createdByUserId}
               role={task.createdByRole}
+              hideIdentity={shouldHideAuthorIdentity}
             />
           }
         />
@@ -261,8 +288,12 @@ export function TaskDetailsCard({
             <Button
               type="button"
               variant={task.status === 'archived' ? 'default' : 'destructive'}
-              disabled={isTogglingArchive}
+              disabled={isTogglingArchive || areTaskActionsRestricted}
               onClick={() => {
+                if (areTaskActionsRestricted) {
+                  return;
+                }
+
                 onToggleArchive?.(task);
                 setToggleArchiveConfirmOpen(false);
               }}
@@ -655,11 +686,19 @@ function AuthorLink({
   author,
   authorId,
   role,
+  hideIdentity = false,
 }: {
   author?: UserDetails;
   authorId?: number;
   role?: string | null;
+  hideIdentity?: boolean;
 }) {
+  const authorRole = author?.role?.code ?? role;
+
+  if (hideIdentity) {
+    return <>{formatRole(authorRole)}</>;
+  }
+
   if (!authorId) {
     return <>Не указан</>;
   }
@@ -669,7 +708,7 @@ function AuthorLink({
       <Link to={`/users/${authorId}`} className="text-[#465cd3] hover:underline">
         {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
       </Link>
-      <div className="text-xs font-normal text-slate-500">{formatRole(role)}</div>
+      <div className="text-xs font-normal text-slate-500">{formatRole(authorRole)}</div>
     </div>
   );
 }

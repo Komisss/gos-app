@@ -45,6 +45,7 @@ export function NewTaskForm() {
   const isFederalManager = session?.role?.code === 'federal_manager';
   const [form, setForm] = useState<TaskPayload>(initialForm);
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
+  const [deadlineError, setDeadlineError] = useState(false);
   const minActivationDate = useMemo(() => new Date(), []);
 
   const usersQuery = useQuery({
@@ -81,6 +82,13 @@ export function NewTaskForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (form.status === 'scheduled' && !form.deadline_at) {
+      setDeadlineError(true);
+      return;
+    }
+
+    setDeadlineError(false);
     const shouldAssignAfterCreate = form.status === 'scheduled' || form.status === 'active';
 
     createMutation.mutate({
@@ -144,6 +152,7 @@ export function NewTaskForm() {
               onChange={(event) =>
                 setForm((current) => ({ ...current, full_description: event.target.value }))
               }
+              required
             />
           </Field>
 
@@ -176,16 +185,20 @@ export function NewTaskForm() {
             <Field label="Статус">
               <Select
                 value={form.status}
-                onValueChange={(status) =>
+                onValueChange={(status) => {
+                  if (status !== 'scheduled') {
+                    setDeadlineError(false);
+                  }
+
                   setForm((current) => ({
-                    ...current,
-                    status,
-                    scheduled_at:
-                      status === 'scheduled'
-                        ? current.scheduled_at || toApiDateTime(new Date())
-                        : undefined,
-                  }))
-                }
+                      ...current,
+                      status,
+                      scheduled_at:
+                        status === 'scheduled'
+                          ? current.scheduled_at || toApiDateTime(new Date())
+                          : undefined,
+                  }));
+                }}
               >
                 <SelectTrigger className="w-full border-slate-200 bg-white">
                   <SelectValue />
@@ -270,12 +283,20 @@ export function NewTaskForm() {
               </Select>
             </Field>
 
-            <Field label="Дедлайн">
+            <Field label={form.status === 'scheduled' ? 'Дедлайн *' : 'Дедлайн'}>
               <DateTimePicker
                 value={form.deadline_at ?? undefined}
-                onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
+                onChange={(deadline_at) => {
+                  setForm((current) => ({ ...current, deadline_at }));
+                  if (deadline_at) {
+                    setDeadlineError(false);
+                  }
+                }}
                 placeholder="Выберите дедлайн"
               />
+              {deadlineError && (
+                <p className="text-sm text-red-600">Для запланированной задачи необходимо указать дедлайн.</p>
+              )}
             </Field>
           </div>
 
