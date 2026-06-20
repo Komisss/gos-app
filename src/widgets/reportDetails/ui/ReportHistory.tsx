@@ -113,7 +113,7 @@ export function ReportHistory({
                 <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
                   <TableHead>Событие</TableHead>
                   <TableHead>Описание</TableHead>
-                  <TableHead>Актор</TableHead>
+                  <TableHead>Автор</TableHead>
                   <TableHead>Версия</TableHead>
                   <TableHead>Источник</TableHead>
                   <TableHead>Дата</TableHead>
