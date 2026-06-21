@@ -92,6 +92,10 @@ export interface TaskDto {
   task_id: number;
   title: string;
   scope: TaskScope;
+  region?: {
+    region_id: number;
+    name: string;
+  } | null;
   short_description?: string;
   full_description?: string;
   status: TaskStatus;
@@ -151,6 +155,10 @@ export interface Task {
   department?: string;
   type: TaskType;
   scope?: TaskScope;
+  taskRegion?: {
+    regionId: number;
+    name: string;
+  } | null;
   taskType?: TaskType;
   onlineTaskSubtype?: OnlineTaskSubtype | null;
   reportFormat?: TaskReportFormat;

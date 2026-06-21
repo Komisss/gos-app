@@ -166,6 +166,12 @@ export function mapTaskDtoToTask(task: TaskDto): Task {
     description: task.full_description ?? task.short_description,
     type: task.task_type,
     scope: task.scope,
+    taskRegion: task.region
+      ? {
+          regionId: task.region.region_id,
+          name: task.region.name,
+        }
+      : null,
     taskType: task.task_type,
     onlineTaskSubtype: task.online_task_subtype,
     reportFormat: task.report_format,

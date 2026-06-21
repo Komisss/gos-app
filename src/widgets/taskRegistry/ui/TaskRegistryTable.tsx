@@ -172,7 +172,14 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
                 <div className="text-xs text-slate-500">{getTaskAuthorMeta(task, users)}</div>
               </div>
             </TableCell>
-            <TableCell className="align-top text-slate-700">{getScopeLabel(task.scope ?? task.region)}</TableCell>
+            <TableCell className="align-top text-slate-700">
+              <div className="space-y-1">
+                <div>{getScopeLabel(task.scope ?? task.region)}</div>
+                {task.scope === 'regional' && task.taskRegion && (
+                  <div className="text-xs text-slate-500">{task.taskRegion.name}</div>
+                )}
+              </div>
+            </TableCell>
             <TableCell className="align-top text-slate-700">{getTaskTypeLabel(task.taskType ?? task.type)}</TableCell>
             <TableCell className="align-top text-slate-700">
               <div className="space-y-1">

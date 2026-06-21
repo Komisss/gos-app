@@ -46,6 +46,7 @@ export function NewTaskForm() {
   const [form, setForm] = useState<TaskPayload>(initialForm);
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
   const [deadlineError, setDeadlineError] = useState(false);
+  const [activationTimeError, setActivationTimeError] = useState(false);
   const minActivationDate = useMemo(() => new Date(), []);
 
   const usersQuery = useQuery({
@@ -83,12 +84,17 @@ export function NewTaskForm() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (form.status === 'scheduled' && !form.deadline_at) {
-      setDeadlineError(true);
+    const isScheduled = form.status === 'scheduled';
+    const isDeadlineMissing = isScheduled && !form.deadline_at;
+    const isActivationTimeMissing = isScheduled && !form.scheduled_at;
+
+    setDeadlineError(isDeadlineMissing);
+    setActivationTimeError(isActivationTimeMissing);
+
+    if (isDeadlineMissing || isActivationTimeMissing) {
       return;
     }
 
-    setDeadlineError(false);
     const shouldAssignAfterCreate = form.status === 'scheduled' || form.status === 'active';
 
     createMutation.mutate({
@@ -188,6 +194,7 @@ export function NewTaskForm() {
                 onValueChange={(status) => {
                   if (status !== 'scheduled') {
                     setDeadlineError(false);
+                    setActivationTimeError(false);
                   }
 
                   setForm((current) => ({
@@ -304,10 +311,19 @@ export function NewTaskForm() {
             <Field label="Время активации задачи">
               <DateTimePicker
                 value={form.scheduled_at ?? undefined}
-                onChange={(scheduled_at) => setForm((current) => ({ ...current, scheduled_at }))}
+                onChange={(scheduled_at) => {
+                  setForm((current) => ({ ...current, scheduled_at }));
+
+                  if (scheduled_at) {
+                    setActivationTimeError(false);
+                  }
+                }}
                 placeholder="Выберите дату и время активации"
                 minDate={minActivationDate}
               />
+              {activationTimeError && (
+                <p className="text-sm text-red-600">Укажите время активации задачи.</p>
+              )}
             </Field>
           )}
 

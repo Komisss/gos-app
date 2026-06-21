@@ -17,6 +17,7 @@ import type {
 import { getRegions } from '@/entities/region/api/regions';
 import { getReportFormatLabel, getTaskTypeLabel, getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
@@ -242,12 +243,20 @@ export function ReportRegistry({
   );
   const userOptions = useMemo(
     () =>
-      (usersQuery.data ?? []).map((user) => ({
-        value: String(user.id),
-        label: user.fullName,
-        description: [user.role?.name, `@${user.username}`].filter(Boolean).join(' • '),
-      })),
-    [usersQuery.data],
+      (usersQuery.data ?? [])
+        .filter(
+          (user) =>
+            filters.region_ids.length === 0 ||
+            (user.region !== null && filters.region_ids.includes(user.region.id)),
+        )
+        .map((user) => ({
+          value: String(user.id),
+          label: user.fullName,
+          description: [user.role?.name, `@${user.username}`, user.region?.name]
+            .filter(Boolean)
+            .join(' • '),
+        })),
+    [filters.region_ids, usersQuery.data],
   );
   const orgUnitOptions = useMemo(
     () =>
@@ -297,6 +306,18 @@ export function ReportRegistry({
       setFilters((current) => {
         const nextFilters = { ...current, ...patch, page: 1 };
 
+        if (patch.region_ids && patch.region_ids.length > 0) {
+          const allowedUserIds = new Set(
+            (usersQuery.data ?? [])
+              .filter(
+                (user) => user.region !== null && patch.region_ids?.includes(user.region.id),
+              )
+              .map((user) => user.id),
+          );
+
+          nextFilters.user_ids = current.user_ids.filter((userId) => allowedUserIds.has(userId));
+        }
+
         if (appliedFilters !== null) {
           setAppliedFilters(nextFilters);
         }
@@ -304,7 +325,7 @@ export function ReportRegistry({
         return nextFilters;
       });
     },
-    [appliedFilters],
+    [appliedFilters, usersQuery.data],
   );
 
   const handleToggleReport = useCallback((reportId: number, checked: boolean) => {
@@ -386,7 +407,7 @@ export function ReportRegistry({
           )}
         </div>
 
-        {statusFilterOnly ? (
+        {statusFilterOnly ? (tableVariant !== 'task-region' &&
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="max-w-sm">
               <MultiSelect
@@ -598,6 +619,8 @@ export function ReportRegistry({
             filters={filters}
             taskOptions={taskOptions}
             userOptions={userOptions}
+            reportTypeOptions={reportTypeOptions}
+            reportStatusOptions={reportStatusOptions}
             onFiltersChange={handleTableFiltersChange}
             onReportClick={handleOpenReportPage}
           />
@@ -1003,6 +1026,8 @@ function TaskRegionReportsTable({
   filters,
   taskOptions,
   userOptions,
+  reportTypeOptions,
+  reportStatusOptions,
   onFiltersChange,
   onReportClick,
 }: {
@@ -1010,15 +1035,19 @@ function TaskRegionReportsTable({
   filters: ReportFilters;
   taskOptions: SelectOption[];
   userOptions: SelectOption[];
+  reportTypeOptions: Array<{ value: ReportType; label: string }>;
+  reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
   onFiltersChange: (filters: Partial<ReportFilters>) => void;
   onReportClick: (reportId: number) => void;
 }) {
+  const { session } = useAuth();
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const isFederalManager = session?.role?.code === 'federal_manager' || session?.role?.id === 1;
 
   return (
     <>
       <TableScrollArea headerHeight="6rem" height="70vh">
-        <Table className="min-w-[1120px] whitespace-nowrap">
+        <Table className="min-w-[1280px] whitespace-nowrap">
           <TableHeader>
             <TableRow className="border-b-slate-200 bg-white hover:bg-white">
               <TableHead className="w-28" />
@@ -1044,7 +1073,26 @@ function TaskRegionReportsTable({
                 />
               </TableHead>
               <TableHead className="w-24" />
-              <TableHead className="min-w-[220px]" />
+              <TableHead className="w-44 align-bottom">
+                <MultiSelect
+                  label=""
+                  values={filters.report_types}
+                  placeholder="Все форматы"
+                  options={reportTypeOptions}
+                  onChange={(report_types) => onFiltersChange({ report_types: report_types as ReportType[] })}
+                />
+              </TableHead>
+              <TableHead className="min-w-[220px] align-bottom">
+                <MultiSelect
+                  label=""
+                  values={filters.report_statuses}
+                  placeholder="Все статусы"
+                  options={reportStatusOptions}
+                  onChange={(report_statuses) =>
+                    onFiltersChange({ report_statuses: report_statuses as ReportStatus[] })
+                  }
+                />
+              </TableHead>
             </TableRow>
             <TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">
               <TableHead className="w-28">ID отчета</TableHead>
@@ -1052,13 +1100,14 @@ function TaskRegionReportsTable({
               <TableHead className="min-w-[280px]">Отчет</TableHead>
               <TableHead className="min-w-[240px]">Исполнитель</TableHead>
               <TableHead className="w-24">Действия</TableHead>
+              <TableHead className="w-44">Формат отчета</TableHead>
               <TableHead className="min-w-[220px]">Статус отчета</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {reports.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">
                   Отчетов пока нет.
                 </TableCell>
               </TableRow>
@@ -1106,6 +1155,7 @@ function TaskRegionReportsTable({
                     {report.reportId ? (
                       <ReportModerationActions
                         reportId={report.reportId}
+                        federalMode={isFederalManager}
                         iconOnly
                         acceptIcon={<ThumbsUp />}
                         revisionIcon={<ThumbsDown />}
@@ -1118,6 +1168,7 @@ function TaskRegionReportsTable({
                       <span className="text-xs text-slate-500">n/a</span>
                     )}
                   </TableCell>
+                  <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
                   <TableCell>
                     <StatusBadge
                       value={report.reportStatus ?? 'not_completed'}

@@ -36,6 +36,9 @@ type Props = {
 
 export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmit }: Props) {
   const [form, setForm] = useState<TaskPayload>(() => getInitialForm(task));
+  const [descriptionError, setDescriptionError] = useState(false);
+  const [deadlineError, setDeadlineError] = useState(false);
+  const [activationTimeError, setActivationTimeError] = useState(false);
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -56,13 +59,32 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
   });
 
   useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     setForm(getInitialForm(task));
-  }, [task]);
+    setDescriptionError(false);
+    setDeadlineError(false);
+    setActivationTimeError(false);
+  }, [open, task]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!task) {
+      return;
+    }
+
+    const isDescriptionMissing = !form.full_description?.trim();
+    const isDeadlineMissing = !form.deadline_at;
+    const isActivationTimeMissing = form.status === 'scheduled' && !form.scheduled_at;
+
+    setDescriptionError(isDescriptionMissing);
+    setDeadlineError(isDeadlineMissing);
+    setActivationTimeError(isActivationTimeMissing);
+
+    if (isDescriptionMissing || isDeadlineMissing || isActivationTimeMissing) {
       return;
     }
 
@@ -91,8 +113,19 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             <textarea
               className="min-h-28 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
               value={form.full_description ?? ''}
-              onChange={(event) => setForm((current) => ({ ...current, full_description: event.target.value }))}
+              onChange={(event) => {
+                const fullDescription = event.target.value;
+                setForm((current) => ({ ...current, full_description: fullDescription }));
+
+                if (fullDescription.trim()) {
+                  setDescriptionError(false);
+                }
+              }}
+              required
             />
+            {descriptionError && (
+              <p className="text-sm text-red-600">Описание задачи обязательно.</p>
+            )}
           </Field>
 
           <Field label="Адресат задачи">
@@ -130,7 +163,11 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             <Field label="Статус">
               <Select
                 value={form.status}
-                onValueChange={(status) =>
+                onValueChange={(status) => {
+                  if (status !== 'scheduled') {
+                    setActivationTimeError(false);
+                  }
+
                   setForm((current) => ({
                     ...current,
                     status,
@@ -138,8 +175,8 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                       status === 'scheduled'
                         ? current.scheduled_at || toApiDateTime(new Date())
                         : null,
-                  }))
-                }
+                  }));
+                }}
               >
                 <SelectTrigger className="w-full bg-white">
                   <SelectValue />
@@ -227,19 +264,37 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
           <Field label="Дедлайн">
               <DateTimePicker
                 value={form.deadline_at ?? undefined}
-                onChange={(deadline_at) => setForm((current) => ({ ...current, deadline_at }))}
+                onChange={(deadline_at) => {
+                  setForm((current) => ({ ...current, deadline_at }));
+
+                  if (deadline_at) {
+                    setDeadlineError(false);
+                  }
+                }}
                 placeholder="Выберите дедлайн"
               />
+              {deadlineError && (
+                <p className="text-sm text-red-600">Дедлайн задачи обязателен.</p>
+              )}
             </Field>
 
           {form.status === 'scheduled' && (
             <Field label="Время активации задачи">
               <DateTimePicker
                 value={form.scheduled_at ?? undefined}
-                onChange={(scheduled_at) => setForm((current) => ({ ...current, scheduled_at }))}
+                onChange={(scheduled_at) => {
+                  setForm((current) => ({ ...current, scheduled_at }));
+
+                  if (scheduled_at) {
+                    setActivationTimeError(false);
+                  }
+                }}
                 placeholder="Выберите дату и время активации"
                 minDate={new Date()}
               />
+              {activationTimeError && (
+                <p className="text-sm text-red-600">Укажите время активации задачи.</p>
+              )}
             </Field>
           )}
 
