@@ -57,7 +57,7 @@ export function UserRegistry({
       ...initialFilters,
     };
 
-    if (isRegionalManager && currentUserRegionId && !nextFilters.region) {
+    if (isRegionalManager && currentUserRegionId) {
       nextFilters.region = String(currentUserRegionId);
     }
 
@@ -86,7 +86,7 @@ export function UserRegistry({
     }
 
     setFilters((current) =>
-      current.region
+      current.region === String(currentUserRegionId)
         ? current
         : { ...current, region: String(currentUserRegionId), org_unit: '' },
     );
@@ -221,8 +221,13 @@ export function UserRegistry({
               orgUnits={orgUnits}
               regions={regions}
               tableFilterMode={resolvedTableFilterMode}
+              regionFilterDisabled={isRegionalManager}
               onFiltersChange={updateFilters}
-              onRegionClick={(region) => updateFilters({ region: String(region.id), org_unit: '' })}
+              onRegionClick={
+                isRegionalManager
+                  ? undefined
+                  : (region) => updateFilters({ region: String(region.id), org_unit: '' })
+              }
             />
             <UserPagination
               page={page}
