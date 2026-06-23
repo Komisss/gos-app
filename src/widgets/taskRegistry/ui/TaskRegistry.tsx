@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/ui/dialog';
-import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
+import { FilterMultiSearchSelect } from '@/shared/ui/filter-multi-search-select';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { TaskDetailsDialog } from '@/widgets/taskDetails/ui/TaskDetailsDialog';
@@ -41,10 +41,12 @@ const emptyTaskFilters: TaskFilters = {
   created_by_user_id: '',
   created_from: '',
   created_to: '',
+  scheduled_at_from: '',
+  scheduled_at_to: '',
   deadline_at_from: '',
   deadline_at_to: '',
-  org_unit: '',
-  region_id: '',
+  org_unit_ids: [],
+  region_ids: [],
   scope: '',
   status: '',
 };
@@ -72,9 +74,12 @@ export function TaskRegistry() {
   const taskQueryFilters = useMemo(
     () => ({
       ...filters,
-      region_id:
-        filters.region_id ||
-        (isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : ''),
+      region_ids:
+        filters.region_ids?.length
+          ? filters.region_ids
+          : isRegionalManager && currentUserRegionId
+            ? [currentUserRegionId]
+            : [],
     }),
     [currentUserRegionId, filters, isRegionalManager],
   );
@@ -92,9 +97,9 @@ export function TaskRegistry() {
     }
 
     setFilters((current) =>
-      current.region_id
+      current.region_ids?.length === 1 && current.region_ids[0] === currentUserRegionId
         ? current
-        : { ...current, region_id: String(currentUserRegionId) },
+        : { ...current, region_ids: [currentUserRegionId] },
     );
   }, [currentUserRegionId, isRegionalManager]);
 
@@ -162,10 +167,46 @@ export function TaskRegistry() {
   const totalPages = tasksPage?.totalPages ?? 1;
   const users = usersQuery.data ?? emptyUsers;
 
+  const orgUnitOptions = useMemo(() => {
+    const selectedRegionIds = filters.region_ids ?? [];
+
+    return (orgUnitsQuery.data ?? [])
+      .filter(
+        (orgUnit) =>
+          selectedRegionIds.length === 0 ||
+          (orgUnit.regionId !== null && selectedRegionIds.includes(orgUnit.regionId)),
+      )
+      .map((orgUnit) => ({
+        value: String(orgUnit.id),
+        label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+        description: orgUnit.regionName ?? 'Регион не указан',
+      }));
+  }, [filters.region_ids, orgUnitsQuery.data]);
+
   const updateFilters = useCallback((patch: TaskFilters) => {
     setPage(1);
-    setFilters((current) => ({ ...current, ...patch }));
-  }, []);
+    setFilters((current) => {
+      const nextFilters = { ...current, ...patch };
+
+      if (patch.region_ids) {
+        const allowedOrgUnitIds = new Set(
+          (orgUnitsQuery.data ?? [])
+            .filter(
+              (orgUnit) =>
+                patch.region_ids?.length === 0 ||
+                (orgUnit.regionId !== null && patch.region_ids?.includes(orgUnit.regionId)),
+            )
+            .map((orgUnit) => orgUnit.id),
+        );
+
+        nextFilters.org_unit_ids = (current.org_unit_ids ?? []).filter((orgUnitId) =>
+          allowedOrgUnitIds.has(orgUnitId),
+        );
+      }
+
+      return nextFilters;
+    });
+  }, [orgUnitsQuery.data]);
 
   const changeSize = useCallback((nextSize: number) => {
     setPage(1);
@@ -217,6 +258,18 @@ export function TaskRegistry() {
                 onChange={(created_to) => updateFilters({ created_to })}
               />
               <FilterInput
+                label="Активирована от"
+                type="datetime"
+                value={filters.scheduled_at_from}
+                onChange={(scheduled_at_from) => updateFilters({ scheduled_at_from })}
+              />
+              <FilterInput
+                label="Активирована до"
+                type="datetime"
+                value={filters.scheduled_at_to}
+                onChange={(scheduled_at_to) => updateFilters({ scheduled_at_to })}
+              />
+              <FilterInput
                 label="Дедлайн от"
                 type="datetime"
                 value={filters.deadline_at_from}
@@ -228,27 +281,25 @@ export function TaskRegistry() {
                 value={filters.deadline_at_to}
                 onChange={(deadline_at_to) => updateFilters({ deadline_at_to })}
               />
-              <FilterSearchSelect
-                label="Структура подчинения"
-                value={filters.org_unit}
-                placeholder="Все структуры подчинения"
-                searchPlaceholder="Поиск структуры подчинения"
-                options={(orgUnitsQuery.data ?? []).map((orgUnit) => ({
-                  value: String(orgUnit.id),
-                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-                }))}
-                onChange={(org_unit) => updateFilters({ org_unit })}
-              />
-              <FilterSearchSelect
+              <FilterMultiSearchSelect
                 label="Регион"
-                value={filters.region_id}
+                values={(filters.region_ids ?? []).map(String)}
+                disabled={isRegionalManager}
                 placeholder="Все регионы"
                 searchPlaceholder="Поиск региона"
                 options={(regionsQuery.data ?? []).map((region) => ({
                   value: String(region.id),
                   label: region.name,
                 }))}
-                onChange={(region_id) => updateFilters({ region_id })}
+                onChange={(regionIds) => updateFilters({ region_ids: toNumbers(regionIds) })}
+              />
+              <FilterMultiSearchSelect
+                label="Структура подчинения"
+                values={(filters.org_unit_ids ?? []).map(String)}
+                placeholder="Все структуры подчинения"
+                searchPlaceholder="Поиск структуры подчинения"
+                options={orgUnitOptions}
+                onChange={(orgUnitIds) => updateFilters({ org_unit_ids: toNumbers(orgUnitIds) })}
               />
             </div>
             <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
@@ -259,10 +310,10 @@ export function TaskRegistry() {
                   setPage(1);
                   setFilters({
                     ...emptyTaskFilters,
-                    region_id:
+                    region_ids:
                       isRegionalManager && currentUserRegionId
-                        ? String(currentUserRegionId)
-                        : '',
+                        ? [currentUserRegionId]
+                        : [],
                   });
                 }}
               >
@@ -459,6 +510,10 @@ function TaskPagination({
 
 function clampPage(page: number, totalPages: number) {
   return Math.min(Math.max(1, page), Math.max(totalPages, 1));
+}
+
+function toNumbers(values: string[]) {
+  return values.map(Number).filter(Number.isFinite);
 }
 
 function FilterInput({

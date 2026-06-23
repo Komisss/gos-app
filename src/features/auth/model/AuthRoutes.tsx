@@ -32,6 +32,18 @@ export function PublicOnlyRoute() {
   return <Outlet />;
 }
 
+export function StatisticsRoute() {
+  const { session } = useAuth();
+  const isRegionalManager =
+    session?.role?.code === 'regional_manager' || session?.role?.id === 2;
+
+  if (isRegionalManager) {
+    return <Navigate to="/tasks" replace />;
+  }
+
+  return <Outlet />;
+}
+
 function AuthRouteLoader() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 text-sm text-slate-500">

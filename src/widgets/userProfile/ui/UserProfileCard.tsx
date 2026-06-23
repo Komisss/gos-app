@@ -11,6 +11,9 @@ import {
   updateUser,
 } from '@/entities/user/api/users';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
+import { isManagementRole } from '@/entities/user/lib/isManagementRole';
+import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
+import { getUsernameError } from '@/shared/lib/username';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
@@ -38,6 +41,8 @@ export function UserProfileCard() {
   const parsedUserId = Number(userId);
   const queryClient = useQueryClient();
   const [form, setForm] = useState<UserFormState>(emptyForm);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
 
   const userQuery = useQuery({
@@ -49,6 +54,8 @@ export function UserProfileCard() {
   useEffect(() => {
     if (userQuery.data) {
       setForm(getInitialForm(userQuery.data));
+      setPhoneError(null);
+      setUsernameError(null);
     }
   }, [userQuery.data]);
 
@@ -86,13 +93,27 @@ export function UserProfileCard() {
       return;
     }
 
+    const canEditUsername = isManagementRole(userQuery.data?.role ?? null);
+    const nextPhoneError = getPhoneError(form.phone);
+    const nextUsernameError = canEditUsername ? getUsernameError(form.username) : null;
+
+    setPhoneError(nextPhoneError);
+    setUsernameError(nextUsernameError);
+
+    if (nextPhoneError || nextUsernameError) {
+      return;
+    }
+
     const payload: UserPatchPayload = {
-      username: form.username,
       full_name: form.full_name,
       max_user_id: form.max_user_id,
       phone: form.phone,
       birthday: form.birthday || null,
     };
+
+    if (canEditUsername) {
+      payload.username = form.username;
+    }
 
     updateMutation.mutate(payload);
   }
@@ -111,6 +132,7 @@ export function UserProfileCard() {
 
   const user = userQuery.data;
   const isLockedFederalManager = isFederalManager(user);
+  const showUsername = isManagementRole(user.role);
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -125,7 +147,7 @@ export function UserProfileCard() {
             </Button>
             <div>
               <h1 className="text-2xl font-semibold !text-slate-900">{user.fullName}</h1>
-              <p className="text-sm text-slate-500">@{user.username}</p>
+              {showUsername && <p className="text-sm text-slate-500">@{user.username}</p>}
             </div>
           </div>
 
@@ -165,16 +187,23 @@ export function UserProfileCard() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
-                <Field label="Логин">
-                  <Input
-                    disabled={isLockedFederalManager}
-                    value={form.username}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, username: event.target.value }))
-                    }
-                    required
-                  />
-                </Field>
+                {showUsername && (
+                  <Field label="Логин">
+                    <Input
+                      disabled={isLockedFederalManager}
+                      className={usernameError ? 'border-red-400 focus-visible:ring-red-200' : undefined}
+                      value={form.username}
+                      aria-invalid={Boolean(usernameError)}
+                      onChange={(event) => {
+                        const username = event.target.value;
+                        setForm((current) => ({ ...current, username }));
+                        setUsernameError(username ? getUsernameError(username) : null);
+                      }}
+                      required
+                    />
+                    {usernameError && <p className="text-sm text-red-600">{usernameError}</p>}
+                  </Field>
+                )}
 
                 <Field label="ФИО">
                   <Input
@@ -200,11 +229,22 @@ export function UserProfileCard() {
                 <Field label="Телефон">
                   <Input
                     disabled={isLockedFederalManager}
+                    className={phoneError ? 'border-red-400 focus-visible:ring-red-200' : undefined}
+                    inputMode="tel"
+                    placeholder="89999999999"
                     value={form.phone}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, phone: event.target.value }))
-                    }
+                    aria-invalid={Boolean(phoneError)}
+                    aria-required="true"
+                    onChange={(event) => {
+                      const phone = formatRussianPhone(event.target.value);
+                      setForm((current) => ({ ...current, phone }));
+
+                      if (isCompleteRussianPhone(phone)) {
+                        setPhoneError(null);
+                      }
+                    }}
                   />
+                  {phoneError && <p className="text-sm text-red-600">{phoneError}</p>}
                 </Field>
 
                 <Field label="Дата рождения">
@@ -343,7 +383,7 @@ function getInitialForm(user: UserDetails): UserFormState {
     username: user.username,
     full_name: user.fullName,
     max_user_id: user.maxUserId ?? '',
-    phone: user.phone ?? '',
+    phone: formatRussianPhone(user.phone ?? ''),
     birthday: user.birthday ?? '',
   };
 }
@@ -355,6 +395,14 @@ const emptyForm: UserFormState = {
   phone: '',
   birthday: '',
 };
+
+function getPhoneError(value: string) {
+  if (!value) {
+    return 'Номер телефона обязателен.';
+  }
+
+  return isCompleteRussianPhone(value) ? null : 'Введите номер телефона полностью: 11 цифр.';
+}
 
 function formatHeadUser(headUser: UserDetails['headUser']) {
   if (!headUser) {

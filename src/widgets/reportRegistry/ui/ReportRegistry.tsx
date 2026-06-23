@@ -260,11 +260,18 @@ export function ReportRegistry({
   );
   const orgUnitOptions = useMemo(
     () =>
-      (orgUnitsQuery.data ?? []).map((orgUnit) => ({
-        value: String(orgUnit.id),
-        label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-      })),
-    [orgUnitsQuery.data],
+      (orgUnitsQuery.data ?? [])
+        .filter(
+          (orgUnit) =>
+            filters.region_ids.length === 0 ||
+            (orgUnit.regionId !== null && filters.region_ids.includes(orgUnit.regionId)),
+        )
+        .map((orgUnit) => ({
+          value: String(orgUnit.id),
+          label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+          description: orgUnit.regionName ?? 'Регион не указан',
+        })),
+    [filters.region_ids, orgUnitsQuery.data],
   );
 
   useEffect(() => {
@@ -316,6 +323,19 @@ export function ReportRegistry({
           );
 
           nextFilters.user_ids = current.user_ids.filter((userId) => allowedUserIds.has(userId));
+
+          const allowedOrgUnitIds = new Set(
+            (orgUnitsQuery.data ?? [])
+              .filter(
+                (orgUnit) =>
+                  orgUnit.regionId !== null && patch.region_ids?.includes(orgUnit.regionId),
+              )
+              .map((orgUnit) => orgUnit.id),
+          );
+
+          nextFilters.org_unit_ids = current.org_unit_ids.filter((orgUnitId) =>
+            allowedOrgUnitIds.has(orgUnitId),
+          );
         }
 
         if (appliedFilters !== null) {
@@ -325,7 +345,7 @@ export function ReportRegistry({
         return nextFilters;
       });
     },
-    [appliedFilters, usersQuery.data],
+    [appliedFilters, orgUnitsQuery.data, usersQuery.data],
   );
 
   const handleToggleReport = useCallback((reportId: number, checked: boolean) => {
@@ -619,7 +639,6 @@ export function ReportRegistry({
             filters={filters}
             taskOptions={taskOptions}
             userOptions={userOptions}
-            reportTypeOptions={reportTypeOptions}
             reportStatusOptions={reportStatusOptions}
             onFiltersChange={handleTableFiltersChange}
             onReportClick={handleOpenReportPage}
@@ -1026,7 +1045,6 @@ function TaskRegionReportsTable({
   filters,
   taskOptions,
   userOptions,
-  reportTypeOptions,
   reportStatusOptions,
   onFiltersChange,
   onReportClick,
@@ -1035,7 +1053,6 @@ function TaskRegionReportsTable({
   filters: ReportFilters;
   taskOptions: SelectOption[];
   userOptions: SelectOption[];
-  reportTypeOptions: Array<{ value: ReportType; label: string }>;
   reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
   onFiltersChange: (filters: Partial<ReportFilters>) => void;
   onReportClick: (reportId: number) => void;
@@ -1043,11 +1060,12 @@ function TaskRegionReportsTable({
   const { session } = useAuth();
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const isFederalManager = session?.role?.code === 'federal_manager' || session?.role?.id === 1;
+  const isRegionalManager = session?.role?.code === 'regional_manager' || session?.role?.id === 2;
 
   return (
     <>
       <TableScrollArea headerHeight="6rem" height="70vh">
-        <Table className="min-w-[1280px] whitespace-nowrap">
+        <Table className="min-w-[1120px] whitespace-nowrap">
           <TableHeader>
             <TableRow className="border-b-slate-200 bg-white hover:bg-white">
               <TableHead className="w-28" />
@@ -1061,7 +1079,14 @@ function TaskRegionReportsTable({
                   onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
                 />
               </TableHead>
-              <TableHead className="min-w-[280px]" />
+              <TableHead className="min-w-[280px] align-bottom">
+                <DebouncedFilterText
+                  label=""
+                  value={filters.search}
+                  placeholder="Поиск по отчетам"
+                  onChange={(search) => onFiltersChange({ search })}
+                />
+              </TableHead>
               <TableHead className="min-w-[240px] align-bottom">
                 <MultiSearchSelect
                   label=""
@@ -1073,15 +1098,6 @@ function TaskRegionReportsTable({
                 />
               </TableHead>
               <TableHead className="w-24" />
-              <TableHead className="w-44 align-bottom">
-                <MultiSelect
-                  label=""
-                  values={filters.report_types}
-                  placeholder="Все форматы"
-                  options={reportTypeOptions}
-                  onChange={(report_types) => onFiltersChange({ report_types: report_types as ReportType[] })}
-                />
-              </TableHead>
               <TableHead className="min-w-[220px] align-bottom">
                 <MultiSelect
                   label=""
@@ -1100,14 +1116,13 @@ function TaskRegionReportsTable({
               <TableHead className="min-w-[280px]">Отчет</TableHead>
               <TableHead className="min-w-[240px]">Исполнитель</TableHead>
               <TableHead className="w-24">Действия</TableHead>
-              <TableHead className="w-44">Формат отчета</TableHead>
               <TableHead className="min-w-[220px]">Статус отчета</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {reports.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-10 text-center text-sm text-slate-500">
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-slate-500">
                   Отчетов пока нет.
                 </TableCell>
               </TableRow>
@@ -1153,22 +1168,23 @@ function TaskRegionReportsTable({
                   </TableCell>
                   <TableCell>
                     {report.reportId ? (
-                      <ReportModerationActions
-                        reportId={report.reportId}
-                        federalMode={isFederalManager}
-                        iconOnly
-                        acceptIcon={<ThumbsUp />}
-                        revisionIcon={<ThumbsDown />}
-                        acceptButtonLabel="Принять отчет"
-                        acceptTitle="Принять отчет"
-                        revisionButtonLabel="Вернуть на доработку"
-                        revisionTitle="Вернуть на доработку"
-                      />
+                      shouldHideRegionalModerationActions(report, isRegionalManager) ? null : (
+                        <ReportModerationActions
+                          reportId={report.reportId}
+                          federalMode={isFederalManager}
+                          iconOnly
+                          acceptIcon={<ThumbsUp />}
+                          revisionIcon={<ThumbsDown />}
+                          acceptButtonLabel="Принять отчет"
+                          acceptTitle="Принять отчет"
+                          revisionButtonLabel="Вернуть на доработку"
+                          revisionTitle="Вернуть на доработку"
+                        />
+                      )
                     ) : (
                       <span className="text-xs text-slate-500">n/a</span>
                     )}
                   </TableCell>
-                  <TableCell>{getReportFormatLabel(report.requiredReportFormat)}</TableCell>
                   <TableCell>
                     <StatusBadge
                       value={report.reportStatus ?? 'not_completed'}
@@ -1486,6 +1502,43 @@ function FilterText({
   );
 }
 
+function DebouncedFilterText({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [inputValue, setInputValue] = useState(value);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (inputValue === value) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => onChange(inputValue), 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [inputValue, onChange, value]);
+
+  return (
+    <FilterText
+      label={label}
+      value={inputValue}
+      placeholder={placeholder}
+      onChange={setInputValue}
+    />
+  );
+}
+
 function DateFilter({
   label,
   value,
@@ -1772,6 +1825,18 @@ function getTaskRegionReportStatusLabel(report: CrmReport) {
   }
 
   return 'Не указан';
+}
+
+function shouldHideRegionalModerationActions(report: CrmReport, isRegionalManager: boolean) {
+  if (!isRegionalManager || report.raw.last_moderation?.moderation_level !== 'federal') {
+    return false;
+  }
+
+  return (
+    report.reportStatus === 'accepted' ||
+    report.reportStatus === 'revision_requested' ||
+    report.reportStatus === 'not_completed'
+  );
 }
 
 function getTaskScopeLabel(scope: string) {

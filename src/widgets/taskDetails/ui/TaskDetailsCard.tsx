@@ -859,36 +859,40 @@ function buildTargetItems(
     return [];
   }
 
-  return task.targets.map((target) => {
+  return task.targets.flatMap<TargetItem>((target) => {
     if (target.target_type === 'user') {
       const user = data.users.find((item) => item.id === target.target_id);
 
-      return {
+      return [{
         key: `${target.target_type}-${target.target_id}`,
         title: user ? `${user.fullName} (@${user.username})` : `Пользователь #${target.target_id}`,
         description: `ID: ${target.target_id}`,
         href: `/users/${target.target_id}`,
-      };
+      }];
     }
 
     if (target.target_type === 'region') {
       const region = data.regions.find((item) => item.id === target.target_id);
 
-      return {
+      if (!region) {
+        return [];
+      }
+
+      return [{
         key: `${target.target_type}-${target.target_id}`,
-        title: region?.name ?? `Регион #${target.target_id}`,
-        description: region ? `Код: ${region.code}` : `ID: ${target.target_id}`,
-      };
+        title: region.name,
+        description: `Код: ${region.code}`,
+      }];
     }
 
     const orgUnit = data.orgUnits.find((item) => item.id === target.target_id);
     const region = data.regions.find((item) => item.id === orgUnit?.regionId);
 
-    return {
+    return [{
       key: `${target.target_type}-${target.target_id}`,
       title: orgUnit?.name ?? `Структура подчинения #${target.target_id}`,
       description: region ? `Регион: ${region.name}` : 'Регион не указан',
-    };
+    }];
   });
 }
 

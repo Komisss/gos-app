@@ -10,10 +10,12 @@ export type TaskFilters = Partial<{
   created_by_user_id: string;
   created_from: string;
   created_to: string;
+  scheduled_at_from: string;
+  scheduled_at_to: string;
   deadline_at_from: string;
   deadline_at_to: string;
-  org_unit: string;
-  region_id: string;
+  org_unit_ids: number[];
+  region_ids: number[];
   scope: string;
   status: string;
   page: string;
@@ -85,7 +87,10 @@ function buildQueryString(filters: TaskFilters) {
       return;
     }
 
-    params.set(key, normalizeDateTimeFilter(key, value));
+    params.set(
+      key,
+      Array.isArray(value) ? value.join(',') : normalizeDateTimeFilter(key, String(value)),
+    );
   });
 
   const query = params.toString();
@@ -97,6 +102,8 @@ function normalizeDateTimeFilter(key: string, value: string) {
   if (
     key !== 'created_from' &&
     key !== 'created_to' &&
+    key !== 'scheduled_at_from' &&
+    key !== 'scheduled_at_to' &&
     key !== 'deadline_at_from' &&
     key !== 'deadline_at_to'
   ) {

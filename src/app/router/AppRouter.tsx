@@ -15,7 +15,7 @@ import TasksListPage from '@pages/tasks/ui/TasksListPage';
 import RegionManagersPage from '@pages/users/ui/RegionManagersPage';
 import UserProfilePage from '@pages/users/ui/UserProfilePage';
 import UsersPage from '@pages/users/ui/UsersPage';
-import { ProtectedRoute, PublicOnlyRoute } from '@/features/auth/model/AuthRoutes';
+import { ProtectedRoute, PublicOnlyRoute, StatisticsRoute } from '@/features/auth/model/AuthRoutes';
 
 export const AppRouter = () => {
   return (
@@ -27,10 +27,13 @@ export const AppRouter = () => {
 
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
-            <Route path="/stats" element={<StatsPage />} />
-            <Route path="/stats/dashboard" element={<ReportsPage />} />
             <Route path="/stats/by_region" element={<TaskRegionReportsPage />} />
-            <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
+            <Route element={<StatisticsRoute />}>
+              <Route path="/stats" element={<StatsPage />} />
+              <Route path="/stats/dashboard" element={<ReportsPage />} />
+              <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
+              <Route path="/" element={<StatsPage />} />
+            </Route>
             <Route path="/reports/:reportId" element={<ReportDetailsPage />} />
             <Route path="/tasks" element={<TasksListPage />} />
             <Route path="/tasks/new" element={<NewTaskPage />} />
@@ -41,7 +44,6 @@ export const AppRouter = () => {
             <Route path="/users/:userId" element={<UserProfilePage />} />
             {/* <Route path="/org-units/new" element={<NewOrgUnitPage />} /> */}
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/" element={<StatsPage />} />
           </Route>
         </Route>
       </Routes>

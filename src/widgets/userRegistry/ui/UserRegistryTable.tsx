@@ -5,6 +5,7 @@ import { getUserStatusLabel, type UserFilters } from '@/entities/user/api/users'
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import type { Region } from '@/entities/region/model/types';
 import type { UserListItem } from '@/entities/user/model/types';
+import { isManagementRole } from '@/entities/user/lib/isManagementRole';
 import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Badge } from '@/shared/ui/badge';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
@@ -21,6 +22,7 @@ type Props = {
   orgUnits: OrgUnit[];
   regions: Region[];
   tableFilterMode?: TableFilterMode;
+  regionFilterDisabled?: boolean;
   onFiltersChange: (filters: UserFilters) => void;
   onRegionClick?: (region: Region) => void;
 };
@@ -37,6 +39,7 @@ export const UserRegistryTable = memo(function UserRegistryTable({
   orgUnits,
   regions,
   tableFilterMode = 'all',
+  regionFilterDisabled = false,
   onFiltersChange,
   onRegionClick,
 }: Props) {
@@ -54,6 +57,7 @@ export const UserRegistryTable = memo(function UserRegistryTable({
           orgUnits={orgUnits}
           regions={regions}
           tableFilterMode={tableFilterMode}
+          regionFilterDisabled={regionFilterDisabled}
           onFiltersChange={onFiltersChange}
         />
         <UserRegistryTableBody users={users} onRegionClick={onRegionClick} onUserClick={handleUserClick} />
@@ -67,12 +71,14 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
   orgUnits,
   regions,
   tableFilterMode,
+  regionFilterDisabled,
   onFiltersChange,
 }: {
   filters: UserFilters;
   orgUnits: OrgUnit[];
   regions: Region[];
   tableFilterMode: TableFilterMode;
+  regionFilterDisabled: boolean;
   onFiltersChange: (filters: UserFilters) => void;
 }) {
   const showFilters = tableFilterMode !== 'none';
@@ -91,6 +97,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
             <FilterSearchSelect
               label=""
               value={filters.region}
+              disabled={regionFilterDisabled}
               placeholder="Все регионы"
               searchPlaceholder="Поиск региона"
               options={regions.map((region) => ({
@@ -204,7 +211,9 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({
             <TableCell className="min-w-[240px]">
               <div className="space-y-1 whitespace-normal">
                 <div className="text-sm font-medium text-slate-900">{user.fullName}</div>
-                <div className="text-xs text-slate-500">@{user.username}</div>
+                {isManagementRole(user.role) && (
+                  <div className="text-xs text-slate-500">{user.username}</div>
+                )}
               </div>
             </TableCell>
             <TableCell className="text-slate-700">{user.role?.name ?? 'Не указана'}</TableCell>

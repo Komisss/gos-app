@@ -13,6 +13,8 @@ import { getRegions } from '@/entities/region/api/regions';
 import { getUserById, registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
+import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
+import { getUsernameError } from '@/shared/lib/username';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { DatePicker } from '@/shared/ui/date-picker';
@@ -51,6 +53,8 @@ export function NewUserForm() {
   const isFederalManager = session?.role?.code === 'federal_manager';
   const isRegionalManager = session?.role?.code === 'regional_manager';
   const [form, setForm] = useState<RegisterUserPayload>(initialForm);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   const showCredentials = shouldUseCredentials(form.role);
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
   const availableRoleOptions = useMemo(() => {
@@ -115,6 +119,10 @@ export function NewUserForm() {
     if (!showCredentials && (form.username || form.password)) {
       setForm((current) => ({ ...current, username: '', password: '' }));
     }
+
+    if (!showCredentials) {
+      setUsernameError(null);
+    }
   }, [form.password, form.username, showCredentials]);
 
   useEffect(() => {
@@ -133,6 +141,17 @@ export function NewUserForm() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    const nextPhoneError = getPhoneError(form.phone);
+    const nextUsernameError = showCredentials ? getUsernameError(form.username ?? '') : null;
+
+    setPhoneError(nextPhoneError);
+    setUsernameError(nextUsernameError);
+
+    if (nextPhoneError || nextUsernameError) {
+      return;
+    }
+
     const payload: RegisterUserPayload = {
       ...form,
       phone: form.phone.trim(),
@@ -199,6 +218,7 @@ export function NewUserForm() {
                   placeholder="Выберите регион"
                   searchPlaceholder="Поиск региона"
                   loading={regionsQuery.isLoading}
+                  disabled={isRegionalManager}
                   value={form.region}
                   options={(regionsQuery.data ?? []).map((region) => ({
                     id: region.id,
@@ -244,14 +264,22 @@ export function NewUserForm() {
           <div className="grid gap-5 md:grid-cols-2">
             <Field label="Телефон">
               <Input
-                className="border-slate-200"
+                className={phoneError ? 'border-red-400 focus-visible:ring-red-200' : 'border-slate-200'}
                 inputMode="tel"
                 placeholder="89999999999"
                 value={form.phone}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, phone: formatRussianPhone(event.target.value) }))
-                }
+                aria-invalid={Boolean(phoneError)}
+                aria-required="true"
+                onChange={(event) => {
+                  const phone = formatRussianPhone(event.target.value);
+                  setForm((current) => ({ ...current, phone }));
+
+                  if (isCompleteRussianPhone(phone)) {
+                    setPhoneError(null);
+                  }
+                }}
               />
+              {phoneError && <p className="text-sm text-red-600">{phoneError}</p>}
             </Field>
 
             <Field label="День рождения">
@@ -270,12 +298,18 @@ export function NewUserForm() {
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Логин">
                 <Input
-                  className="border-slate-200"
+                  className={usernameError ? 'border-red-400 focus-visible:ring-red-200' : 'border-slate-200'}
                   placeholder="Введите логин"
                   value={form.username ?? ''}
-                  onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+                  aria-invalid={Boolean(usernameError)}
+                  onChange={(event) => {
+                    const username = event.target.value;
+                    setForm((current) => ({ ...current, username }));
+                    setUsernameError(username ? getUsernameError(username) : null);
+                  }}
                   required
                 />
+                {usernameError && <p className="text-sm text-red-600">{usernameError}</p>}
               </Field>
 
               <Field label="Пароль">
@@ -468,18 +502,12 @@ function getAdultMaxBirthdayDate() {
   return date;
 }
 
-function formatRussianPhone(value: string) {
-  const digits = value.replace(/\D/g, '');
-
-  if (!digits) {
-    return '';
+function getPhoneError(value: string) {
+  if (!value) {
+    return 'Номер телефона обязателен.';
   }
 
-  const nationalDigits = digits.startsWith('7') || digits.startsWith('8')
-    ? digits.slice(1)
-    : digits;
-
-  return `8${nationalDigits.slice(0, 10)}`;
+  return isCompleteRussianPhone(value) ? null : 'Введите номер телефона полностью: 11 цифр.';
 }
 
 function parseDateOnly(value: string) {
