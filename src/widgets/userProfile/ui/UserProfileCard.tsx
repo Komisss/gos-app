@@ -1,8 +1,12 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, Power, PowerOff, Save } from 'lucide-react';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
+import { filterOrgUnitsForUserRole } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
+import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import {
   activateUser,
   deactivateUser,
@@ -12,13 +16,18 @@ import {
 } from '@/entities/user/api/users';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
 import { isManagementRole } from '@/entities/user/lib/isManagementRole';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
 import { getUsernameError } from '@/shared/lib/username';
+import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
 import { Card, CardContent } from '@/shared/ui/card';
 import { DatePicker } from '@/shared/ui/date-picker';
 import { Input } from '@/shared/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { ScrollArea } from '@/shared/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -34,16 +43,31 @@ type UserFormState = {
   max_user_id: string;
   phone: string;
   birthday: string;
+  role: number | null;
+  org_unit: number | null;
 };
+
+const roleOptions: Array<{ id: number; code: string; label: string }> = [
+  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
+  { id: 4, code: 'main_manager', label: 'Б3' },
+  { id: 5, code: 'assistant', label: 'Помощник Б3' },
+  { id: 6, code: 'unit_head', label: 'Б2' },
+  { id: 7, code: 'department_head', label: 'Б1' },
+  { id: 8, code: 'employee', label: 'Активист' },
+];
 
 export function UserProfileCard() {
   const { userId } = useParams();
   const parsedUserId = Number(userId);
   const queryClient = useQueryClient();
+  const { session } = useAuth();
   const [form, setForm] = useState<UserFormState>(emptyForm);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [isOrgUnitTouched, setIsOrgUnitTouched] = useState(false);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
+  const isCurrentUserFederalManager = session?.role?.code === 'federal_manager';
+  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
 
   const userQuery = useQuery({
     queryKey: ['users', parsedUserId],
@@ -51,11 +75,17 @@ export function UserProfileCard() {
     enabled: Number.isFinite(parsedUserId),
   });
 
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units-tree'],
+    queryFn: getOrgUnitsTree,
+  });
+
   useEffect(() => {
     if (userQuery.data) {
       setForm(getInitialForm(userQuery.data));
       setPhoneError(null);
       setUsernameError(null);
+      setIsOrgUnitTouched(false);
     }
   }, [userQuery.data]);
 
@@ -63,6 +93,7 @@ export function UserProfileCard() {
     mutationFn: (payload: UserPatchPayload) => updateUser(parsedUserId, payload),
     onSuccess: async (updatedUser) => {
       setForm(getInitialForm(updatedUser));
+      setIsOrgUnitTouched(false);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['users'] }),
         queryClient.invalidateQueries({ queryKey: ['users', parsedUserId] }),
@@ -86,6 +117,63 @@ export function UserProfileCard() {
     },
   });
 
+  const availableRoleOptions = useMemo(() => {
+    const editableOptions = isCurrentUserFederalManager
+      ? roleOptions
+      : isCurrentUserRegionalManager
+        ? roleOptions.filter((role) => role.id >= 4)
+        : roleOptions;
+    const currentRole = userQuery.data?.role;
+    const currentRoleRank = getRoleRank(currentRole?.id ?? null);
+    const downgradeOnlyOptions =
+      currentRoleRank !== null && !isTopManagerByRole(currentRole)
+        ? editableOptions.filter((role) => {
+            const roleRank = getRoleRank(role.id);
+
+            return roleRank !== null && roleRank >= currentRoleRank;
+          })
+        : editableOptions;
+    const currentRoleOption =
+      currentRole && form.role === currentRole.id
+        ? { id: currentRole.id, code: currentRole.code, label: currentRole.name }
+        : null;
+
+    if (currentRoleOption && !downgradeOnlyOptions.some((role) => role.id === currentRoleOption.id)) {
+      return [currentRoleOption, ...downgradeOnlyOptions];
+    }
+
+    return downgradeOnlyOptions;
+  }, [form.role, isCurrentUserFederalManager, isCurrentUserRegionalManager, userQuery.data?.role]);
+
+  const availableOrgUnits = useMemo(() => {
+    const effectiveRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
+    const filteredOrgUnits = filterOrgUnitsForUserRole(
+      orgUnitsQuery.data ?? [],
+      effectiveRoleId,
+      userQuery.data?.region?.id ?? null,
+    );
+    const currentOrgUnit = userQuery.data?.orgUnit;
+    const currentOrgUnitId = currentOrgUnit ? Number(currentOrgUnit.id) : null;
+
+    if (!currentOrgUnit || filteredOrgUnits.some((orgUnit) => orgUnit.id === currentOrgUnitId)) {
+      return filteredOrgUnits;
+    }
+
+    return [
+      {
+        id: currentOrgUnitId ?? currentOrgUnit.id,
+        name: currentOrgUnit.name,
+        type: currentOrgUnit.type,
+        parentId: typeof currentOrgUnit.parent === 'number' ? currentOrgUnit.parent : null,
+        regionId: userQuery.data?.region?.id ?? null,
+        regionName: userQuery.data?.region?.name,
+        headUser: null,
+        depth: 0,
+      },
+      ...filteredOrgUnits,
+    ];
+  }, [form.role, orgUnitsQuery.data, userQuery.data?.orgUnit, userQuery.data?.region]);
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -104,11 +192,14 @@ export function UserProfileCard() {
       return;
     }
 
+    const effectiveRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
+    const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, userQuery.data?.orgUnit, isOrgUnitTouched);
     const payload: UserPatchPayload = {
       full_name: form.full_name,
-      max_user_id: form.max_user_id,
       phone: form.phone,
       birthday: form.birthday || null,
+      role: effectiveRoleId,
+      org_unit: canSelectOrgUnit(effectiveRoleId) ? effectiveOrgUnitId : null,
     };
 
     if (canEditUsername) {
@@ -132,7 +223,12 @@ export function UserProfileCard() {
 
   const user = userQuery.data;
   const isLockedFederalManager = isFederalManager(user);
+  const isRoleAndOrgUnitLocked = isTopManager(user);
   const showUsername = isManagementRole(user.role);
+  const effectiveFormRoleId = getEffectiveRoleId(form.role, user.role);
+  const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, user.orgUnit, isOrgUnitTouched);
+  const selectedRoleLabel =
+    availableRoleOptions.find((role) => role.id === effectiveFormRoleId)?.label ?? user.role?.name ?? 'Выберите роль';
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -218,11 +314,8 @@ export function UserProfileCard() {
 
                 <Field label="ID пользователя в MAX">
                   <Input
-                    disabled={isLockedFederalManager}
+                    disabled
                     value={form.max_user_id}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, max_user_id: event.target.value }))
-                    }
                   />
                 </Field>
 
@@ -266,12 +359,87 @@ export function UserProfileCard() {
               </div>
 
               <div className="grid gap-5 md:grid-cols-3">
-                <ReadonlyField label="Роль" value={user.role?.name ?? 'Не указана'} />
+                <Field label="Роль">
+                  <Select
+                    value={getSelectRoleValue(effectiveFormRoleId, availableRoleOptions)}
+                    disabled={isRoleAndOrgUnitLocked}
+                    onValueChange={(role) => {
+                      const nextRole = Number(role);
+
+                      if (
+                        !Number.isInteger(nextRole) ||
+                        !availableRoleOptions.some((option) => option.id === nextRole) ||
+                        nextRole === effectiveFormRoleId
+                      ) {
+                        return;
+                      }
+
+                      setIsOrgUnitTouched(true);
+                      setForm((current) => ({
+                        ...current,
+                        role: nextRole,
+                        org_unit: null,
+                      }));
+                    }}
+                  >
+                    <SelectTrigger className="w-full border-slate-200 bg-white text-slate-900 [&_[data-slot=select-value]]:text-slate-900">
+                      <SelectValue placeholder={selectedRoleLabel} />
+                    </SelectTrigger>
+                    <SelectContent align="start" position="popper" className="z-[100] bg-white text-slate-900">
+                      {availableRoleOptions.map((role) => (
+                        <SelectItem key={role.id} value={String(role.id)}>
+                          {role.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <ReadonlyField label="Регион" value={user.region?.name ?? 'Не указан'} />
-                <ReadonlyField
-                  label="Структура подчинения"
-                  value={user.orgUnit?.name ?? 'Не указана'}
-                />
+                <Field label="Структура подчинения">
+                  {canSelectOrgUnit(effectiveFormRoleId) ? (
+                    <div className="space-y-2">
+                      <SearchSelect
+                        placeholder={user.region ? 'Выберите структуру подчинения' : 'Сначала укажите регион'}
+                        searchPlaceholder="Поиск структуры подчинения"
+                        loading={orgUnitsQuery.isLoading}
+                        disabled={isRoleAndOrgUnitLocked || !user.region}
+                        value={effectiveOrgUnitId}
+                        selectedFallback={
+                          user.orgUnit
+                            ? {
+                                label: user.orgUnit.name,
+                                description: user.region?.name,
+                              }
+                            : undefined
+                        }
+                        options={availableOrgUnits.map((orgUnit) => ({
+                          id: orgUnit.id,
+                          label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                          description: getOrgUnitDescription(orgUnit),
+                        }))}
+                        onChange={(org_unit) => {
+                          setIsOrgUnitTouched(true);
+                          setForm((current) => ({ ...current, org_unit }));
+                        }}
+                      />
+                      {effectiveOrgUnitId !== null && effectiveOrgUnitId !== 0 && !isRoleAndOrgUnitLocked && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          className="h-auto px-0 text-xs font-medium text-slate-500 hover:bg-transparent hover:text-slate-900"
+                          onClick={() => {
+                            setIsOrgUnitTouched(true);
+                            setForm((current) => ({ ...current, org_unit: null }));
+                          }}
+                        >
+                          Убрать структуру
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Не требуется для выбранной роли</p>
+                  )}
+                </Field>
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
@@ -353,6 +521,127 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+type SearchOption = {
+  id: number;
+  label: string;
+  description?: string;
+};
+
+function SearchSelect({
+  placeholder,
+  searchPlaceholder,
+  loading,
+  disabled = false,
+  value,
+  selectedFallback,
+  options,
+  onChange,
+}: {
+  placeholder: string;
+  searchPlaceholder: string;
+  loading: boolean;
+  disabled?: boolean;
+  value: number | null;
+  selectedFallback?: {
+    label: string;
+    description?: string;
+  };
+  options: SearchOption[];
+  onChange: (value: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const selectedOption = options.find((option) => option.id === value);
+  const selectedLabel = selectedOption?.label.trim() ?? (value ? selectedFallback?.label : undefined);
+  const selectedDescription = selectedOption?.description ?? (value ? selectedFallback?.description : undefined);
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) =>
+      `${option.label} ${option.description ?? ''}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [options, query]);
+
+  function handleSelect(option: SearchOption) {
+    onChange(option.id);
+    setOpen(false);
+  }
+
+  return (
+    <Popover open={open && !disabled} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={disabled}
+          className="min-h-10 w-full justify-between gap-2 border-slate-200 bg-white text-left font-normal"
+        >
+          <span className="min-w-0">
+            <span className={cn('block truncate', selectedLabel ? 'text-slate-900' : 'text-slate-500')}>
+              {selectedLabel ?? placeholder}
+            </span>
+            {selectedDescription && (
+              <span className="block truncate text-xs text-slate-500">{selectedDescription}</span>
+            )}
+          </span>
+          <ChevronsUpDown className="size-4 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[min(560px,calc(100vw-3rem))] p-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            className="h-9 border-slate-200 pl-9"
+            placeholder={searchPlaceholder}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
+
+        <ScrollArea className="mt-3 h-64 rounded-md border border-slate-200">
+          <div className="p-1">
+            {loading ? (
+              <div className="px-3 py-8 text-center text-sm text-slate-500">
+                Загружаем список...
+              </div>
+            ) : filteredOptions.length === 0 ? (
+              <div className="px-3 py-8 text-center text-sm text-slate-500">
+                Ничего не найдено.
+              </div>
+            ) : (
+              filteredOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                  onClick={() => handleSelect(option)}
+                >
+                  <Check
+                    className={cn(
+                      'mt-0.5 size-4 text-[#465cd3]',
+                      value === option.id ? 'opacity-100' : 'opacity-0',
+                    )}
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-slate-900">{option.label}</span>
+                    {option.description && (
+                      <span className="block text-xs text-slate-500">{option.description}</span>
+                    )}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function ReadonlyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="space-y-2">
@@ -385,6 +674,8 @@ function getInitialForm(user: UserDetails): UserFormState {
     max_user_id: user.maxUserId ?? '',
     phone: formatRussianPhone(user.phone ?? ''),
     birthday: user.birthday ?? '',
+    role: toEntityId(user.role?.id),
+    org_unit: toEntityId(user.orgUnit?.id),
   };
 }
 
@@ -394,6 +685,8 @@ const emptyForm: UserFormState = {
   max_user_id: '',
   phone: '',
   birthday: '',
+  role: null,
+  org_unit: null,
 };
 
 function getPhoneError(value: string) {
@@ -402,6 +695,51 @@ function getPhoneError(value: string) {
   }
 
   return isCompleteRussianPhone(value) ? null : 'Введите номер телефона полностью: 11 цифр.';
+}
+
+function getOrgUnitDescription(orgUnit: OrgUnit) {
+  return [
+    orgUnit.regionName,
+    orgUnit.headUser ? `Руководитель: ${orgUnit.headUser.full_name}` : null,
+    orgUnit.headUser?.role?.name,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+}
+
+function canSelectOrgUnit(role: number | null) {
+  return role !== null && role !== 1 && role !== 2;
+}
+
+function getEffectiveOrgUnitId(
+  formOrgUnitId: number | null,
+  userOrgUnit: UserDetails['orgUnit'],
+  isOrgUnitTouched: boolean,
+) {
+  if (isOrgUnitTouched) {
+    return formOrgUnitId;
+  }
+
+  return formOrgUnitId ?? toEntityId(userOrgUnit?.id);
+}
+
+function getEffectiveRoleId(formRoleId: number | null, userRole: UserDetails['role']) {
+  return toEntityId(formRoleId) ?? toEntityId(userRole?.id);
+}
+
+function getSelectRoleValue(
+  roleId: number | null,
+  availableRoleOptions: Array<{ id: number; code: string; label: string }>,
+) {
+  return roleId !== null && availableRoleOptions.some((role) => role.id === roleId)
+    ? String(roleId)
+    : undefined;
+}
+
+function toEntityId(value: unknown) {
+  const numberValue = Number(value);
+
+  return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null;
 }
 
 function formatHeadUser(headUser: UserDetails['headUser']) {
@@ -449,4 +787,24 @@ function toDateOnly(value: Date) {
 
 function isFederalManager(user: Pick<UserDetails, 'role'>) {
   return user.role?.code === 'federal_manager' || user.role?.id === 1;
+}
+
+function isTopManager(user: Pick<UserDetails, 'role'>) {
+  return isTopManagerByRole(user.role);
+}
+
+function isTopManagerByRole(role: UserDetails['role']) {
+  return (
+    role?.code === 'federal_manager' ||
+    role?.code === 'regional_manager' ||
+    role?.id === 1 ||
+    role?.id === 2
+  );
+}
+
+function getRoleRank(roleId: number | null) {
+  const roleOrder = [1, 2, 4, 5, 6, 7, 8];
+  const index = roleId === null ? -1 : roleOrder.indexOf(roleId);
+
+  return index === -1 ? null : index;
 }

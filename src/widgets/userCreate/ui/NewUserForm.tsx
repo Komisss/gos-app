@@ -40,7 +40,7 @@ const initialForm: RegisterUserPayload = {
   full_name: '',
   phone: '',
   birthday: '',
-  max_user_id: '',
+  max_user_id: null,
   role: 2,
   region: null,
   org_unit: 0,
@@ -68,6 +68,7 @@ export function NewUserForm() {
 
     return roleOptions.filter((role) => role.code !== 'federal_manager');
   }, [isFederalManager, isRegionalManager]);
+  const selectedRoleOption = availableRoleOptions.find((role) => role.id === form.role);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -156,6 +157,7 @@ export function NewUserForm() {
       ...form,
       phone: form.phone.trim(),
       birthday: form.birthday,
+      max_user_id: null,
       region: form.role === 1 ? null : form.region,
       org_unit: canSelectOrgUnit(form.role) ? form.org_unit || null : null,
     };
@@ -199,10 +201,10 @@ export function NewUserForm() {
                   }));
                 }}
               >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
-                  <SelectValue />
+                <SelectTrigger className="w-full border-slate-200 bg-white text-slate-900 [&_[data-slot=select-value]]:text-slate-900">
+                  <SelectValue placeholder={selectedRoleOption?.label ?? 'Выберите роль'} />
                 </SelectTrigger>
-                <SelectContent align="start">
+                <SelectContent align="start" position="popper" className="z-[100] bg-white text-slate-900">
                   {availableRoleOptions.map((role) => (
                     <SelectItem key={role.id} value={String(role.id)}>
                       {role.label}
@@ -325,15 +327,6 @@ export function NewUserForm() {
             </div>
           )}
 
-          <Field label="ID пользователя в MAX">
-            <Input
-              className="border-slate-200"
-              placeholder="Введите ID пользователя в MAX"
-              value={form.max_user_id}
-              onChange={(event) => setForm((current) => ({ ...current, max_user_id: event.target.value }))}
-            />
-          </Field>
-
           {createMutation.isError && (
             <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               Не удалось создать пользователя.
@@ -407,9 +400,16 @@ function SearchSelect({
           type="button"
           variant="outline"
           disabled={disabled}
-          className="h-10 w-full justify-between border-slate-200 bg-white text-left font-normal"
+          className="min-h-10 w-full justify-between gap-2 border-slate-200 bg-white text-left font-normal"
         >
-          <span className="min-w-0 truncate">{selectedOption?.label.trim() ?? placeholder}</span>
+          <span className="min-w-0">
+            <span className={cn('block truncate', selectedOption ? 'text-slate-900' : 'text-slate-500')}>
+              {selectedOption?.label.trim() ?? placeholder}
+            </span>
+            {selectedOption?.description && (
+              <span className="block truncate text-xs text-slate-500">{selectedOption.description}</span>
+            )}
+          </span>
           <ChevronsUpDown className="size-4 opacity-50" />
         </Button>
       </PopoverTrigger>

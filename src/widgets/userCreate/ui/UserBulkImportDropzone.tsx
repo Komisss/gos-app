@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 
 import { importUsersExcel, type UsersImportResult } from '@/entities/user/api/users';
+import { ApiError } from '@/shared/lib/apiError';
+import { downloadBlob } from '@/shared/lib/downloadBlob';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { toast } from '@/shared/ui/sonner';
@@ -25,6 +27,15 @@ export function UserBulkImportDropzone() {
       setFileError(null);
       showImportResultToast(result);
       await queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.details instanceof Blob) {
+        downloadBlob(error.details, `users-import-errors-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        toast.warning('Импорт завершен с ошибками', {
+          description: 'Файл с ошибками скачан автоматически.',
+          duration: 8000,
+        });
+      }
     },
   });
 
@@ -118,24 +129,26 @@ function isXlsxFile(file: File) {
 }
 
 function showImportResultToast(result: UsersImportResult) {
-  const hasErrors = result.errors.length > 0;
+  const errors = result.errors ?? [];
+  const hasErrors = errors.length > 0;
   const title = hasErrors ? 'Импорт пользователей завершен с ошибками' : 'Пользователи импортированы';
   const description = (
     <div className="space-y-2">
+      {result.detail && <p>{result.detail}</p>}
       <p>
         Создано: {result.created}, обновлено: {result.updated}
       </p>
       {hasErrors && (
         <div className="space-y-1">
-          <p>Ошибки: {result.errors.length}</p>
+          <p>Ошибки: {errors.length}</p>
           <ul className="max-h-40 space-y-1 overflow-auto pr-1">
-            {result.errors.slice(0, 10).map((item) => (
+            {errors.slice(0, 10).map((item) => (
               <li key={`${item.row}-${item.error}`}>
                 Строка {item.row}: {item.error}
               </li>
             ))}
           </ul>
-          {result.errors.length > 10 && <p>И еще {result.errors.length - 10}</p>}
+          {errors.length > 10 && <p>И еще {errors.length - 10}</p>}
         </div>
       )}
     </div>

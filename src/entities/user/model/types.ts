@@ -1,4 +1,4 @@
-export type UserStatus = 'active' | 'inactive' | 'deactivated' | string;
+export type UserStatus = 'active' | 'disabled' | 'moderation' | 'archived' | string;
 
 export type UserRole = {
   id: number;
@@ -28,6 +28,7 @@ export type UserOrgUnit = {
 export type UserListDto = {
   id: number;
   active: boolean;
+  status?: UserStatus;
   username: string;
   full_name: string;
   max_user_id?: string | null;
@@ -108,7 +109,7 @@ export type RegisterUserPayload = {
   full_name: string;
   phone: string;
   birthday: string;
-  max_user_id: string;
+  max_user_id: number | null;
   role: RegisterUserRoleId;
   region: number | null;
   org_unit: number | null;

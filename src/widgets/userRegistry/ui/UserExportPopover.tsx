@@ -1,15 +1,20 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { Download } from 'lucide-react';
 
-import type { UserFilters } from '@/entities/user/api/users';
+import { USER_WITHOUT_ORG_UNIT_FILTER, type UserFilters } from '@/entities/user/api/users';
 import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Button } from '@/shared/ui/button';
-import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { FilterMultiSearchSelect } from '@/shared/ui/filter-multi-search-select';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { emptyUserExportFilters } from '../model/useUserExport';
+
+const statusOptions = [
+  { value: 'active', label: 'Активен' },
+  { value: 'disabled', label: 'Отключен' },
+  { value: 'moderation', label: 'На модерации' },
+];
 
 type UserExportPopoverProps = {
   filters: UserFilters;
@@ -63,60 +68,63 @@ export function UserExportPopover({
                 onChange={(event) => onExportFiltersChange((current) => ({ ...current, search: event.target.value }))}
               />
             </div>
-            <ExportDateFilter
-              label="Создан от"
-              value={exportFilters.created_from}
-              onChange={(created_from) => onExportFiltersChange((current) => ({ ...current, created_from }))}
-            />
-            <ExportDateFilter
-              label="Создан до"
-              value={exportFilters.created_to}
-              onChange={(created_to) => onExportFiltersChange((current) => ({ ...current, created_to }))}
-            />
             <FilterSearchSelect
               label="Структура подчинения"
-              value={exportFilters.org_unit}
+              value={exportFilters.org_unit_ids}
               placeholder="Все структуры подчинения"
               searchPlaceholder="Поиск структуры подчинения"
-              options={orgUnits.map((orgUnit) => ({
-                value: String(orgUnit.id),
-                label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-              }))}
-              onChange={(org_unit) => onExportFiltersChange((current) => ({ ...current, org_unit }))}
+              options={[
+                {
+                  value: USER_WITHOUT_ORG_UNIT_FILTER,
+                  label: 'Без структуры подчинения',
+                },
+                ...orgUnits.map((orgUnit) => ({
+                  value: String(orgUnit.id),
+                  label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                })),
+              ]}
+              onChange={(org_unit_ids) => onExportFiltersChange((current) => ({ ...current, org_unit_ids }))}
             />
-            <FilterSearchSelect
+            <FilterMultiSearchSelect
               label="Регион"
-              value={exportFilters.region}
+              values={splitFilterValues(exportFilters.region_ids)}
               placeholder="Все регионы"
               searchPlaceholder="Поиск региона"
               options={regions.map((region) => ({ value: String(region.id), label: region.name }))}
-              onChange={(region) => onExportFiltersChange((current) => ({ ...current, region }))}
+              onChange={(region_ids) =>
+                onExportFiltersChange((current) => ({
+                  ...current,
+                  region_ids: joinFilterValues(region_ids),
+                }))
+              }
             />
-            <ExportSelect
+            <FilterMultiSearchSelect
               label="Роль"
-              value={exportFilters.role}
-              placeholder="Все"
+              values={splitFilterValues(exportFilters.roles)}
+              placeholder="Все роли"
+              searchPlaceholder="Поиск роли"
               options={userRoleFilterOptions}
-              onChange={(role) => onExportFiltersChange((current) => ({ ...current, role }))}
+              onChange={(roles) =>
+                onExportFiltersChange((current) => ({
+                  ...current,
+                  roles: joinFilterValues(roles),
+                }))
+              }
             />
-            <div className="space-y-1 md:col-span-2">
-              <p className="text-xs font-medium text-slate-500 !mb-1">Статус</p>
-              <Select
-                value={exportFilters.status || 'all'}
-                onValueChange={(status) =>
-                  onExportFiltersChange((current) => ({ ...current, status: status === 'all' ? '' : status }))
+            <div className="md:col-span-2">
+              <FilterMultiSearchSelect
+                label="Статус"
+                values={splitFilterValues(exportFilters.status)}
+                placeholder="Все статусы"
+                searchPlaceholder="Поиск статуса"
+                options={statusOptions}
+                onChange={(status) =>
+                  onExportFiltersChange((current) => ({
+                    ...current,
+                    status: joinFilterValues(status),
+                  }))
                 }
-              >
-                <SelectTrigger className="w-full border-slate-200 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent align="start">
-                  <SelectItem value="all">Все</SelectItem>
-                  <SelectItem value="active">Активен</SelectItem>
-                  <SelectItem value="inactive">Неактивен</SelectItem>
-                  <SelectItem value="deactivated">Деактивирован</SelectItem>
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 
@@ -151,44 +159,10 @@ export function UserExportPopover({
   );
 }
 
-function ExportDateFilter({ label, value, onChange }: { label: string; value?: string; onChange: (value: string) => void }) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <DateTimePicker value={value} onChange={onChange} placeholder="Выберите дату" />
-    </div>
-  );
+function splitFilterValues(value?: string) {
+  return value ? value.split(',').filter(Boolean) : [];
 }
 
-function ExportSelect({
-  label,
-  value,
-  placeholder,
-  options,
-  onChange,
-}: {
-  label: string;
-  value?: string;
-  placeholder: string;
-  options: Array<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      <Select value={value || 'all'} onValueChange={(nextValue) => onChange(nextValue === 'all' ? '' : nextValue)}>
-        <SelectTrigger className="w-full border-slate-200 bg-white">
-          <SelectValue placeholder={placeholder} />
-        </SelectTrigger>
-        <SelectContent align="start">
-          <SelectItem value="all">{placeholder}</SelectItem>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+function joinFilterValues(values: string[]) {
+  return values.join(',');
 }

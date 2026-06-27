@@ -4,7 +4,7 @@ import { useAuth } from '@/features/auth/model/AuthContext';
 import { UserRegistry } from '@/widgets/userRegistry/ui/UserRegistry';
 
 const regionalManagerFilters = {
-  role: '2',
+  roles: '2',
 };
 
 export default function RegionManagersPage() {
@@ -20,7 +20,6 @@ export default function RegionManagersPage() {
       title="Регионы с управляющими"
       initialFilters={regionalManagerFilters}
       showActions={false}
-      showFilterCard={false}
       tableFilterMode="region"
     />
   );

@@ -13,13 +13,15 @@ const USERS_ENDPOINT = '/api/v1/users';
 const USERS_EXPORT_ENDPOINT = '/api/v1/users/export';
 const USERS_IMPORT_ENDPOINT = '/api/v1/users/import';
 const REGISTER_ENDPOINT = '/api/v1/auth/register';
+export const USER_WITHOUT_ORG_UNIT_FILTER = '__without_org_unit__';
 
 export type UserFilters = Partial<{
   created_from: string;
   created_to: string;
-  org_unit: string;
-  region: string;
-  role: string;
+  org_unit_ids: string;
+  org_unit_isnull: string;
+  region_ids: string;
+  roles: string;
   search: string;
   status: string;
   page: string;
@@ -35,9 +37,10 @@ export type UsersPage = {
 };
 
 export type UsersImportResult = {
+  detail?: string;
   created: number;
   updated: number;
-  errors: Array<{
+  errors?: Array<{
     row: number;
     error: string;
   }>;
@@ -81,7 +84,7 @@ export async function getUsersPage(filters: UserFilters = {}, page = 1, pageSize
 }
 
 export async function downloadUsersExcel(filters: UserFilters = {}) {
-  return http<Blob>(`${USERS_EXPORT_ENDPOINT}${buildQueryString(filters)}`, {
+  return http<Blob>(`${USERS_EXPORT_ENDPOINT}${buildQueryString(filters, { roles: 'role_ids' })}`, {
     method: 'GET',
     responseType: 'blob',
   });
@@ -94,10 +97,12 @@ export async function importUsersExcel(file: File) {
   return http<UsersImportResult>(USERS_IMPORT_ENDPOINT, {
     method: 'POST',
     body: formData,
+    errorResponseType: 'blob',
+    suppressErrorToast: true,
   });
 }
 
-function buildQueryString(filters: UserFilters) {
+function buildQueryString(filters: UserFilters, keyMap: Partial<Record<keyof UserFilters, string>> = {}) {
   const params = new URLSearchParams();
 
   Object.entries(filters).forEach(([key, value]) => {
@@ -105,7 +110,12 @@ function buildQueryString(filters: UserFilters) {
       return;
     }
 
-    params.set(key, normalizeDateTimeFilter(key, value));
+    if (key === 'org_unit_ids' && value === USER_WITHOUT_ORG_UNIT_FILTER) {
+      params.set('org_unit_isnull', 'true');
+      return;
+    }
+
+    params.set(keyMap[key as keyof UserFilters] ?? key, normalizeDateTimeFilter(key, value));
   });
 
   const query = params.toString();
@@ -158,11 +168,18 @@ export async function deactivateUser(userId: number) {
 }
 
 export function getUserStatusLabel(user: Pick<UserListItem, 'active' | 'status'>) {
-  if (user.active || user.status === 'active') {
-    return 'Активен';
-  }
+  return getStatusLabel(user.status || (user.active ? 'active' : 'disabled'));
+}
 
-  return 'Неактивен';
+export function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    active: 'Активен',
+    disabled: 'Отключен',
+    moderation: 'На модерации',
+    archived: 'В архиве',
+  };
+
+  return labels[status] ?? status;
 }
 
 function normalizeUsersResponse(response: UsersResponse) {
@@ -177,7 +194,7 @@ function mapUserListDto(user: UserListDto): UserListItem {
   return {
     id: user.id,
     active: user.active,
-    status: user.active ? 'active' : 'inactive',
+    status: user.status ?? (user.active ? 'active' : 'disabled'),
     username: user.username,
     fullName: user.full_name,
     maxUserId: user.max_user_id,

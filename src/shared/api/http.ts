@@ -6,6 +6,8 @@ import { showErrorToast } from '@/shared/lib/showErrorToast';
 type HttpOptions = RequestInit & {
   auth?: boolean;
   responseType?: 'json' | 'blob';
+  errorResponseType?: 'json' | 'blob';
+  suppressErrorToast?: boolean;
 };
 
 export async function http<T>(url: string, options: HttpOptions = {}): Promise<T> {
@@ -14,7 +16,9 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
   try {
     response = await requestWithCookies(url, options);
   } catch (error) {
-    showErrorToast(error);
+    if (!options.suppressErrorToast) {
+      showErrorToast(error);
+    }
     throw error;
   }
 
@@ -23,24 +27,35 @@ export async function http<T>(url: string, options: HttpOptions = {}): Promise<T
       await refreshAccessToken();
       const retryResponse = await requestWithCookies(url, options);
 
-      return parseResponse<T>(retryResponse, options.responseType);
+      return parseResponse<T>(retryResponse, options.responseType, options.errorResponseType);
     } catch (error) {
       clearSession();
-      showErrorToast(error);
+      if (!options.suppressErrorToast) {
+        showErrorToast(error);
+      }
       throw error;
     }
   }
 
   try {
-    return await parseResponse<T>(response, options.responseType);
+    return await parseResponse<T>(response, options.responseType, options.errorResponseType);
   } catch (error) {
-    showErrorToast(error);
+    if (!options.suppressErrorToast) {
+      showErrorToast(error);
+    }
     throw error;
   }
 }
 
 async function requestWithCookies(url: string, options: HttpOptions) {
-  const { auth: _auth, responseType: _responseType, headers, ...requestOptions } = options;
+  const {
+    auth: _auth,
+    responseType: _responseType,
+    errorResponseType: _errorResponseType,
+    suppressErrorToast: _suppressErrorToast,
+    headers,
+    ...requestOptions
+  } = options;
   const requestHeaders = new Headers(headers);
 
   if (!requestHeaders.has('Content-Type') && requestOptions.body && !(requestOptions.body instanceof FormData)) {
@@ -54,9 +69,13 @@ async function requestWithCookies(url: string, options: HttpOptions) {
   });
 }
 
-async function parseResponse<T>(response: Response, responseType: HttpOptions['responseType'] = 'json'): Promise<T> {
+async function parseResponse<T>(
+  response: Response,
+  responseType: HttpOptions['responseType'] = 'json',
+  errorResponseType: HttpOptions['errorResponseType'] = 'json',
+): Promise<T> {
   if (!response.ok) {
-    const details = await parseErrorResponse(response);
+    const details = await parseErrorResponse(response, errorResponseType);
     throw new ApiError({
       status: response.status,
       message:
@@ -85,7 +104,15 @@ async function parseResponse<T>(response: Response, responseType: HttpOptions['r
   return response.json() as Promise<T>;
 }
 
-async function parseErrorResponse(response: Response) {
+async function parseErrorResponse(response: Response, errorResponseType: HttpOptions['errorResponseType'] = 'json') {
+  if (errorResponseType === 'blob') {
+    try {
+      return await response.blob();
+    } catch {
+      return undefined;
+    }
+  }
+
   const contentType = response.headers.get('Content-Type');
 
   if (contentType?.includes('application/json')) {

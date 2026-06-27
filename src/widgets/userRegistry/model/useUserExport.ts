@@ -5,11 +5,9 @@ import { downloadUsersExcel, type UserFilters } from '@/entities/user/api/users'
 import { downloadBlob } from '@/shared/lib/downloadBlob';
 
 export const emptyUserExportFilters: UserFilters = {
-  created_from: '',
-  created_to: '',
-  org_unit: '',
-  region: '',
-  role: '',
+  org_unit_ids: '',
+  region_ids: '',
+  roles: '',
   search: '',
   status: '',
 };
