@@ -160,11 +160,11 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
           <TableHead className="w-32 align-bottom">
             {showAllFilters && (
               <FilterMultiSearchSelect
-                values={splitFilterValues(filters.status)}
+                values={splitFilterValues(filters.statuses)}
                 placeholder="Все статусы"
                 searchPlaceholder="Поиск статуса"
                 options={statusOptions}
-                onChange={(status) => onFiltersChange({ status: joinFilterValues(status) })}
+                onChange={(statuses) => onFiltersChange({ statuses: joinFilterValues(statuses) })}
               />
             )}
           </TableHead>

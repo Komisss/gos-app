@@ -23,7 +23,7 @@ export type UserFilters = Partial<{
   region_ids: string;
   roles: string;
   search: string;
-  status: string;
+  statuses: string;
   page: string;
   page_size: string;
 }>;

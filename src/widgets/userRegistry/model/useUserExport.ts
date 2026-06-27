@@ -9,7 +9,7 @@ export const emptyUserExportFilters: UserFilters = {
   region_ids: '',
   roles: '',
   search: '',
-  status: '',
+  statuses: '',
 };
 
 export function useUserExport() {

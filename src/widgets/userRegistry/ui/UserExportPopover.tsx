@@ -114,14 +114,14 @@ export function UserExportPopover({
             <div className="md:col-span-2">
               <FilterMultiSearchSelect
                 label="Статус"
-                values={splitFilterValues(exportFilters.status)}
+                values={splitFilterValues(exportFilters.statuses)}
                 placeholder="Все статусы"
                 searchPlaceholder="Поиск статуса"
                 options={statusOptions}
-                onChange={(status) =>
+                onChange={(statuses) =>
                   onExportFiltersChange((current) => ({
                     ...current,
-                    status: joinFilterValues(status),
+                    statuses: joinFilterValues(statuses),
                   }))
                 }
               />

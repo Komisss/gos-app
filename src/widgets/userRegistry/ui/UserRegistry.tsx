@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ListFilter, UserPlus } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
 import { getUsersPage, type UserFilters } from '@/entities/user/api/users';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { Button } from '@/shared/ui/button';
-import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { useUserExport } from '../model/useUserExport';
@@ -16,13 +15,11 @@ import { UserExportPopover } from './UserExportPopover';
 import { UserRegistryTable } from './UserRegistryTable';
 
 const emptyUserFilters: UserFilters = {
-  created_from: '',
-  created_to: '',
-  org_unit: '',
-  region: '',
-  role: '',
+  org_unit_ids: '',
+  region_ids: '',
+  roles: '',
   search: '',
-  status: '',
+  statuses: '',
 };
 
 const emptyRegions: Awaited<ReturnType<typeof getRegions>> = [];
@@ -32,7 +29,6 @@ type UserRegistryProps = {
   title?: string;
   initialFilters?: UserFilters;
   showActions?: boolean;
-  showFilterCard?: boolean;
   showTableFilters?: boolean;
   tableFilterMode?: 'all' | 'region' | 'none';
 };
@@ -41,7 +37,6 @@ export function UserRegistry({
   title = 'Список пользователей',
   initialFilters = {},
   showActions = true,
-  showFilterCard = true,
   showTableFilters = true,
   tableFilterMode,
 }: UserRegistryProps = {}) {
@@ -58,13 +53,12 @@ export function UserRegistry({
     };
 
     if (isRegionalManager && currentUserRegionId) {
-      nextFilters.region = String(currentUserRegionId);
+      nextFilters.region_ids = String(currentUserRegionId);
     }
 
     return nextFilters;
   }, [currentUserRegionId, initialFilters, isRegionalManager]);
   const [filters, setFilters] = useState<UserFilters>(initialUserFilters);
-  const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const debouncedSearch = useDebouncedValue(filters.search ?? '', 500);
@@ -72,8 +66,8 @@ export function UserRegistry({
   const queryFilters = useMemo(
     () => ({
       ...filters,
-      region:
-        filters.region ||
+      region_ids:
+        filters.region_ids ||
         (isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : ''),
       search: debouncedSearch,
     }),
@@ -86,9 +80,9 @@ export function UserRegistry({
     }
 
     setFilters((current) =>
-      current.region === String(currentUserRegionId)
+      current.region_ids === String(currentUserRegionId)
         ? current
-        : { ...current, region: String(currentUserRegionId), org_unit: '' },
+        : { ...current, region_ids: String(currentUserRegionId), org_unit_ids: '' },
     );
   }, [currentUserRegionId, isRegionalManager]);
 
@@ -127,6 +121,11 @@ export function UserRegistry({
     setPageSize(nextPageSize);
   }, []);
 
+  const resetFilters = useCallback(() => {
+    setPage(1);
+    setFilters(initialUserFilters);
+  }, [initialUserFilters]);
+
   return (
     <div className="min-h-full bg-slate-50">
       <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-6 py-6">
@@ -141,17 +140,9 @@ export function UserRegistry({
 
           {showActions && (
             <div className="flex flex-wrap gap-2">
-              {showFilterCard && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-slate-200 bg-white"
-                  onClick={() => setFiltersOpen((current) => !current)}
-                >
-                  <ListFilter />
-                  Фильтры
-                </Button>
-              )}
+              <Button type="button" variant="outline" className="border-slate-200 bg-white" onClick={resetFilters}>
+                Сбросить фильтры
+              </Button>
               <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
                 <Link to="/users/new">
                   <UserPlus />
@@ -174,37 +165,6 @@ export function UserRegistry({
           )}
         </div>
 
-        {showFilterCard && filtersOpen && (
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <FilterInput
-                label="Создан от"
-                type="datetime"
-                value={filters.created_from}
-                onChange={(created_from) => updateFilters({ created_from })}
-              />
-              <FilterInput
-                label="Создан до"
-                type="datetime"
-                value={filters.created_to}
-                onChange={(created_to) => updateFilters({ created_to })}
-              />
-            </div>
-            <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setPage(1);
-                  setFilters(initialUserFilters);
-                }}
-              >
-                Сбросить фильтры
-              </Button>
-            </div>
-          </div>
-        )}
-
         {usersQuery.isLoading ? (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
             Загружаем пользователей...
@@ -226,7 +186,7 @@ export function UserRegistry({
               onRegionClick={
                 isRegionalManager
                   ? undefined
-                  : (region) => updateFilters({ region: String(region.id), org_unit: '' })
+                  : (region) => updateFilters({ region_ids: String(region.id), org_unit_ids: '' })
               }
             />
             <UserPagination
@@ -338,34 +298,6 @@ function UserPagination({
 
 function clampPage(page: number, totalPages: number) {
   return Math.min(Math.max(1, page), Math.max(totalPages, 1));
-}
-
-function FilterInput({
-  label,
-  type,
-  value,
-  onChange,
-}: {
-  label: string;
-  type: 'number' | 'datetime';
-  value?: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
-      {type === 'datetime' ? (
-        <DateTimePicker value={value} onChange={onChange} placeholder="Выберите дату" />
-      ) : (
-        <Input
-          type="number"
-          className="h-9 border-slate-200 text-sm"
-          value={value ?? ''}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-    </div>
-  );
 }
 
 function useDebouncedValue<T>(value: T, delay: number) {
