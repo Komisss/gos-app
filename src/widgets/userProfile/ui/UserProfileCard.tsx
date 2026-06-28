@@ -66,7 +66,6 @@ export function UserProfileCard() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isOrgUnitTouched, setIsOrgUnitTouched] = useState(false);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
-  const isCurrentUserFederalManager = session?.role?.code === 'federal_manager';
   const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
 
   const userQuery = useQuery({
@@ -118,32 +117,12 @@ export function UserProfileCard() {
   });
 
   const availableRoleOptions = useMemo(() => {
-    const editableOptions = isCurrentUserFederalManager
-      ? roleOptions
-      : isCurrentUserRegionalManager
-        ? roleOptions.filter((role) => role.id >= 4)
-        : roleOptions;
-    const currentRole = userQuery.data?.role;
-    const currentRoleRank = getRoleRank(currentRole?.id ?? null);
-    const downgradeOnlyOptions =
-      currentRoleRank !== null && !isTopManagerByRole(currentRole)
-        ? editableOptions.filter((role) => {
-            const roleRank = getRoleRank(role.id);
-
-            return roleRank !== null && roleRank >= currentRoleRank;
-          })
-        : editableOptions;
-    const currentRoleOption =
-      currentRole && form.role === currentRole.id
-        ? { id: currentRole.id, code: currentRole.code, label: currentRole.name }
-        : null;
-
-    if (currentRoleOption && !downgradeOnlyOptions.some((role) => role.id === currentRoleOption.id)) {
-      return [currentRoleOption, ...downgradeOnlyOptions];
+    if (isCurrentUserRegionalManager) {
+      return roleOptions.filter((role) => role.id >= 4);
     }
 
-    return downgradeOnlyOptions;
-  }, [form.role, isCurrentUserFederalManager, isCurrentUserRegionalManager, userQuery.data?.role]);
+    return roleOptions;
+  }, [isCurrentUserRegionalManager]);
 
   const availableOrgUnits = useMemo(() => {
     const effectiveRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
@@ -837,11 +816,4 @@ function isTopManagerByRole(role: UserDetails['role']) {
     role?.id === 1 ||
     role?.id === 2
   );
-}
-
-function getRoleRank(roleId: number | null) {
-  const roleOrder = [1, 2, 4, 5, 6, 7, 8];
-  const index = roleId === null ? -1 : roleOrder.indexOf(roleId);
-
-  return index === -1 ? null : index;
 }
