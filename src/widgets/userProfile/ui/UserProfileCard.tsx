@@ -180,6 +180,7 @@ export function UserProfileCard() {
       phone: form.phone,
       birthday: form.birthday || null,
       role: effectiveRoleId,
+      org_unit: userQuery.data?.orgUnit ? toEntityId(userQuery.data.orgUnit.id) : null,
       parent_org_unit: canSelectOrgUnit(effectiveRoleId) ? effectiveOrgUnitId : null,
     };
 

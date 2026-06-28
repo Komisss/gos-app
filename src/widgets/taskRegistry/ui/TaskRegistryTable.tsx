@@ -108,7 +108,6 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
             options={[
               { value: 'scheduled', label: 'Запланирована' },
               { value: 'active', label: 'Активная' },
-              { value: 'pending', label: 'В работе' },
               { value: 'completed', label: 'Завершена' },
               { value: 'archived', label: 'В архиве' },
             ]}
