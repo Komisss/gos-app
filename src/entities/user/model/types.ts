@@ -83,7 +83,7 @@ export type UserDetails = UserListItem & {
 export type UserPatchPayload = Partial<{
   role: number | null;
   region: number | null;
-  org_unit: number | null;
+  parent_org_unit: number | null;
   last_login: string;
   is_superuser: boolean;
   username: string;

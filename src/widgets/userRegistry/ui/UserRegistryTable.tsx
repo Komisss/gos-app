@@ -10,7 +10,6 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import type { Region } from '@/entities/region/model/types';
 import type { UserListItem, UserOrgUnit } from '@/entities/user/model/types';
 import { isManagementRole } from '@/entities/user/lib/isManagementRole';
-import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Badge } from '@/shared/ui/badge';
 import { FilterMultiSearchSelect } from '@/shared/ui/filter-multi-search-select';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
@@ -25,6 +24,7 @@ type Props = {
   filters: UserFilters;
   orgUnits: OrgUnit[];
   regions: Region[];
+  roleOptions: Array<{ value: string; label: string }>;
   tableFilterMode?: TableFilterMode;
   regionFilterDisabled?: boolean;
   onFiltersChange: (filters: UserFilters) => void;
@@ -42,6 +42,7 @@ export const UserRegistryTable = memo(function UserRegistryTable({
   filters,
   orgUnits,
   regions,
+  roleOptions,
   tableFilterMode = 'all',
   regionFilterDisabled = false,
   onFiltersChange,
@@ -60,6 +61,7 @@ export const UserRegistryTable = memo(function UserRegistryTable({
           filters={filters}
           orgUnits={orgUnits}
           regions={regions}
+          roleOptions={roleOptions}
           tableFilterMode={tableFilterMode}
           regionFilterDisabled={regionFilterDisabled}
           onFiltersChange={onFiltersChange}
@@ -74,6 +76,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
   filters,
   orgUnits,
   regions,
+  roleOptions,
   tableFilterMode,
   regionFilterDisabled,
   onFiltersChange,
@@ -81,6 +84,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
   filters: UserFilters;
   orgUnits: OrgUnit[];
   regions: Region[];
+  roleOptions: Array<{ value: string; label: string }>;
   tableFilterMode: TableFilterMode;
   regionFilterDisabled: boolean;
   onFiltersChange: (filters: UserFilters) => void;
@@ -130,7 +134,7 @@ const UserRegistryTableHeader = memo(function UserRegistryTableHeader({
                 values={splitFilterValues(filters.roles)}
                 placeholder="Все роли"
                 searchPlaceholder="Поиск роли"
-                options={userRoleFilterOptions}
+                options={roleOptions}
                 onChange={(roles) => onFiltersChange({ roles: joinFilterValues(roles) })}
               />
             )}

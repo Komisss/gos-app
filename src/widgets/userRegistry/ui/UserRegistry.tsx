@@ -6,6 +6,7 @@ import { UserPlus } from 'lucide-react';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
 import { getUsersPage, type UserFilters } from '@/entities/user/api/users';
+import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -63,6 +64,13 @@ export function UserRegistry({
   const [pageSize, setPageSize] = useState(25);
   const debouncedSearch = useDebouncedValue(filters.search ?? '', 500);
   const userExport = useUserExport();
+  const availableRoleFilterOptions = useMemo(
+    () =>
+      isRegionalManager
+        ? userRoleFilterOptions.filter((role) => role.value !== '1' && role.value !== '2')
+        : userRoleFilterOptions,
+    [isRegionalManager],
+  );
   const queryFilters = useMemo(
     () => ({
       ...filters,
@@ -80,11 +88,17 @@ export function UserRegistry({
     }
 
     setFilters((current) =>
-      current.region_ids === String(currentUserRegionId)
+      current.region_ids === String(currentUserRegionId) &&
+      current.roles === getAllowedRoleFilterValue(current.roles, availableRoleFilterOptions)
         ? current
-        : { ...current, region_ids: String(currentUserRegionId), org_unit_ids: '' },
+        : {
+            ...current,
+            region_ids: String(currentUserRegionId),
+            roles: getAllowedRoleFilterValue(current.roles, availableRoleFilterOptions),
+            org_unit_ids: '',
+          },
     );
-  }, [currentUserRegionId, isRegionalManager]);
+  }, [availableRoleFilterOptions, currentUserRegionId, isRegionalManager]);
 
   const usersQuery = useQuery({
     queryKey: ['users', queryFilters, page, pageSize],
@@ -157,6 +171,7 @@ export function UserRegistry({
                 open={userExport.exportOpen}
                 orgUnits={orgUnits}
                 regions={regions}
+                roleOptions={availableRoleFilterOptions}
                 onDownload={userExport.runExport}
                 onExportFiltersChange={userExport.setExportFilters}
                 onOpenChange={userExport.setExportOpen}
@@ -180,6 +195,7 @@ export function UserRegistry({
               filters={filters}
               orgUnits={orgUnits}
               regions={regions}
+              roleOptions={availableRoleFilterOptions}
               tableFilterMode={resolvedTableFilterMode}
               regionFilterDisabled={isRegionalManager}
               onFiltersChange={updateFilters}
@@ -298,6 +314,22 @@ function UserPagination({
 
 function clampPage(page: number, totalPages: number) {
   return Math.min(Math.max(1, page), Math.max(totalPages, 1));
+}
+
+function getAllowedRoleFilterValue(
+  value: string | undefined,
+  roleOptions: Array<{ value: string; label: string }>,
+) {
+  if (!value) {
+    return '';
+  }
+
+  const allowedRoleIds = new Set(roleOptions.map((role) => role.value));
+
+  return value
+    .split(',')
+    .filter((roleId) => allowedRoleIds.has(roleId))
+    .join(',');
 }
 
 function useDebouncedValue<T>(value: T, delay: number) {

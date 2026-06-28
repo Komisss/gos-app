@@ -2,7 +2,6 @@ import type { Dispatch, SetStateAction } from 'react';
 import { Download } from 'lucide-react';
 
 import { USER_WITHOUT_ORG_UNIT_FILTER, type UserFilters } from '@/entities/user/api/users';
-import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Button } from '@/shared/ui/button';
 import { FilterMultiSearchSelect } from '@/shared/ui/filter-multi-search-select';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
@@ -24,6 +23,7 @@ type UserExportPopoverProps = {
   open: boolean;
   orgUnits: Array<{ id: number; name: string; depth: number }>;
   regions: Array<{ id: number; name: string }>;
+  roleOptions: Array<{ value: string; label: string }>;
   onDownload: () => void;
   onExportFiltersChange: Dispatch<SetStateAction<UserFilters>>;
   onOpenChange: (open: boolean) => void;
@@ -37,6 +37,7 @@ export function UserExportPopover({
   open,
   orgUnits,
   regions,
+  roleOptions,
   onDownload,
   onExportFiltersChange,
   onOpenChange,
@@ -103,7 +104,7 @@ export function UserExportPopover({
               values={splitFilterValues(exportFilters.roles)}
               placeholder="Все роли"
               searchPlaceholder="Поиск роли"
-              options={userRoleFilterOptions}
+              options={roleOptions}
               onChange={(roles) =>
                 onExportFiltersChange((current) => ({
                   ...current,

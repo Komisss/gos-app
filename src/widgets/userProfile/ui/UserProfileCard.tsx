@@ -154,8 +154,13 @@ export function UserProfileCard() {
     );
     const currentOrgUnit = userQuery.data?.orgUnit;
     const currentOrgUnitId = currentOrgUnit ? getUserOrgUnitSelectionId(currentOrgUnit) : null;
+    const currentRoleId = toEntityId(userQuery.data?.role?.id);
 
     if (!currentOrgUnit || filteredOrgUnits.some((orgUnit) => orgUnit.id === currentOrgUnitId)) {
+      return filteredOrgUnits;
+    }
+
+    if (isOrgUnitTouched || effectiveRoleId !== currentRoleId) {
       return filteredOrgUnits;
     }
 
@@ -169,7 +174,7 @@ export function UserProfileCard() {
       fallbackOrgUnit,
       ...filteredOrgUnits,
     ];
-  }, [form.role, orgUnitsQuery.data, userQuery.data?.orgUnit, userQuery.data?.region]);
+  }, [form.role, isOrgUnitTouched, orgUnitsQuery.data, userQuery.data?.orgUnit, userQuery.data?.region, userQuery.data?.role]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -196,7 +201,7 @@ export function UserProfileCard() {
       phone: form.phone,
       birthday: form.birthday || null,
       role: effectiveRoleId,
-      org_unit: canSelectOrgUnit(effectiveRoleId) ? effectiveOrgUnitId : null,
+      parent_org_unit: canSelectOrgUnit(effectiveRoleId) ? effectiveOrgUnitId : null,
     };
 
     if (canEditUsername) {
@@ -224,6 +229,14 @@ export function UserProfileCard() {
   const showUsername = isManagementRole(user.role);
   const effectiveFormRoleId = getEffectiveRoleId(form.role, user.role);
   const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, user.orgUnit, isOrgUnitTouched);
+  const initialOrgUnitSelectionId = user.orgUnit ? getUserOrgUnitSelectionId(user.orgUnit) : null;
+  const selectedOrgUnitFallback =
+    user.orgUnit && effectiveOrgUnitId === initialOrgUnitSelectionId
+      ? {
+          label: getUserOrgUnitDisplayName(user.orgUnit),
+          description: user.region?.name,
+        }
+      : undefined;
   const selectedRoleLabel =
     availableRoleOptions.find((role) => role.id === effectiveFormRoleId)?.label ?? user.role?.name ?? 'Выберите роль';
 
@@ -402,18 +415,11 @@ export function UserProfileCard() {
                         loading={orgUnitsQuery.isLoading}
                         disabled={isRoleAndOrgUnitLocked || !user.region}
                         value={effectiveOrgUnitId}
-                        selectedFallback={
-                          user.orgUnit
-                            ? {
-                                label: getUserOrgUnitDisplayName(user.orgUnit),
-                                description: user.region?.name,
-                              }
-                            : undefined
-                        }
+                        selectedFallback={selectedOrgUnitFallback}
                         options={availableOrgUnits.map((orgUnit) => ({
                           id: orgUnit.id,
                           label:
-                            orgUnit.id === effectiveOrgUnitId && user.orgUnit
+                            orgUnit.id === initialOrgUnitSelectionId && user.orgUnit
                               ? getUserOrgUnitDisplayName(user.orgUnit)
                               : `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                           description: getOrgUnitDescription(orgUnit),

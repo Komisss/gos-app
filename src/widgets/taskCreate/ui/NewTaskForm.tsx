@@ -85,7 +85,7 @@ export function NewTaskForm() {
     event.preventDefault();
 
     const isScheduled = form.status === 'scheduled';
-    const isDeadlineMissing = isScheduled && !form.deadline_at;
+    const isDeadlineMissing = !form.deadline_at;
     const isActivationTimeMissing = isScheduled && !form.scheduled_at;
 
     setDeadlineError(isDeadlineMissing);
@@ -302,7 +302,7 @@ export function NewTaskForm() {
                 placeholder="Выберите дедлайн"
               />
               {deadlineError && (
-                <p className="text-sm text-red-600">Для запланированной задачи необходимо указать дедлайн.</p>
+                <p className="text-sm text-red-600">Укажите дедлайн задачи.</p>
               )}
             </Field>
           </div>
