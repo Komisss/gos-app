@@ -153,23 +153,20 @@ export function UserProfileCard() {
       userQuery.data?.region?.id ?? null,
     );
     const currentOrgUnit = userQuery.data?.orgUnit;
-    const currentOrgUnitId = currentOrgUnit ? Number(currentOrgUnit.id) : null;
+    const currentOrgUnitId = currentOrgUnit ? getUserOrgUnitSelectionId(currentOrgUnit) : null;
 
     if (!currentOrgUnit || filteredOrgUnits.some((orgUnit) => orgUnit.id === currentOrgUnitId)) {
       return filteredOrgUnits;
     }
 
+    const fallbackOrgUnit = getUserOrgUnitFallbackOption(
+      currentOrgUnit,
+      userQuery.data?.region?.id ?? null,
+      userQuery.data?.region?.name,
+    );
+
     return [
-      {
-        id: currentOrgUnitId ?? currentOrgUnit.id,
-        name: currentOrgUnit.name,
-        type: currentOrgUnit.type,
-        parentId: typeof currentOrgUnit.parent === 'number' ? currentOrgUnit.parent : null,
-        regionId: userQuery.data?.region?.id ?? null,
-        regionName: userQuery.data?.region?.name,
-        headUser: null,
-        depth: 0,
-      },
+      fallbackOrgUnit,
       ...filteredOrgUnits,
     ];
   }, [form.role, orgUnitsQuery.data, userQuery.data?.orgUnit, userQuery.data?.region]);
@@ -358,7 +355,7 @@ export function UserProfileCard() {
                 <ReadonlyField label="Дата создания" value={formatDateTime(user.createdAt)} />
               </div>
 
-              <div className="grid gap-5 md:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-4">
                 <Field label="Роль">
                   <Select
                     value={getSelectRoleValue(effectiveFormRoleId, availableRoleOptions)}
@@ -395,7 +392,8 @@ export function UserProfileCard() {
                   </Select>
                 </Field>
                 <ReadonlyField label="Регион" value={user.region?.name ?? 'Не указан'} />
-                <Field label="Структура подчинения">
+                <div className="md:col-span-2">
+                  <Field label="Структура подчинения">
                   {canSelectOrgUnit(effectiveFormRoleId) ? (
                     <div className="space-y-2">
                       <SearchSelect
@@ -407,14 +405,17 @@ export function UserProfileCard() {
                         selectedFallback={
                           user.orgUnit
                             ? {
-                                label: user.orgUnit.name,
+                                label: getUserOrgUnitDisplayName(user.orgUnit),
                                 description: user.region?.name,
                               }
                             : undefined
                         }
                         options={availableOrgUnits.map((orgUnit) => ({
                           id: orgUnit.id,
-                          label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
+                          label:
+                            orgUnit.id === effectiveOrgUnitId && user.orgUnit
+                              ? getUserOrgUnitDisplayName(user.orgUnit)
+                              : `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
                           description: getOrgUnitDescription(orgUnit),
                         }))}
                         onChange={(org_unit) => {
@@ -439,7 +440,8 @@ export function UserProfileCard() {
                   ) : (
                     <p className="text-sm text-slate-500">Не требуется для выбранной роли</p>
                   )}
-                </Field>
+                  </Field>
+                </div>
               </div>
 
               <div className="grid gap-5 md:grid-cols-2">
@@ -675,7 +677,7 @@ function getInitialForm(user: UserDetails): UserFormState {
     phone: formatRussianPhone(user.phone ?? ''),
     birthday: user.birthday ?? '',
     role: toEntityId(user.role?.id),
-    org_unit: toEntityId(user.orgUnit?.id),
+    org_unit: user.orgUnit ? getUserOrgUnitSelectionId(user.orgUnit) : null,
   };
 }
 
@@ -707,6 +709,35 @@ function getOrgUnitDescription(orgUnit: OrgUnit) {
     .join(' • ');
 }
 
+function getUserOrgUnitDisplayName(orgUnit: NonNullable<UserDetails['orgUnit']>) {
+  return typeof orgUnit.parent === 'object' && orgUnit.parent?.name ? orgUnit.parent.name : orgUnit.name;
+}
+
+function getUserOrgUnitSelectionId(orgUnit: NonNullable<UserDetails['orgUnit']>) {
+  return typeof orgUnit.parent === 'object' && orgUnit.parent
+    ? toEntityId(orgUnit.parent.id)
+    : toEntityId(orgUnit.id);
+}
+
+function getUserOrgUnitFallbackOption(
+  orgUnit: NonNullable<UserDetails['orgUnit']>,
+  regionId: number | null,
+  regionName?: string | null,
+): OrgUnit {
+  const parent = typeof orgUnit.parent === 'object' ? orgUnit.parent : null;
+
+  return {
+    id: getUserOrgUnitSelectionId(orgUnit) ?? orgUnit.id,
+    name: parent?.name ?? orgUnit.name,
+    type: (parent?.type ?? orgUnit.type) as OrgUnit['type'],
+    parentId: typeof orgUnit.parent === 'number' ? orgUnit.parent : null,
+    regionId,
+    regionName,
+    headUser: null,
+    depth: 0,
+  };
+}
+
 function canSelectOrgUnit(role: number | null) {
   return role !== null && role !== 1 && role !== 2;
 }
@@ -720,7 +751,7 @@ function getEffectiveOrgUnitId(
     return formOrgUnitId;
   }
 
-  return formOrgUnitId ?? toEntityId(userOrgUnit?.id);
+  return formOrgUnitId ?? (userOrgUnit ? getUserOrgUnitSelectionId(userOrgUnit) : null);
 }
 
 function getEffectiveRoleId(formRoleId: number | null, userRole: UserDetails['role']) {

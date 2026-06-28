@@ -21,7 +21,14 @@ export type UserOrgUnit = {
   id: number;
   name: string;
   type?: string;
-  parent?: number | null;
+  parent?: number | UserOrgUnitParent | null;
+  head_user?: OrgUnitHeadUser | string | null;
+};
+
+export type UserOrgUnitParent = {
+  id: number;
+  name: string;
+  type?: string;
   head_user?: OrgUnitHeadUser | string | null;
 };
 

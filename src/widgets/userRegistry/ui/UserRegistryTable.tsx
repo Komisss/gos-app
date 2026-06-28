@@ -8,7 +8,7 @@ import {
 } from '@/entities/user/api/users';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import type { Region } from '@/entities/region/model/types';
-import type { UserListItem } from '@/entities/user/model/types';
+import type { UserListItem, UserOrgUnit } from '@/entities/user/model/types';
 import { isManagementRole } from '@/entities/user/lib/isManagementRole';
 import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { Badge } from '@/shared/ui/badge';
@@ -235,7 +235,7 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({
             </TableCell>
             <TableCell className="text-slate-700">{user.role?.name ?? 'Не указана'}</TableCell>
             <TableCell className="min-w-[220px] whitespace-normal text-slate-700">
-              {user.orgUnit?.name ?? 'Не указана'}
+              {formatOrgUnitParent(user.orgUnit)}
             </TableCell>
             <TableCell>
               <Badge
@@ -276,4 +276,12 @@ function splitFilterValues(value?: string) {
 
 function joinFilterValues(values: string[]) {
   return values.join(',');
+}
+
+function formatOrgUnitParent(orgUnit: UserOrgUnit | null) {
+  if (!orgUnit) {
+    return 'Не указана';
+  }
+
+  return typeof orgUnit.parent === 'object' && orgUnit.parent?.name ? orgUnit.parent.name : orgUnit.name;
 }
