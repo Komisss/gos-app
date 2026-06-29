@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { UserPlus } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
@@ -13,6 +11,7 @@ import { Input } from '@/shared/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { useUserExport } from '../model/useUserExport';
 import { UserExportPopover } from './UserExportPopover';
+import { UserImportPopover } from './UserImportPopover';
 import { UserRegistryTable } from './UserRegistryTable';
 
 const emptyUserFilters: UserFilters = {
@@ -64,6 +63,8 @@ export function UserRegistry({
   const [pageSize, setPageSize] = useState(25);
   const debouncedSearch = useDebouncedValue(filters.search ?? '', 500);
   const userExport = useUserExport();
+  const enforcedRegionIds =
+    isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : '';
   const availableRoleFilterOptions = useMemo(
     () =>
       isRegionalManager
@@ -96,9 +97,25 @@ export function UserRegistry({
             region_ids: String(currentUserRegionId),
             roles: getAllowedRoleFilterValue(current.roles, availableRoleFilterOptions),
             org_unit_ids: '',
-          },
+      },
     );
   }, [availableRoleFilterOptions, currentUserRegionId, isRegionalManager]);
+
+  useEffect(() => {
+    if (!enforcedRegionIds) {
+      return;
+    }
+
+    userExport.setExportFilters((current) =>
+      current.region_ids === enforcedRegionIds
+        ? current
+        : {
+            ...current,
+            region_ids: enforcedRegionIds,
+            org_unit_ids: '',
+          },
+    );
+  }, [enforcedRegionIds, userExport.setExportFilters]);
 
   const usersQuery = useQuery({
     queryKey: ['users', queryFilters, page, pageSize],
@@ -157,12 +174,7 @@ export function UserRegistry({
               <Button type="button" variant="outline" className="border-slate-200 bg-white" onClick={resetFilters}>
                 Сбросить фильтры
               </Button>
-              <Button asChild className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
-                <Link to="/users/new">
-                  <UserPlus />
-                  Добавить пользователя
-                </Link>
-              </Button>
+              <UserImportPopover />
               <UserExportPopover
                 filters={queryFilters}
                 exportFilters={userExport.exportFilters}
@@ -171,6 +183,8 @@ export function UserRegistry({
                 open={userExport.exportOpen}
                 orgUnits={orgUnits}
                 regions={regions}
+                regionFilterDisabled={Boolean(enforcedRegionIds)}
+                enforcedRegionIds={enforcedRegionIds}
                 roleOptions={availableRoleFilterOptions}
                 onDownload={userExport.runExport}
                 onExportFiltersChange={userExport.setExportFilters}
