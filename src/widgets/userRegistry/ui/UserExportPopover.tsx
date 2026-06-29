@@ -23,6 +23,8 @@ type UserExportPopoverProps = {
   open: boolean;
   orgUnits: Array<{ id: number; name: string; depth: number }>;
   regions: Array<{ id: number; name: string }>;
+  regionFilterDisabled?: boolean;
+  enforcedRegionIds?: string;
   roleOptions: Array<{ value: string; label: string }>;
   onDownload: () => void;
   onExportFiltersChange: Dispatch<SetStateAction<UserFilters>>;
@@ -37,17 +39,30 @@ export function UserExportPopover({
   open,
   orgUnits,
   regions,
+  regionFilterDisabled = false,
+  enforcedRegionIds = '',
   roleOptions,
   onDownload,
   onExportFiltersChange,
   onOpenChange,
 }: UserExportPopoverProps) {
+  function normalizeExportFilters(nextFilters: UserFilters): UserFilters {
+    if (!regionFilterDisabled || !enforcedRegionIds) {
+      return nextFilters;
+    }
+
+    return {
+      ...nextFilters,
+      region_ids: enforcedRegionIds,
+    };
+  }
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button type="button" className="bg-[#6d79ea] text-white hover:bg-[#5c67d9]">
+        <Button type="button" className="bg-[#465cd3] text-white hover:bg-[#3c50bd]">
           <Download />
-          Скачать XLSX
+          Экспорт
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(560px,calc(100vw-2rem))] p-4">
@@ -89,6 +104,7 @@ export function UserExportPopover({
             <FilterMultiSearchSelect
               label="Регион"
               values={splitFilterValues(exportFilters.region_ids)}
+              disabled={regionFilterDisabled}
               placeholder="Все регионы"
               searchPlaceholder="Поиск региона"
               options={regions.map((region) => ({ value: String(region.id), label: region.name }))}
@@ -136,11 +152,15 @@ export function UserExportPopover({
           )}
 
           <div className="flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-4">
-            <Button type="button" variant="outline" onClick={() => onExportFiltersChange(emptyUserExportFilters)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onExportFiltersChange(normalizeExportFilters(emptyUserExportFilters))}
+            >
               Сбросить
             </Button>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => onExportFiltersChange(filters)}>
+              <Button type="button" variant="outline" onClick={() => onExportFiltersChange(normalizeExportFilters(filters))}>
                 Взять фильтры таблицы
               </Button>
               <Button

@@ -190,7 +190,7 @@ function ReportsDeadlinesResult({ result, onPageChange }: { result: ReportsByDea
           <TableHeader><TableRow className="border-b-slate-200 bg-slate-50/80 hover:bg-slate-50/80">{tableColumns.map((column) => <TableHead key={column.key}>{column.label}</TableHead>)}</TableRow></TableHeader>
           <TableBody>
             {result.items.length === 0 ? <TableRow><TableCell colSpan={tableColumns.length} className="py-10 text-center text-sm text-slate-500">Нет данных.</TableCell></TableRow> : result.items.map((item, index) => (
-              <TableRow key={index} className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
+              <TableRow key={index} className={`align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}`}>
                 {tableColumns.map((column) => <TableCell key={column.key} className="max-w-[260px] truncate">{formatTableValue(item, column)}</TableCell>)}
               </TableRow>
             ))}

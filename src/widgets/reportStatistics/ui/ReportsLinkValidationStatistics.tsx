@@ -279,7 +279,7 @@ function ReportsLinkValidationResult({ result, onPageChange }: { result: Reports
             {rows.length === 0 ? (
               <TableRow><TableCell colSpan={Math.max(columns.length, 1)} className="py-10 text-center text-sm text-slate-500">Нет данных.</TableCell></TableRow>
             ) : rows.map((item, index) => (
-              <TableRow key={index} className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}>
+              <TableRow key={index} className={`align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}`}>
                 {columns.map((column) => <TableCell key={column} className="max-w-[260px] truncate">{formatMetricValue(item[column])}</TableCell>)}
               </TableRow>
             ))}

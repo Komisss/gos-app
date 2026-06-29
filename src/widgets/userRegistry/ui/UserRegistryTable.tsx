@@ -207,8 +207,8 @@ const UserRegistryTableBody = memo(function UserRegistryTableBody({
         users.map((user, index) => (
           <TableRow
             key={user.id}
-            className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
-              index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
+            className={`cursor-pointer align-top border-b-slate-200 ${
+              index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'
             }`}
             onClick={() => onUserClick(user.id)}
           >

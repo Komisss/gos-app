@@ -123,6 +123,7 @@ type ReportRegistryProps = {
   showBulkActions?: boolean;
   emptyStateText?: string;
   tableVariant?: 'default' | 'task-region';
+  userOptionsOverride?: SelectOption[];
 };
 
 export function ReportRegistry({
@@ -135,6 +136,7 @@ export function ReportRegistry({
   showBulkActions = true,
   emptyStateText = 'Настройте фильтры и нажмите «Получить отчеты».',
   tableVariant = 'default',
+  userOptionsOverride,
 }: ReportRegistryProps = {}) {
   const navigate = useNavigate();
   const { isRegionalManager, regionId: currentUserRegionId } = useCurrentUserRegion();
@@ -241,22 +243,33 @@ export function ReportRegistry({
       })),
     [tasksQuery.data],
   );
-  const userOptions = useMemo(
+  const allUserOptions = useMemo(
     () =>
-      (usersQuery.data ?? [])
-        .filter(
-          (user) =>
-            filters.region_ids.length === 0 ||
-            (user.region !== null && filters.region_ids.includes(user.region.id)),
-        )
-        .map((user) => ({
-          value: String(user.id),
-          label: user.fullName,
-          description: [user.role?.name, `@${user.username}`, user.region?.name]
-            .filter(Boolean)
-            .join(' • '),
-        })),
-    [filters.region_ids, usersQuery.data],
+      (usersQuery.data ?? []).map((user) => ({
+        value: String(user.id),
+        label: user.fullName,
+        description: [user.role?.name, `@${user.username}`, user.region?.name]
+          .filter(Boolean)
+          .join(' • '),
+      })),
+    [usersQuery.data],
+  );
+  const userOptions = useMemo(
+    () => {
+      if (userOptionsOverride) {
+        return userOptionsOverride;
+      }
+
+      return allUserOptions.filter((userOption) => {
+        const user = (usersQuery.data ?? []).find((item) => String(item.id) === userOption.value);
+
+        return (
+          filters.region_ids.length === 0 ||
+          (user?.region !== null && user?.region !== undefined && filters.region_ids.includes(user.region.id))
+        );
+      });
+    },
+    [allUserOptions, filters.region_ids, userOptionsOverride, usersQuery.data],
   );
   const orgUnitOptions = useMemo(
     () =>
@@ -314,13 +327,15 @@ export function ReportRegistry({
         const nextFilters = { ...current, ...patch, page: 1 };
 
         if (patch.region_ids && patch.region_ids.length > 0) {
-          const allowedUserIds = new Set(
-            (usersQuery.data ?? [])
-              .filter(
-                (user) => user.region !== null && patch.region_ids?.includes(user.region.id),
-              )
-              .map((user) => user.id),
-          );
+          const allowedUserIds = userOptionsOverride
+            ? new Set(userOptionsOverride.map((userOption) => Number(userOption.value)))
+            : new Set(
+                (usersQuery.data ?? [])
+                  .filter(
+                    (user) => user.region !== null && patch.region_ids?.includes(user.region.id),
+                  )
+                  .map((user) => user.id),
+              );
 
           nextFilters.user_ids = current.user_ids.filter((userId) => allowedUserIds.has(userId));
 
@@ -345,7 +360,7 @@ export function ReportRegistry({
         return nextFilters;
       });
     },
-    [appliedFilters, orgUnitsQuery.data, usersQuery.data],
+    [appliedFilters, orgUnitsQuery.data, userOptionsOverride, usersQuery.data],
   );
 
   const handleToggleReport = useCallback((reportId: number, checked: boolean) => {
@@ -971,7 +986,7 @@ const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
           return (
             <TableRow
               key={`${report.id}-${index}`}
-              className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-100'}`}
+              className={`cursor-pointer align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}`}
               onClick={() => {
                 if (selectableReportId) {
                   onReportClick(selectableReportId);
@@ -1130,9 +1145,7 @@ function TaskRegionReportsTable({
               reports.map((report, index) => (
                 <TableRow
                   key={`${report.id}-${index}`}
-                  className={`align-top border-b-slate-200 hover:bg-slate-50/60 ${
-                    index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
-                  }`}
+                  className={`align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}`}
                 >
                   <TableCell className="font-medium text-slate-700">
                     {report.reportId ? (

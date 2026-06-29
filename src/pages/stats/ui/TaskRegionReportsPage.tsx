@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 
 import type { ReportStatus } from '@/entities/report/model/types';
+import { getTaskById } from '@/entities/task/api/tasks';
 import { ReportRegistry } from '@/widgets/reportRegistry/ui/ReportRegistry';
 
 export default function TaskRegionReportsPage() {
@@ -9,6 +11,11 @@ export default function TaskRegionReportsPage() {
   const taskId = toPositiveNumber(searchParams.get('task_id'));
   const regionId = toPositiveNumber(searchParams.get('region_id'));
   const reportStatus = normalizeReportStatus(searchParams.get('report_status'));
+  const taskQuery = useQuery({
+    queryKey: ['tasks', taskId],
+    queryFn: () => getTaskById(taskId ?? 0),
+    enabled: Boolean(taskId),
+  });
 
   const filters = useMemo(() => {
     const dateRange = createTenYearDateRange();
@@ -33,6 +40,30 @@ export default function TaskRegionReportsPage() {
       sort_direction: 'desc' as const,
     };
   }, [regionId, reportStatus, taskId]);
+  const taskAssignmentUserOptions = useMemo(() => {
+    const assignments = taskQuery.data?.taskAssignments ?? [];
+    const usersById = new Map<number, { value: string; label: string; description?: string }>();
+
+    assignments.forEach((assignment) => {
+      if (
+        !assignment.user_id ||
+        usersById.has(assignment.user_id) ||
+        (regionId !== null && assignment.region_id !== regionId)
+      ) {
+        return;
+      }
+
+      usersById.set(assignment.user_id, {
+        value: String(assignment.user_id),
+        label: assignment.user_full_name,
+        description: [assignment.username ? `@${assignment.username}` : null, assignment.region_name]
+          .filter(Boolean)
+          .join(' • '),
+      });
+    });
+
+    return Array.from(usersById.values());
+  }, [regionId, taskQuery.data?.taskAssignments]);
 
   return (
     <ReportRegistry
@@ -44,6 +75,7 @@ export default function TaskRegionReportsPage() {
       showHeaderActions={false}
       showBulkActions={false}
       tableVariant="task-region"
+      userOptionsOverride={taskAssignmentUserOptions}
       emptyStateText="В URL не переданы id задачи и региона."
     />
   );

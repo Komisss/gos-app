@@ -25,6 +25,7 @@ export type TaskAssignmentDto = {
   task_assignment_id: number;
   user_id: number;
   user_full_name: string;
+  username?: string | null;
   region_id: number | null;
   region_name: string | null;
   org_unit_id: number | null;

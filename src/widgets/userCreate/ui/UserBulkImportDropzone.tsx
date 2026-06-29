@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { FileSpreadsheet, Upload } from 'lucide-react';
 
 import { importUsersExcel, type UsersImportResult } from '@/entities/user/api/users';
-import { ApiError } from '@/shared/lib/apiError';
+import { ApiError, formatApiErrorCode } from '@/shared/lib/apiError';
 import { downloadBlob } from '@/shared/lib/downloadBlob';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -134,7 +134,6 @@ function showImportResultToast(result: UsersImportResult) {
   const title = hasErrors ? 'Импорт пользователей завершен с ошибками' : 'Пользователи импортированы';
   const description = (
     <div className="space-y-2">
-      {result.detail && <p>{result.detail}</p>}
       <p>
         Создано: {result.created}, обновлено: {result.updated}
       </p>
@@ -144,7 +143,7 @@ function showImportResultToast(result: UsersImportResult) {
           <ul className="max-h-40 space-y-1 overflow-auto pr-1">
             {errors.slice(0, 10).map((item) => (
               <li key={`${item.row}-${item.error}`}>
-                Строка {item.row}: {item.error}
+                Строка {item.row}: {formatApiErrorCode(item.error)}
               </li>
             ))}
           </ul>

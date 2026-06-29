@@ -392,8 +392,11 @@ function TaskRegionsStatisticsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {statistics.map((item) => (
-            <TableRow key={item.region_id} className="hover:bg-slate-50">
+          {statistics.map((item, index) => (
+            <TableRow
+              key={item.region_id}
+              className={index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}
+            >
               <TableCell>
                 <Link
                   to={getRegionHref(item)}

@@ -149,9 +149,7 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
         tasks.map((task, index) => (
           <TableRow
             key={task.id}
-            className={`cursor-pointer align-top border-b-slate-200 hover:bg-slate-50/60 ${
-              index % 2 === 0 ? 'bg-white' : 'bg-slate-100'
-            }`}
+            className={`cursor-pointer align-top border-b-slate-200 ${index % 2 === 0 ? 'bg-white hover:bg-sky-50' : 'bg-sky-50/40 hover:bg-sky-100/70'}`}
             onClick={() => onTaskClick?.(task)}
           >
             <TableCell className="font-medium text-slate-700">{task.id}</TableCell>

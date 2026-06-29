@@ -205,6 +205,7 @@ export function UserProfileCard() {
 
   const user = userQuery.data;
   const isLockedFederalManager = isFederalManager(user);
+  const isUserOnModeration = user.status === 'moderation';
   const isRoleAndOrgUnitLocked = isTopManager(user);
   const showUsername = isManagementRole(user.role);
   const effectiveFormRoleId = getEffectiveRoleId(form.role, user.role);
@@ -245,15 +246,17 @@ export function UserProfileCard() {
             >
               {getUserStatusLabel(user)}
             </Badge>
-            <Button
-              type="button"
-              variant={user.active ? 'destructive' : 'outline'}
-              disabled={toggleActiveMutation.isPending || isLockedFederalManager}
-              onClick={() => setToggleActiveConfirmOpen(true)}
-            >
-              {user.active ? <PowerOff /> : <Power />}
-              {user.active ? 'Деактивировать' : 'Активировать'}
-            </Button>
+            {!isUserOnModeration && (
+              <Button
+                type="button"
+                variant={user.active ? 'destructive' : 'outline'}
+                disabled={toggleActiveMutation.isPending || isLockedFederalManager}
+                onClick={() => setToggleActiveConfirmOpen(true)}
+              >
+                {user.active ? <PowerOff /> : <Power />}
+                {user.active ? 'Деактивировать' : 'Активировать'}
+              </Button>
+            )}
           </div>
         </div>
 

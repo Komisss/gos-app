@@ -55,6 +55,8 @@ export function NewUserForm() {
   const [form, setForm] = useState<RegisterUserPayload>(initialForm);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [regionError, setRegionError] = useState<string | null>(null);
+  const [birthdayError, setBirthdayError] = useState<string | null>(null);
   const showCredentials = shouldUseCredentials(form.role);
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
   const availableRoleOptions = useMemo(() => {
@@ -138,6 +140,7 @@ export function NewUserForm() {
         ? current
         : { ...current, region: managerRegionId, org_unit: 0 },
     );
+    setRegionError(null);
   }, [currentUserQuery.data?.region?.id, isRegionalManager]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -145,11 +148,15 @@ export function NewUserForm() {
 
     const nextPhoneError = getPhoneError(form.phone);
     const nextUsernameError = showCredentials ? getUsernameError(form.username ?? '') : null;
+    const nextRegionError = form.role !== 1 && !form.region ? 'Выберите регион.' : null;
+    const nextBirthdayError = form.birthday ? null : 'Выберите день рождения.';
 
     setPhoneError(nextPhoneError);
     setUsernameError(nextUsernameError);
+    setRegionError(nextRegionError);
+    setBirthdayError(nextBirthdayError);
 
-    if (nextPhoneError || nextUsernameError) {
+    if (nextPhoneError || nextUsernameError || nextRegionError || nextBirthdayError) {
       return;
     }
 
@@ -227,10 +234,12 @@ export function NewUserForm() {
                     label: region.name,
                     description: region.code,
                   }))}
-                  onChange={(region) =>
-                    setForm((current) => ({ ...current, region, org_unit: 0 }))
-                  }
+                  onChange={(region) => {
+                    setForm((current) => ({ ...current, region, org_unit: 0 }));
+                    setRegionError(null);
+                  }}
                 />
+                {regionError && <p className="text-sm text-red-600">{regionError}</p>}
               </Field>
             )}
           </div>
@@ -289,10 +298,12 @@ export function NewUserForm() {
                 value={parseDateOnly(form.birthday)}
                 maxDate={maxBirthdayDate}
                 placeholder="Выберите день рождения"
-                onChange={(birthday) =>
-                  setForm((current) => ({ ...current, birthday: toDateOnly(birthday) }))
-                }
+                onChange={(birthday) => {
+                  setForm((current) => ({ ...current, birthday: toDateOnly(birthday) }));
+                  setBirthdayError(null);
+                }}
               />
+              {birthdayError && <p className="text-sm text-red-600">{birthdayError}</p>}
             </Field>
           </div>
 
