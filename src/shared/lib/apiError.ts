@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 const apiErrorTitleByCode: Record<string, string> = {
+  DEBUG_UPDATE_USER_ERROR: 'Ошибка обновления пользователя',
   EMPTY_NAME: 'Не заполнено имя',
   INVALID_FILE_FORMAT: 'Некорректный формат файла',
   FILE_REQUIRED: 'Файл обязателен',

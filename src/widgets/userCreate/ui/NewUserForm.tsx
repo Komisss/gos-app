@@ -156,7 +156,12 @@ export function NewUserForm() {
     setRegionError(nextRegionError);
     setBirthdayError(nextBirthdayError);
 
-    if (nextPhoneError || nextUsernameError || nextRegionError || nextBirthdayError) {
+    if (
+      nextPhoneError ||
+      nextUsernameError ||
+      nextRegionError ||
+      nextBirthdayError
+    ) {
       return;
     }
 

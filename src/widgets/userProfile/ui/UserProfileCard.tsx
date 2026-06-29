@@ -79,6 +79,8 @@ export function UserProfileCard() {
     queryFn: getOrgUnitsTree,
   });
 
+  const effectiveFormRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
+
   useEffect(() => {
     if (userQuery.data) {
       setForm(getInitialForm(userQuery.data));
@@ -208,7 +210,6 @@ export function UserProfileCard() {
   const isUserOnModeration = user.status === 'moderation';
   const isRoleAndOrgUnitLocked = isTopManager(user);
   const showUsername = isManagementRole(user.role);
-  const effectiveFormRoleId = getEffectiveRoleId(form.role, user.role);
   const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, user.orgUnit, isOrgUnitTouched);
   const initialOrgUnitSelectionId = user.orgUnit ? getUserOrgUnitSelectionId(user.orgUnit) : null;
   const selectedOrgUnitFallback =
