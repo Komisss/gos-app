@@ -39,6 +39,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
   const [descriptionError, setDescriptionError] = useState(false);
   const [deadlineError, setDeadlineError] = useState(false);
   const [activationTimeError, setActivationTimeError] = useState(false);
+  const [dateTimeOrderError, setDateTimeOrderError] = useState<string | null>(null);
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -67,6 +68,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
     setDescriptionError(false);
     setDeadlineError(false);
     setActivationTimeError(false);
+    setDateTimeOrderError(null);
   }, [open, task]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -79,12 +81,15 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
     const isDescriptionMissing = !form.full_description?.trim();
     const isDeadlineMissing = !form.deadline_at;
     const isActivationTimeMissing = form.status === 'scheduled' && !form.scheduled_at;
+    const nextDateTimeOrderError =
+      isDeadlineMissing || isActivationTimeMissing ? null : getTaskDateTimeOrderError(form);
 
     setDescriptionError(isDescriptionMissing);
     setDeadlineError(isDeadlineMissing);
     setActivationTimeError(isActivationTimeMissing);
+    setDateTimeOrderError(nextDateTimeOrderError);
 
-    if (isDescriptionMissing || isDeadlineMissing || isActivationTimeMissing) {
+    if (isDescriptionMissing || isDeadlineMissing || isActivationTimeMissing || nextDateTimeOrderError) {
       return;
     }
 
@@ -266,6 +271,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                 value={form.deadline_at ?? undefined}
                 onChange={(deadline_at) => {
                   setForm((current) => ({ ...current, deadline_at }));
+                  setDateTimeOrderError(null);
 
                   if (deadline_at) {
                     setDeadlineError(false);
@@ -276,6 +282,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
               {deadlineError && (
                 <p className="text-sm text-red-600">Дедлайн задачи обязателен.</p>
               )}
+              {dateTimeOrderError && <p className="text-sm text-red-600">{dateTimeOrderError}</p>}
             </Field>
 
           {form.status === 'scheduled' && (
@@ -284,6 +291,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                 value={form.scheduled_at ?? undefined}
                 onChange={(scheduled_at) => {
                   setForm((current) => ({ ...current, scheduled_at }));
+                  setDateTimeOrderError(null);
 
                   if (scheduled_at) {
                     setActivationTimeError(false);
@@ -599,6 +607,34 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
       Number.isNaN(scheduledAt.getTime()) || scheduledAt < now ? now : scheduledAt,
     ),
   };
+}
+
+function getTaskDateTimeOrderError(form: TaskPayload) {
+  if (!form.deadline_at) {
+    return null;
+  }
+
+  const deadlineAt = new Date(form.deadline_at);
+
+  if (Number.isNaN(deadlineAt.getTime())) {
+    return 'Некорректная дата дедлайна.';
+  }
+
+  const activationAt = form.status === 'scheduled' && form.scheduled_at
+    ? new Date(form.scheduled_at)
+    : new Date();
+
+  if (Number.isNaN(activationAt.getTime())) {
+    return 'Некорректное время активации задачи.';
+  }
+
+  if (deadlineAt < activationAt) {
+    return form.status === 'scheduled'
+      ? 'Дедлайн не может быть раньше времени активации задачи.'
+      : 'Дедлайн активной задачи не может быть раньше текущего времени.';
+  }
+
+  return null;
 }
 
 function normalizeOptionalString(value: string | null) {

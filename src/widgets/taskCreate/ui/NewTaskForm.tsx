@@ -47,6 +47,7 @@ export function NewTaskForm() {
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
   const [deadlineError, setDeadlineError] = useState(false);
   const [activationTimeError, setActivationTimeError] = useState(false);
+  const [dateTimeOrderError, setDateTimeOrderError] = useState<string | null>(null);
   const minActivationDate = useMemo(() => new Date(), []);
 
   const usersQuery = useQuery({
@@ -87,11 +88,14 @@ export function NewTaskForm() {
     const isScheduled = form.status === 'scheduled';
     const isDeadlineMissing = !form.deadline_at;
     const isActivationTimeMissing = isScheduled && !form.scheduled_at;
+    const nextDateTimeOrderError =
+      isDeadlineMissing || isActivationTimeMissing ? null : getTaskDateTimeOrderError(form);
 
     setDeadlineError(isDeadlineMissing);
     setActivationTimeError(isActivationTimeMissing);
+    setDateTimeOrderError(nextDateTimeOrderError);
 
-    if (isDeadlineMissing || isActivationTimeMissing) {
+    if (isDeadlineMissing || isActivationTimeMissing || nextDateTimeOrderError) {
       return;
     }
 
@@ -295,6 +299,7 @@ export function NewTaskForm() {
                 value={form.deadline_at ?? undefined}
                 onChange={(deadline_at) => {
                   setForm((current) => ({ ...current, deadline_at }));
+                  setDateTimeOrderError(null);
                   if (deadline_at) {
                     setDeadlineError(false);
                   }
@@ -304,6 +309,7 @@ export function NewTaskForm() {
               {deadlineError && (
                 <p className="text-sm text-red-600">Укажите дедлайн задачи.</p>
               )}
+              {dateTimeOrderError && <p className="text-sm text-red-600">{dateTimeOrderError}</p>}
             </Field>
           </div>
 
@@ -313,6 +319,7 @@ export function NewTaskForm() {
                 value={form.scheduled_at ?? undefined}
                 onChange={(scheduled_at) => {
                   setForm((current) => ({ ...current, scheduled_at }));
+                  setDateTimeOrderError(null);
 
                   if (scheduled_at) {
                     setActivationTimeError(false);
@@ -372,6 +379,34 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
       Number.isNaN(scheduledAt.getTime()) || scheduledAt < now ? now : scheduledAt,
     ),
   };
+}
+
+function getTaskDateTimeOrderError(form: TaskPayload) {
+  if (!form.deadline_at) {
+    return null;
+  }
+
+  const deadlineAt = new Date(form.deadline_at);
+
+  if (Number.isNaN(deadlineAt.getTime())) {
+    return 'Некорректная дата дедлайна.';
+  }
+
+  const activationAt = form.status === 'scheduled' && form.scheduled_at
+    ? new Date(form.scheduled_at)
+    : new Date();
+
+  if (Number.isNaN(activationAt.getTime())) {
+    return 'Некорректное время активации задачи.';
+  }
+
+  if (deadlineAt < activationAt) {
+    return form.status === 'scheduled'
+      ? 'Дедлайн не может быть раньше времени активации задачи.'
+      : 'Дедлайн активной задачи не может быть раньше текущего времени.';
+  }
+
+  return null;
 }
 
 function normalizeOptionalString(value: string | null) {

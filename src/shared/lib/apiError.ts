@@ -11,6 +11,7 @@ export class ApiError extends Error {
 }
 
 const apiErrorTitleByCode: Record<string, string> = {
+  DEADLINE_CANNOT_BE_EARLIER_THAN_SCHEDULED_AT: 'Дедлайн не может быть раньше активации задачи',
   DEBUG_UPDATE_USER_ERROR: 'Ошибка обновления пользователя',
   EMPTY_NAME: 'Не заполнено имя',
   INVALID_FILE_FORMAT: 'Некорректный формат файла',
