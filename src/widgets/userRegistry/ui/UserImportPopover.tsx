@@ -2,9 +2,8 @@ import { Download, Upload } from 'lucide-react';
 
 import { Button } from '@/shared/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { USER_IMPORT_TEMPLATE_URL } from '@/widgets/userCreate/model/userImportTemplate';
 import { UserBulkImportDropzone } from '@/widgets/userCreate/ui/UserBulkImportDropzone';
-
-const USER_IMPORT_TEMPLATE_URL = '/templates/users-import-template.xlsx';
 
 export function UserImportPopover() {
   return (

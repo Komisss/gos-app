@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, Download, Search } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import {
@@ -22,6 +22,7 @@ import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
+import { USER_IMPORT_TEMPLATE_URL } from '../model/userImportTemplate';
 import { UserBulkImportDropzone } from './UserBulkImportDropzone';
 
 const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
@@ -192,7 +193,23 @@ export function NewUserForm() {
           </p>
         </div>
 
-        <UserBulkImportDropzone />
+        <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Массовое добавление пользователей</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Скачайте шаблон для заполнения или загрузите готовый XLSX-файл.
+              </p>
+            </div>
+            <Button asChild type="button" variant="outline" className="shrink-0 border-slate-200 bg-white">
+              <a href={USER_IMPORT_TEMPLATE_URL} download>
+                <Download />
+                Скачать шаблон
+              </a>
+            </Button>
+          </div>
+          <UserBulkImportDropzone />
+        </div>
 
         <form
           className="space-y-6 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"

@@ -210,6 +210,7 @@ export function UserProfileCard() {
   const isUserOnModeration = user.status === 'moderation';
   const isRoleAndOrgUnitLocked = isTopManager(user);
   const showUsername = isManagementRole(user.role);
+  const showMaxUserId = !isTopManager(user);
   const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, user.orgUnit, isOrgUnitTouched);
   const initialOrgUnitSelectionId = user.orgUnit ? getUserOrgUnitSelectionId(user.orgUnit) : null;
   const selectedOrgUnitFallback =
@@ -306,12 +307,14 @@ export function UserProfileCard() {
                   />
                 </Field>
 
-                <Field label="ID пользователя в MAX">
-                  <Input
-                    disabled
-                    value={form.max_user_id}
-                  />
-                </Field>
+                {showMaxUserId && (
+                  <Field label="ID пользователя в MAX">
+                    <Input
+                      disabled
+                      value={form.max_user_id}
+                    />
+                  </Field>
+                )}
 
                 <Field label="Телефон">
                   <Input
