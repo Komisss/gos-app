@@ -6,6 +6,7 @@ import { Check, ChevronsUpDown, Download, Search } from 'lucide-react';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import {
   filterOrgUnitsForUserRole,
+  getAutoLockedOrgUnitForUserRole,
   getOrgUnitHeadRoleCodesForUserRole,
 } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
@@ -101,6 +102,18 @@ export function NewUserForm() {
     () => filterOrgUnitsForUserRole(orgUnitsQuery.data ?? [], form.role, form.region),
     [form.region, form.role, orgUnitsQuery.data],
   );
+  const autoLockedOrgUnit = useMemo(
+    () => getAutoLockedOrgUnitForUserRole(availableOrgUnits, form.role, form.region),
+    [availableOrgUnits, form.region, form.role],
+  );
+
+  useEffect(() => {
+    if (!autoLockedOrgUnit || form.org_unit === autoLockedOrgUnit.id) {
+      return;
+    }
+
+    setForm((current) => ({ ...current, org_unit: autoLockedOrgUnit.id }));
+  }, [autoLockedOrgUnit, form.org_unit]);
 
   useEffect(() => {
     if (form.org_unit && !availableOrgUnits.some((orgUnit) => orgUnit.id === form.org_unit)) {
@@ -272,7 +285,7 @@ export function NewUserForm() {
                 placeholder={getOrgUnitPlaceholder(form.role, form.region)}
                 searchPlaceholder="Поиск структуры подчинения"
                 loading={orgUnitsQuery.isLoading}
-                disabled={!form.region}
+                disabled={!form.region || Boolean(autoLockedOrgUnit)}
                 value={form.org_unit}
                 options={availableOrgUnits.map((orgUnit) => ({
                   id: orgUnit.id,

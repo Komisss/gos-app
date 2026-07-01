@@ -5,7 +5,10 @@ import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
-import { filterOrgUnitsForUserRole } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
+import {
+  filterOrgUnitsForUserRole,
+  getAutoLockedOrgUnitForUserRole,
+} from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import {
   activateUser,
@@ -156,6 +159,24 @@ export function UserProfileCard() {
       ...filteredOrgUnits,
     ];
   }, [form.role, isOrgUnitTouched, orgUnitsQuery.data, userQuery.data?.orgUnit, userQuery.data?.region, userQuery.data?.role]);
+  const autoLockedOrgUnit = useMemo(
+    () =>
+      getAutoLockedOrgUnitForUserRole(
+        availableOrgUnits,
+        effectiveFormRoleId,
+        userQuery.data?.region?.id ?? null,
+      ),
+    [availableOrgUnits, effectiveFormRoleId, userQuery.data?.region?.id],
+  );
+
+  useEffect(() => {
+    if (!autoLockedOrgUnit || form.org_unit === autoLockedOrgUnit.id) {
+      return;
+    }
+
+    setIsOrgUnitTouched(true);
+    setForm((current) => ({ ...current, org_unit: autoLockedOrgUnit.id }));
+  }, [autoLockedOrgUnit, form.org_unit]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -400,7 +421,7 @@ export function UserProfileCard() {
                         placeholder={user.region ? 'Выберите структуру подчинения' : 'Сначала укажите регион'}
                         searchPlaceholder="Поиск структуры подчинения"
                         loading={orgUnitsQuery.isLoading}
-                        disabled={isRoleAndOrgUnitLocked || !user.region}
+                        disabled={isRoleAndOrgUnitLocked || !user.region || Boolean(autoLockedOrgUnit)}
                         value={effectiveOrgUnitId}
                         selectedFallback={selectedOrgUnitFallback}
                         options={availableOrgUnits.map((orgUnit) => ({
@@ -416,7 +437,10 @@ export function UserProfileCard() {
                           setForm((current) => ({ ...current, org_unit }));
                         }}
                       />
-                      {effectiveOrgUnitId !== null && effectiveOrgUnitId !== 0 && !isRoleAndOrgUnitLocked && (
+                      {effectiveOrgUnitId !== null &&
+                        effectiveOrgUnitId !== 0 &&
+                        !isRoleAndOrgUnitLocked &&
+                        !autoLockedOrgUnit && (
                         <Button
                           type="button"
                           variant="ghost"

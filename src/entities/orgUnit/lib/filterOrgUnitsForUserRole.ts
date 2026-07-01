@@ -12,7 +12,11 @@ export function filterOrgUnitsForUserRole(
   const targetHeadRoleCodes = getOrgUnitHeadRoleCodesForUserRole(roleId);
 
   return orgUnits.filter((orgUnit) => {
-    if (orgUnit.regionId !== regionId || orgUnit.isActive === false) {
+    if (
+      orgUnit.regionId !== regionId ||
+      orgUnit.isActive === false ||
+      orgUnit.headUser?.status !== 'active'
+    ) {
       return false;
     }
 
@@ -42,4 +46,24 @@ export function getOrgUnitHeadRoleCodesForUserRole(roleId: number) {
   }
 
   return [];
+}
+
+export function getAutoLockedOrgUnitForUserRole(
+  orgUnits: OrgUnit[],
+  roleId: number | null,
+  regionId: number | null,
+) {
+  if (roleId !== 4 || !regionId) {
+    return null;
+  }
+
+  const regionalManagerOrgUnits = orgUnits.filter(
+    (orgUnit) =>
+      orgUnit.regionId === regionId &&
+      orgUnit.isActive !== false &&
+      orgUnit.headUser?.status === 'active' &&
+      orgUnit.headUser?.role?.code === 'regional_manager',
+  );
+
+  return regionalManagerOrgUnits.length === 1 ? regionalManagerOrgUnits[0] : null;
 }
