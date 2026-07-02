@@ -363,6 +363,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
   const scheduledAt = form.scheduled_at ? new Date(form.scheduled_at) : now;
   const normalized: TaskPayload = {
     ...form,
+    title: form.title.trim(),
     full_description: normalizeOptionalString(form.full_description),
     deadline_at: form.deadline_at || null,
     scheduled_at: null,
@@ -445,13 +446,19 @@ function AssignmentCombobox({
 
   function handleSelect(item: AssignmentOption) {
     const currentIds = value?.kind === item.kind ? value.ids : [];
-    const nextIds = currentIds.includes(item.id)
+    const nextIds = item.kind === 'region'
+      ? [item.id]
+      : currentIds.includes(item.id)
       ? currentIds.filter((id) => id !== item.id)
       : [...currentIds, item.id];
     const nextTarget = nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null;
 
     onChange(nextTarget);
     setQuery('');
+
+    if (item.kind === 'region') {
+      setOpen(false);
+    }
   }
 
   return (
@@ -586,18 +593,20 @@ function getAssignmentOptions(
     }));
   }
 
-  return data.users.map((user) => ({
-    id: user.id,
-    kind: 'user',
-    label: user.fullName,
-    description: [
-      user.role?.name ?? 'Роль не указана',
-      `@${user.username}`,
-      user.region?.name,
-    ]
-      .filter(Boolean)
-      .join(' • '),
-  }));
+  return data.users
+    .filter(isActiveUser)
+    .map((user) => ({
+      id: user.id,
+      kind: 'user',
+      label: user.fullName,
+      description: [
+        user.role?.name ?? 'Роль не указана',
+        `@${user.username}`,
+        user.region?.name,
+      ]
+        .filter(Boolean)
+        .join(' • '),
+    }));
 }
 
 function getAssignmentLabel(
@@ -644,6 +653,10 @@ function getSearchLabel(kind: AssignmentKind) {
 
 function isReportFormatLocked(form: TaskPayload) {
   return form.task_type === 'street_action' || form.online_task_subtype === 'like';
+}
+
+function isActiveUser(user: UserListItem) {
+  return user.status === 'active' || (user.active && !user.status);
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

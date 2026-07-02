@@ -70,6 +70,7 @@ export function UserProfileCard() {
   const [isOrgUnitTouched, setIsOrgUnitTouched] = useState(false);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
   const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
+  const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
 
   const userQuery = useQuery({
     queryKey: ['users', parsedUserId],
@@ -186,8 +187,9 @@ export function UserProfileCard() {
     }
 
     const canEditUsername = isManagementRole(userQuery.data?.role ?? null);
+    const trimmedUsername = form.username.trim();
     const nextPhoneError = getPhoneError(form.phone);
-    const nextUsernameError = canEditUsername ? getUsernameError(form.username) : null;
+    const nextUsernameError = canEditUsername ? getUsernameError(trimmedUsername) : null;
 
     setPhoneError(nextPhoneError);
     setUsernameError(nextUsernameError);
@@ -199,8 +201,8 @@ export function UserProfileCard() {
     const effectiveRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
     const effectiveOrgUnitId = getEffectiveOrgUnitId(form.org_unit, userQuery.data?.orgUnit, isOrgUnitTouched);
     const payload: UserPatchPayload = {
-      full_name: form.full_name,
-      phone: form.phone,
+      full_name: form.full_name.trim(),
+      phone: form.phone.trim(),
       birthday: form.birthday || null,
       role: effectiveRoleId,
       org_unit: userQuery.data?.orgUnit ? toEntityId(userQuery.data.orgUnit.id) : null,
@@ -208,7 +210,7 @@ export function UserProfileCard() {
     };
 
     if (canEditUsername) {
-      payload.username = form.username;
+      payload.username = trimmedUsername;
     }
 
     updateMutation.mutate(payload);
@@ -358,10 +360,13 @@ export function UserProfileCard() {
                   {phoneError && <p className="text-sm text-red-600">{phoneError}</p>}
                 </Field>
 
+                <ReadonlyLinkField label="ВК" value={user.linkVk} />
+
                 <Field label="Дата рождения">
                   <DatePicker
                     disabled={isLockedFederalManager}
                     value={parseDateOnly(form.birthday)}
+                    maxDate={maxBirthdayDate}
                     onChange={(birthday) =>
                       setForm((current) => ({
                         ...current,
@@ -670,6 +675,26 @@ function ReadonlyField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ReadonlyLinkField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      {value ? (
+        <a
+          className="break-all text-sm font-medium text-[#465cd3] hover:text-[#3c50bd] hover:underline"
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {value}
+        </a>
+      ) : (
+        <p className="text-sm text-slate-900">Нет ссылки</p>
+      )}
+    </div>
+  );
+}
+
 function UserProfileMessage({ text, tone = 'default' }: { text: string; tone?: 'default' | 'error' }) {
   return (
     <div className="min-h-full bg-slate-50 px-6 py-6">
@@ -714,6 +739,14 @@ function getPhoneError(value: string) {
   }
 
   return isCompleteRussianPhone(value) ? null : 'Введите номер телефона полностью: 11 цифр.';
+}
+
+function getAdultMaxBirthdayDate() {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - 18);
+  date.setHours(0, 0, 0, 0);
+
+  return date;
 }
 
 function getOrgUnitDescription(orgUnit: OrgUnit) {

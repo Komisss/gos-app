@@ -1824,8 +1824,8 @@ function getReportStatusLabel(status: string) {
 
 function getTaskRegionReportStatusLabel(report: CrmReport) {
   if (report.reportStatus === 'accepted') {
-    return report.raw.last_moderation?.moderation_level === 'regional'
-      ? 'Одобрен региональным руководителем'
+    return isRegionalModerationLevel(report.raw.last_moderation?.moderation_level)
+      ? 'Одобрено регионом'
       : 'Одобрен';
   }
 
@@ -1834,10 +1834,22 @@ function getTaskRegionReportStatusLabel(report: CrmReport) {
   }
 
   if (report.reportStatus === 'revision_requested' || report.reportStatus === 'not_completed') {
-    return 'Отклонен';
+    return isRegionalModerationLevel(report.raw.last_moderation?.moderation_level)
+      ? 'Отклонено регионом'
+      : 'Отклонен';
   }
 
   return 'Не указан';
+}
+
+function isRegionalModerationLevel(moderationLevel?: string | null) {
+  return (
+    moderationLevel === 'regional' ||
+    moderationLevel === 'main_manager' ||
+    moderationLevel === 'assistant' ||
+    moderationLevel === 'unit_head' ||
+    moderationLevel === 'department_head'
+  );
 }
 
 function shouldHideRegionalModerationActions(report: CrmReport, isRegionalManager: boolean) {

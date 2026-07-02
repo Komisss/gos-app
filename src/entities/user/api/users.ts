@@ -218,6 +218,7 @@ function mapUserDetailsDto(user: UserDetailsDto): UserDetails {
     maxUserId: user.max_user_id,
     phone: user.phone,
     birthday: user.birthday,
+    linkVk: user.link_vk ?? null,
     createdAt: user.created_at,
   };
 }

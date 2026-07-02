@@ -9,6 +9,7 @@ import type { Region } from '@/entities/region/model/types';
 import type { Task, TaskPayload, TaskTargetPayload, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
+import { useAuth } from '@/features/auth/model/AuthContext';
 import { toApiDateTime } from '@/shared/lib/dateTime';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
@@ -35,6 +36,8 @@ type Props = {
 };
 
 export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmit }: Props) {
+  const { session } = useAuth();
+  const isFederalManager = session?.role?.code === 'federal_manager';
   const [form, setForm] = useState<TaskPayload>(() => getInitialForm(task));
   const [descriptionError, setDescriptionError] = useState(false);
   const [deadlineError, setDeadlineError] = useState(false);
@@ -70,6 +73,12 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
     setActivationTimeError(false);
     setDateTimeOrderError(null);
   }, [open, task]);
+
+  useEffect(() => {
+    if (!isFederalManager && form.scope === 'federal') {
+      setForm((current) => ({ ...current, scope: 'regional' }));
+    }
+  }, [form.scope, isFederalManager]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -159,7 +168,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="federal">Федеральный</SelectItem>
+                  {isFederalManager && <SelectItem value="federal">Федеральный</SelectItem>}
                   <SelectItem value="regional">Региональный</SelectItem>
                 </SelectContent>
               </Select>
@@ -358,11 +367,17 @@ function AssignmentCombobox({
 
   function handleSelect(item: AssignmentOption) {
     const currentIds = value?.kind === item.kind ? value.ids : [];
-    const nextIds = currentIds.includes(item.id)
+    const nextIds = item.kind === 'region'
+      ? [item.id]
+      : currentIds.includes(item.id)
       ? currentIds.filter((id) => id !== item.id)
       : [...currentIds, item.id];
 
     onChange(nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null);
+
+    if (item.kind === 'region') {
+      setOpen(false);
+    }
   }
 
   return (
@@ -500,12 +515,14 @@ function getAssignmentOptions(
     }));
   }
 
-  return data.users.map((user) => ({
-    id: user.id,
-    kind: 'user',
-    label: user.fullName,
-    description: `@${user.username}${user.region?.name ? ` • ${user.region.name}` : ''}`,
-  }));
+  return data.users
+    .filter(isActiveUser)
+    .map((user) => ({
+      id: user.id,
+      kind: 'user',
+      label: user.fullName,
+      description: `@${user.username}${user.region?.name ? ` • ${user.region.name}` : ''}`,
+    }));
 }
 
 function getAssignmentLabel(
@@ -589,6 +606,7 @@ function normalizeTaskPayload(form: TaskPayload): TaskPayload {
   const scheduledAt = form.scheduled_at ? new Date(form.scheduled_at) : now;
   const normalized: TaskPayload = {
     ...form,
+    title: form.title.trim(),
     full_description: normalizeOptionalString(form.full_description),
     report_format: isReportFormatLocked(form) ? 'image' : form.report_format,
     online_task_subtype: form.task_type === 'online_action' ? form.online_task_subtype : undefined,
@@ -651,6 +669,10 @@ function omitTargets(payload: TaskPayload): TaskPayload {
 
 function isReportFormatLocked(form: TaskPayload) {
   return form.task_type === 'street_action' || form.online_task_subtype === 'like';
+}
+
+function isActiveUser(user: UserListItem) {
+  return user.status === 'active' || (user.active && !user.status);
 }
 
 function mapTargetsToPayload(task: Task | null): TaskTargetPayload[] | undefined {

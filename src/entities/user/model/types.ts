@@ -56,6 +56,7 @@ export type UserDetailsDto = {
   active: boolean | string;
   phone: string | null;
   birthday: string | null;
+  link_vk?: string | null;
   status: UserStatus;
   created_at: string;
 };
@@ -77,6 +78,7 @@ export type UserDetails = UserListItem & {
   maxUserId: string | null;
   phone: string | null;
   birthday: string | null;
+  linkVk: string | null;
   createdAt: string;
 };
 

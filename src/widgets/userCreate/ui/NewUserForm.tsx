@@ -161,7 +161,8 @@ export function NewUserForm() {
     event.preventDefault();
 
     const nextPhoneError = getPhoneError(form.phone);
-    const nextUsernameError = showCredentials ? getUsernameError(form.username ?? '') : null;
+    const trimmedUsername = form.username?.trim() ?? '';
+    const nextUsernameError = showCredentials ? getUsernameError(trimmedUsername) : null;
     const nextRegionError = form.role !== 1 && !form.region ? 'Выберите регион.' : null;
     const nextBirthdayError = form.birthday ? null : 'Выберите день рождения.';
 
@@ -181,6 +182,9 @@ export function NewUserForm() {
 
     const payload: RegisterUserPayload = {
       ...form,
+      username: trimmedUsername,
+      password: form.password?.trim() ?? '',
+      full_name: form.full_name.trim(),
       phone: form.phone.trim(),
       birthday: form.birthday,
       max_user_id: null,
