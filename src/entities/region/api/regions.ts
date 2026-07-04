@@ -14,6 +14,7 @@ function mapRegionDto(region: RegionDto): Region {
     id: region.id,
     name: region.name,
     code: region.code,
+    externalCode: region.external_code ?? null,
     isActive: region.is_active,
   };
 }

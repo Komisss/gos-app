@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Check,
@@ -7,7 +8,6 @@ import {
   Clock3,
   FileCheck2,
   Link2,
-  ListFilter,
   ListChecks,
   Search,
 } from 'lucide-react';
@@ -34,6 +34,7 @@ import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { AnalyticsDashboardExportPopover } from '@/widgets/reports/ui/AnalyticsDashboardExportPopover';
 import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
+import { RussiaRegionsMap } from '@/widgets/reports/ui/RussiaRegionsMap';
 
 type DashboardFilters = AnalyticsDashboardPayload;
 
@@ -66,9 +67,9 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 ];
 
 export function ReportsDashboard() {
+  const navigate = useNavigate();
   const [filters, setFilters] = useState<DashboardFilters>(() => createInitialFilters());
   const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -141,21 +142,11 @@ export function ReportsDashboard() {
               reportTypeOptions={reportTypeOptions}
               onExportStarted={setExportJob}
             />
-            <Button
-              type="button"
-              variant="outline"
-              className="w-fit border-slate-200 bg-white"
-              onClick={() => setFiltersOpen((current) => !current)}
-            >
-              <ListFilter />
-              Фильтры
-            </Button>
           </div>
         </div>
 
-        {filtersOpen && (
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2">
             <DateFilter
               label="Дата с"
               value={filters.date_from}
@@ -165,117 +156,6 @@ export function ReportsDashboard() {
               label="Дата по"
               value={filters.date_to}
               onChange={(date_to) => setFilters((current) => ({ ...current, date_to }))}
-            />
-            <FilterSelect
-              label="Тип периода"
-              value={filters.period_type}
-              options={periodTypeOptions}
-              onChange={(period_type) =>
-                setFilters((current) => ({
-                  ...current,
-                  period_type: period_type as DashboardPeriodType,
-                }))
-              }
-            />
-            <MultiSearchSelect
-              label="Регионы"
-              values={filters.region_ids.map(String)}
-              placeholder="Все регионы"
-              searchPlaceholder="Поиск региона"
-              options={regionOptions}
-              onChange={(region_ids) =>
-                setFilters((current) => ({ ...current, region_ids: toNumbers(region_ids) }))
-              }
-            />
-            <MultiSearchSelect
-              label="Задачи"
-              values={filters.task_ids.map(String)}
-              placeholder="Все задачи"
-              searchPlaceholder="Поиск по id или названию"
-              options={taskOptions}
-              onChange={(task_ids) =>
-                setFilters((current) => ({ ...current, task_ids: toNumbers(task_ids) }))
-              }
-            />
-            <MultiSearchSelect
-              label="Структуры подчинения"
-              values={filters.org_unit_ids.map(String)}
-              placeholder="Все структуры подчинения"
-              searchPlaceholder="Поиск структуры подчинения"
-              options={orgUnitOptions}
-              onChange={(org_unit_ids) =>
-                setFilters((current) => ({ ...current, org_unit_ids: toNumbers(org_unit_ids) }))
-              }
-            />
-            <MultiSearchSelect
-              label="Пользователи"
-              values={filters.user_ids.map(String)}
-              placeholder="Все пользователи"
-              searchPlaceholder="Поиск по ФИО или username"
-              options={userOptions}
-              onChange={(user_ids) =>
-                setFilters((current) => ({ ...current, user_ids: toNumbers(user_ids) }))
-              }
-            />
-            <MultiSelect
-              label="Тип задачи"
-              values={filters.task_types}
-              placeholder="Все типы"
-              options={taskTypeOptions}
-              onChange={(task_types) =>
-                setFilters((current) => ({
-                  ...current,
-                  task_types: task_types as ReportTaskType[],
-                }))
-              }
-            />
-            <MultiSelect
-              label="Масштаб задачи"
-              values={filters.task_scope}
-              placeholder="Любой масштаб"
-              options={taskScopeOptions}
-              onChange={(task_scope) =>
-                setFilters((current) => ({
-                  ...current,
-                  task_scope: task_scope as ReportTaskScope[],
-                }))
-              }
-            />
-            <MultiSelect
-              label="Тип отчета"
-              values={filters.report_types}
-              placeholder="Все типы отчетов"
-              options={reportTypeOptions}
-              onChange={(report_types) =>
-                setFilters((current) => ({
-                  ...current,
-                  report_types: report_types as ReportType[],
-                }))
-              }
-            />
-          </div>
-
-          <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-3">
-            <BooleanFilter
-              label="Включать архивные задачи"
-              checked={filters.include_archived_tasks}
-              onChange={(include_archived_tasks) =>
-                setFilters((current) => ({ ...current, include_archived_tasks }))
-              }
-            />
-            <BooleanFilter
-              label="Включать удаленные назначения"
-              checked={filters.include_removed_assignments}
-              onChange={(include_removed_assignments) =>
-                setFilters((current) => ({ ...current, include_removed_assignments }))
-              }
-            />
-            <BooleanFilter
-              label="Только текущая версия отчета"
-              checked={filters.only_current_report_version}
-              onChange={(only_current_report_version) =>
-                setFilters((current) => ({ ...current, only_current_report_version }))
-              }
             />
           </div>
 
@@ -297,7 +177,11 @@ export function ReportsDashboard() {
             </Button>
           </div>
         </section>
-        )}
+
+        <RussiaRegionsMap
+          regions={regionsQuery.data ?? []}
+          onRegionClick={(region) => navigate(`/stats/dashboard/region/${region.id}`)}
+        />
 
         {dashboardMutation.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
@@ -470,8 +354,7 @@ function createInitialFilters(): DashboardFilters {
   const now = new Date();
   const dateFrom = new Date(now);
   const dateTo = new Date(now);
-  dateFrom.setMonth(dateFrom.getMonth() - 6);
-  dateTo.setMonth(dateTo.getMonth() + 5);
+  dateFrom.setMonth(dateFrom.getMonth() - 3);
 
   return {
     date_from: dateFrom.toISOString(),
