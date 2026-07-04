@@ -168,6 +168,7 @@ export function NewTaskForm() {
 
           <Field label="Адресат задачи">
             <AssignmentCombobox
+              scope={form.scope}
               users={usersQuery.data ?? []}
               regions={regionsQuery.data ?? []}
               isLoading={usersQuery.isLoading || regionsQuery.isLoading}
@@ -180,7 +181,18 @@ export function NewTaskForm() {
             <Field label="Уровень">
               <Select
                 value={form.scope}
-                onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
+                onValueChange={(scope) => {
+                  const nextScope = scope as TaskPayload['scope'];
+                  setForm((current) => ({ ...current, scope: nextScope }));
+
+                  if (
+                    nextScope === 'regional' &&
+                    assignmentTarget?.kind === 'region' &&
+                    assignmentTarget.ids.length > 1
+                  ) {
+                    handleAssignmentChange({ kind: 'region', ids: [assignmentTarget.ids[0]] });
+                  }
+                }}
               >
                 <SelectTrigger className="w-full border-slate-200 bg-white">
                   <SelectValue />
@@ -423,12 +435,14 @@ function omitTargets(payload: TaskPayload): TaskPayload {
 }
 
 function AssignmentCombobox({
+  scope,
   users,
   regions,
   isLoading,
   value,
   onChange,
 }: {
+  scope: TaskPayload['scope'];
   users: UserListItem[];
   regions: Region[];
   isLoading: boolean;
@@ -446,7 +460,7 @@ function AssignmentCombobox({
 
   function handleSelect(item: AssignmentOption) {
     const currentIds = value?.kind === item.kind ? value.ids : [];
-    const nextIds = item.kind === 'region'
+    const nextIds = item.kind === 'region' && scope === 'regional'
       ? [item.id]
       : currentIds.includes(item.id)
       ? currentIds.filter((id) => id !== item.id)
@@ -456,7 +470,7 @@ function AssignmentCombobox({
     onChange(nextTarget);
     setQuery('');
 
-    if (item.kind === 'region') {
+    if (item.kind === 'region' && scope === 'regional') {
       setOpen(false);
     }
   }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Popover as PopoverPrimitive } from 'radix-ui';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from '@/shared/ui/dialog';
 import { Input } from '@/shared/ui/input';
-import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { Popover, PopoverTrigger } from '@/shared/ui/popover';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
@@ -144,6 +145,7 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
 
           <Field label="Адресат задачи">
             <AssignmentCombobox
+              scope={form.scope}
               users={usersQuery.data ?? []}
               regions={regionsQuery.data ?? []}
               orgUnits={orgUnitsQuery.data ?? []}
@@ -162,7 +164,16 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
             <Field label="Уровень">
               <Select
                 value={form.scope}
-                onValueChange={(scope) => setForm((current) => ({ ...current, scope }))}
+                onValueChange={(scope) =>
+                  setForm((current) => ({
+                    ...current,
+                    scope,
+                    targets:
+                      scope === 'regional'
+                        ? normalizeRegionalTargets(current.targets)
+                        : current.targets,
+                  }))
+                }
               >
                 <SelectTrigger className="w-full bg-white">
                   <SelectValue />
@@ -330,19 +341,22 @@ export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmi
   );
 }
 
+type AssignmentKind = Exclude<TaskTargetType, 'org_unit'>;
+
 type AssignmentTarget = {
-  kind: TaskTargetType;
+  kind: AssignmentKind;
   ids: number[];
 } | null;
 
 type AssignmentOption = {
   id: number;
-  kind: TaskTargetType;
+  kind: AssignmentKind;
   label: string;
   description?: string;
 };
 
 function AssignmentCombobox({
+  scope,
   users,
   regions,
   orgUnits,
@@ -350,6 +364,7 @@ function AssignmentCombobox({
   value,
   onChange,
 }: {
+  scope: TaskPayload['scope'];
   users: UserListItem[];
   regions: Region[];
   orgUnits: OrgUnit[];
@@ -358,7 +373,7 @@ function AssignmentCombobox({
   onChange: (target: AssignmentTarget) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [kind, setKind] = useState<TaskTargetType>(value?.kind ?? 'region');
+  const [kind, setKind] = useState<AssignmentKind>(value?.kind ?? 'region');
   const [query, setQuery] = useState('');
   const data = { users, regions, orgUnits };
   const selectedLabel = getAssignmentLabel(value, data);
@@ -367,7 +382,7 @@ function AssignmentCombobox({
 
   function handleSelect(item: AssignmentOption) {
     const currentIds = value?.kind === item.kind ? value.ids : [];
-    const nextIds = item.kind === 'region'
+    const nextIds = item.kind === 'region' && scope === 'regional'
       ? [item.id]
       : currentIds.includes(item.id)
       ? currentIds.filter((id) => id !== item.id)
@@ -375,7 +390,7 @@ function AssignmentCombobox({
 
     onChange(nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null);
 
-    if (item.kind === 'region') {
+    if (item.kind === 'region' && scope === 'regional') {
       setOpen(false);
     }
   }
@@ -393,13 +408,13 @@ function AssignmentCombobox({
           <ChevronsUpDown className="size-4 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(560px,calc(100vw-3rem))] gap-4 p-4">
+      <DialogPopoverContent align="start" className="w-[min(560px,calc(100vw-3rem))] gap-4 p-4">
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700">Тип адресата</p>
           <Select
             value={kind}
             onValueChange={(nextKind) => {
-              const typedKind = nextKind as TaskTargetType;
+              const typedKind = nextKind as AssignmentKind;
               setKind(typedKind);
               setQuery('');
               onChange(null);
@@ -410,7 +425,6 @@ function AssignmentCombobox({
             </SelectTrigger>
             <SelectContent align="start">
               <SelectItem value="region">Региональная</SelectItem>
-              <SelectItem value="org_unit">Орг структура</SelectItem>
               <SelectItem value="user">Пользователь</SelectItem>
             </SelectContent>
           </Select>
@@ -464,7 +478,7 @@ function AssignmentCombobox({
             </div>
           </ScrollArea>
         </div>
-      </PopoverContent>
+      </DialogPopoverContent>
       </Popover>
       {selectedNames.length > 0 && (
         <p className="text-sm leading-6 text-slate-600">{selectedNames.join(', ')}</p>
@@ -474,7 +488,7 @@ function AssignmentCombobox({
 }
 
 function useAssignmentList(
-  kind: TaskTargetType,
+  kind: AssignmentKind,
   query: string,
   data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
 ) {
@@ -494,7 +508,7 @@ function useAssignmentList(
 }
 
 function getAssignmentOptions(
-  kind: TaskTargetType,
+  kind: AssignmentKind,
   data: { users: UserListItem[]; regions: Region[]; orgUnits: OrgUnit[] },
 ): AssignmentOption[] {
   if (kind === 'region') {
@@ -503,15 +517,6 @@ function getAssignmentOptions(
       kind: 'region',
       label: region.name,
       description: region.code,
-    }));
-  }
-
-  if (kind === 'org_unit') {
-    return data.orgUnits.map((orgUnit) => ({
-      id: orgUnit.id,
-      kind: 'org_unit',
-      label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
-      description: orgUnit.regionId ? `Регион #${orgUnit.regionId}` : undefined,
     }));
   }
 
@@ -547,9 +552,23 @@ function getAssignmentLabel(
 }
 
 function getAssignmentTarget(targets?: TaskTargetPayload[] | null): AssignmentTarget {
-  const firstTarget = targets?.find((target) => target.target_id.length > 0);
+  const firstTarget = targets?.find(
+    (target) => target.target_type !== 'org_unit' && target.target_id.length > 0,
+  );
 
-  return firstTarget ? { kind: firstTarget.target_type, ids: firstTarget.target_id } : null;
+  return firstTarget ? { kind: firstTarget.target_type as AssignmentKind, ids: firstTarget.target_id } : null;
+}
+
+function normalizeRegionalTargets(targets?: TaskTargetPayload[] | null) {
+  if (!targets) {
+    return targets;
+  }
+
+  return targets.map((target) =>
+    target.target_type === 'region' && target.target_id.length > 1
+      ? { ...target, target_id: [target.target_id[0]] }
+      : target,
+  );
 }
 
 function getAssignmentNames(
@@ -565,13 +584,9 @@ function getAssignmentNames(
     .map((item) => item.label.trim());
 }
 
-function getSearchLabel(kind: TaskTargetType) {
+function getSearchLabel(kind: AssignmentKind) {
   if (kind === 'region') {
     return 'Регион';
-  }
-
-  if (kind === 'org_unit') {
-    return 'Орг структура';
   }
 
   return 'Пользователь';
@@ -583,6 +598,25 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <p className="text-sm font-medium text-slate-700">{label}</p>
       {children}
     </div>
+  );
+}
+
+function DialogPopoverContent({
+  className,
+  align = 'center',
+  sideOffset = 4,
+  ...props
+}: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+  return (
+    <PopoverPrimitive.Content
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        'z-50 flex w-72 origin-(--radix-popover-content-transform-origin) flex-col gap-4 rounded-md bg-popover p-4 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-hidden duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+        className,
+      )}
+      {...props}
+    />
   );
 }
 
