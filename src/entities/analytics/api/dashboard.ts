@@ -45,8 +45,25 @@ export async function getAnalyticsDashboard(payload: AnalyticsDashboardPayload) 
   });
 }
 
-export async function getRegionDashboard(regionId: number) {
-  return http<RegionDashboardResponse>(`${REGION_DASHBOARD_ENDPOINT}/${regionId}/`);
+export async function getRegionDashboard(
+  regionId: number,
+  filters: { date_from?: string; date_to?: string } = {},
+) {
+  const params = new URLSearchParams();
+
+  if (filters.date_from) {
+    params.set('date_from', filters.date_from);
+  }
+
+  if (filters.date_to) {
+    params.set('date_to', filters.date_to);
+  }
+
+  const queryString = params.toString();
+
+  return http<RegionDashboardResponse>(
+    `${REGION_DASHBOARD_ENDPOINT}/${regionId}${queryString ? `?${queryString}` : ''}`,
+  );
 }
 
 export async function getReportsByOrgUnits(payload: ReportsByOrgUnitsPayload) {

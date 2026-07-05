@@ -125,6 +125,9 @@ export type RegionDashboardResponse = {
       task_type: ReportTaskType;
       task_subtype: string | null;
       online_task_subtype: string | null;
+      created_at: string | null;
+      activated_at: string | null;
+      deadline_at: string | null;
       people_count: number;
       unique_people_count: number;
     }>;
@@ -141,6 +144,9 @@ export type RegionDashboardResponse = {
       task_type: ReportTaskType;
       task_subtype: string | null;
       online_task_subtype: string | null;
+      created_at: string | null;
+      activated_at: string | null;
+      deadline_at: string | null;
       assignments_count: number;
       reports_count: number;
       accepted_reports_count: number;

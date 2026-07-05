@@ -280,21 +280,6 @@ function DashboardResult({ data }: { data: AnalyticsDashboardResponse }) {
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <InfoPanel title="Примененные фильтры" items={formatFilters(data.filters_applied)} />
-        <InfoPanel
-          title="Период"
-          items={[
-            { label: 'Дата с', value: formatDateTime(data.period.date_from) },
-            { label: 'Дата по', value: formatDateTime(data.period.date_to) },
-          ]}
-        />
-      </div>
-
-      <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
-        Обновлено:{' '}
-        <span className="font-medium text-slate-900">{formatDateTime(data.updated_at)}</span>
-      </div>
     </section>
   );
 }
