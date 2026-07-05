@@ -134,6 +134,7 @@ export default function RegionDashboardPage() {
           metricLabel="Количество человек"
           yAxisLabel="Кол-во чел."
           valueFormatter={formatNumber}
+          isCompleteValue={(_, task) => task.acceptedReportsPercent >= 100}
           tasks={(regionDashboard?.street.tasks ?? []).map((task) => ({
             taskId: task.task_id,
             title: task.task_title,
@@ -141,6 +142,7 @@ export default function RegionDashboardPage() {
             createdAt: task.created_at,
             activatedAt: task.activated_at,
             deadlineAt: task.deadline_at,
+            acceptedReportsPercent: task.accepted_reports_percent,
           }))}
         />
 
@@ -196,7 +198,9 @@ function TasksBarChart({
   metricLabel: string;
   yAxisLabel: string;
   valueFormatter: (value?: number | null) => string;
-  isCompleteValue?: (value: number) => boolean;
+  isCompleteValue?: (value: number, task: {
+    acceptedReportsPercent?: number;
+  }) => boolean;
   tasks: Array<{
     taskId: number;
     title: string;
@@ -204,6 +208,7 @@ function TasksBarChart({
     createdAt: string | null;
     activatedAt: string | null;
     deadlineAt: string | null;
+    acceptedReportsPercent?: number;
   }>;
 }) {
   const navigate = useNavigate();
@@ -215,8 +220,9 @@ function TasksBarChart({
     createdAt: task.createdAt,
     activatedAt: task.activatedAt,
     deadlineAt: task.deadlineAt,
+    acceptedReportsPercent: task.acceptedReportsPercent,
     isOverdue: isPastDate(task.deadlineAt),
-    isComplete: isCompleteValue?.(task.value) ?? false,
+    isComplete: isCompleteValue?.(task.value, task) ?? false,
   }));
   const chartWidth = Math.max(900, chartData.length * 150);
 

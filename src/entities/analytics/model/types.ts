@@ -132,6 +132,11 @@ export type RegionDashboardResponse = {
       deadline_at: string | null;
       people_count: number;
       unique_people_count: number;
+      reports_count: number;
+      successful_reports_count: number;
+      successful_reports_percent: number;
+      accepted_reports_count: number;
+      accepted_reports_percent: number;
     }>;
   };
   online: {
