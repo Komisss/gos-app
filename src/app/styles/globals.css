@@ -292,6 +292,11 @@ code {
   body {
     @apply bg-background text-foreground;
   }
+
+  .recharts-wrapper *:focus:not(:focus-visible) {
+    outline: none !important;
+  }
+
   html {
     @apply font-sans;
   }

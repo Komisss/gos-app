@@ -107,6 +107,7 @@ export type RegionDashboardResponse = {
     accepted_reports: number;
     completed_tasks_percent: number;
     online_tasks_count: number;
+    online_completed_tasks_percent: number;
     online_assignments_count: number;
     online_accepted_reports_count: number;
     online_accepted_reports_percent: number;

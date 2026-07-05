@@ -1,6 +1,7 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { getRegionDashboard } from '@/entities/analytics/api/dashboard';
 
@@ -66,7 +67,7 @@ export default function RegionDashboardPage() {
             />
             <MetricRow
               label="Общий процент выполнения"
-              value={formatPercent(regionDashboard?.summary.completed_tasks_percent)}
+              value={formatPercent(regionDashboard?.summary.online_completed_tasks_percent)}
             />
           </RegionMetricCard>
 
@@ -82,6 +83,8 @@ export default function RegionDashboardPage() {
           </RegionMetricCard>
         </section>
 
+        <StreetTasksLineChart tasks={regionDashboard?.street.tasks ?? []} />
+
         {regionDashboardQuery.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             Не удалось загрузить дашборд региона.
@@ -89,6 +92,107 @@ export default function RegionDashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function StreetTasksLineChart({
+  tasks,
+}: {
+  tasks: Array<{
+    task_id: number;
+    task_title: string;
+    people_count: number;
+  }>;
+}) {
+  const navigate = useNavigate();
+  const chartData = tasks.map((task) => ({
+    id: String(task.task_id),
+    taskId: task.task_id,
+    title: task.task_title,
+    peopleCount: task.people_count,
+  }));
+  const chartWidth = Math.max(900, chartData.length * 150);
+
+  function openTask(taskId: number) {
+    navigate(`/tasks/${taskId}`);
+  }
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold !text-slate-900">Уличные задачи</h2>
+      </div>
+
+      {chartData.length === 0 ? (
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+          Нет данных по уличным задачам.
+        </div>
+      ) : (
+        <div className="mt-4 overflow-x-auto pb-2">
+          <BarChart
+            width={chartWidth}
+            height={320}
+            data={chartData}
+            margin={{ top: 16, right: 24, bottom: 40, left: 0 }}
+            className="cursor-pointer outline-none focus:outline-none"
+            onClick={(data) => {
+              const taskId = Number(data?.activePayload?.[0]?.payload?.taskId);
+
+              if (Number.isFinite(taskId)) {
+                openTask(taskId);
+              }
+            }}
+          >
+            <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" />
+            <XAxis
+              dataKey="id"
+              tick={<TaskTitleTick tasks={chartData} onTaskClick={openTask} />}
+              interval={0}
+              height={72}
+              label={{
+                value: 'Задачи',
+                position: 'insideBottom',
+                offset: -8,
+                fill: '#475569',
+                fontSize: 13,
+              }}
+            />
+            <YAxis
+              allowDecimals={false}
+              tick={{ fill: '#64748b', fontSize: 12 }}
+              tickFormatter={(value) => formatNumber(Number(value))}
+              width={72}
+              label={{
+                value: 'Кол-во чел.',
+                angle: -90,
+                position: 'insideLeft',
+                fill: '#475569',
+                fontSize: 13,
+              }}
+            />
+            <Tooltip
+              formatter={(value) => [formatNumber(Number(value)), 'Количество человек']}
+              labelFormatter={(_, payload) => payload?.[0]?.payload?.title ?? ''}
+            />
+            <Bar
+              dataKey="peopleCount"
+              fill="#465cd3"
+              radius={[6, 6, 0, 0]}
+              maxBarSize={56}
+              className="cursor-pointer outline-none focus:outline-none"
+              background={(props) => <ClickableBarBackground {...props} onTaskClick={openTask} />}
+              onClick={(data) => {
+                const taskId = Number(data?.payload?.taskId);
+
+                if (Number.isFinite(taskId)) {
+                  openTask(taskId);
+                }
+              }}
+            />
+          </BarChart>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -110,6 +214,94 @@ function MetricRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ClickableBarBackground({
+  x,
+  y,
+  width,
+  height,
+  payload,
+  onTaskClick,
+}: {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  payload?: {
+    taskId?: number;
+  };
+  onTaskClick: (taskId: number) => void;
+}) {
+  const clickWidth = 130;
+  const rectWidth = Number(width ?? 0);
+  const rectX = Number(x ?? 0) + rectWidth / 2 - clickWidth / 2;
+  const taskId = Number(payload?.taskId);
+
+  return (
+    <rect
+      x={rectX}
+      y={Number(y ?? 0)}
+      width={clickWidth}
+      height={Number(height ?? 0)}
+      fill="#465cd3"
+      opacity={0.001}
+      className="cursor-pointer outline-none focus:outline-none"
+      tabIndex={-1}
+      style={{ outline: 'none' }}
+      onClick={() => {
+        if (Number.isFinite(taskId)) {
+          onTaskClick(taskId);
+        }
+      }}
+    />
+  );
+}
+
+function TaskTitleTick({
+  x = 0,
+  y = 0,
+  payload,
+  tasks,
+  onTaskClick,
+}: {
+  x?: number;
+  y?: number;
+  payload?: {
+    value?: string;
+  };
+  tasks: Array<{
+    id: string;
+    taskId: number;
+    title: string;
+  }>;
+  onTaskClick: (taskId: number) => void;
+}) {
+  const task = tasks.find((item) => item.id === payload?.value);
+  const title = task?.title ?? '';
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text
+        x={0}
+        y={0}
+        dy={16}
+        textAnchor="end"
+        transform="rotate(-25)"
+        fill="#64748b"
+        fontSize={12}
+        className="cursor-pointer hover:fill-[#465cd3]"
+        onClick={() => {
+          if (task) {
+            onTaskClick(task.taskId);
+          }
+        }}
+      >
+        <title>{title}</title>
+        {truncateChartLabel(title)}
+      </text>
+    </g>
+  );
+}
+
 function formatNumber(value?: number | null) {
   return value === undefined || value === null ? '—' : new Intl.NumberFormat('ru-RU').format(value);
 }
@@ -118,6 +310,10 @@ function formatPercent(value?: number | null) {
   return value === undefined || value === null
     ? '—'
     : `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value)}%`;
+}
+
+function truncateChartLabel(value: string) {
+  return value.length > 18 ? `${value.slice(0, 18)}...` : value;
 }
 
 function RegionDashboardMessage({
