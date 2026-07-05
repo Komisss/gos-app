@@ -5,7 +5,7 @@ import { useAuth } from './AuthContext';
 
 export function useCurrentUserRegion() {
   const { session } = useAuth();
-  const isRegionalManager = session?.role?.code === 'regional_manager';
+  const isRegionalManager = session?.role?.code === 'regional_manager' || session?.role?.id === 2;
   const userQuery = useQuery({
     queryKey: ['users', session?.userId],
     queryFn: () => getUserById(session?.userId ?? 0),

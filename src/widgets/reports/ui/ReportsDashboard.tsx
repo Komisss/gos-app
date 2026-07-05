@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -69,6 +69,7 @@ const reportTypeOptions: Array<{ value: ReportType; label: string }> = [
 export function ReportsDashboard() {
   const navigate = useNavigate();
   const [filters, setFilters] = useState<DashboardFilters>(() => createInitialFilters());
+  const [appliedFilters, setAppliedFilters] = useState<DashboardFilters>(() => createInitialFilters());
   const [exportJob, setExportJob] = useState<ExportCreateResponse | null>(null);
 
   const regionsQuery = useQuery({
@@ -91,12 +92,13 @@ export function ReportsDashboard() {
     queryFn: getOrgUnitsTree,
   });
 
-  const dashboardMutation = useMutation({
-    mutationFn: getAnalyticsDashboard,
+  const dashboardQuery = useQuery({
+    queryKey: ['analytics-dashboard', appliedFilters],
+    queryFn: () => getAnalyticsDashboard(appliedFilters),
   });
 
   function handleSubmit() {
-    dashboardMutation.mutate(filters);
+    setAppliedFilters(filters);
   }
 
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
@@ -145,6 +147,11 @@ export function ReportsDashboard() {
           </div>
         </div>
 
+        <RussiaRegionsMap
+          regions={regionsQuery.data ?? []}
+          onRegionClick={(region) => navigate(`/stats/dashboard/region/${region.id}`)}
+        />
+
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="grid gap-4 md:grid-cols-2">
             <DateFilter
@@ -163,37 +170,40 @@ export function ReportsDashboard() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => setFilters(createInitialFilters())}
+              onClick={() => {
+                const initialFilters = createInitialFilters();
+                setFilters(initialFilters);
+                setAppliedFilters(initialFilters);
+              }}
             >
               Сбросить фильтры
             </Button>
             <Button
               type="button"
               className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={dashboardMutation.isPending}
+              disabled={dashboardQuery.isFetching}
               onClick={handleSubmit}
             >
-              {dashboardMutation.isPending ? 'Загрузка...' : 'Получить дашборд'}
+              {dashboardQuery.isFetching ? 'Загрузка...' : 'Получить дашборд'}
             </Button>
           </div>
         </section>
 
-        <RussiaRegionsMap
-          regions={regionsQuery.data ?? []}
-          onRegionClick={(region) => navigate(`/stats/dashboard/region/${region.id}`)}
-        />
-
-        {dashboardMutation.isError && (
+        {dashboardQuery.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             Не удалось загрузить данные дашборда.
           </div>
         )}
 
-        {dashboardMutation.data ? (
-          <DashboardResult data={dashboardMutation.data} />
+        {dashboardQuery.isLoading ? (
+          <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+            Загружаем дашборд...
+          </div>
+        ) : dashboardQuery.data ? (
+          <DashboardResult data={dashboardQuery.data} />
         ) : (
           <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-            Настройте фильтры и нажмите «Получить дашборд».
+            Данные дашборда пока не загружены.
           </div>
         )}
       </div>

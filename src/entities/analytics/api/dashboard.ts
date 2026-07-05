@@ -1,5 +1,6 @@
 import type {
   AnalyticsDashboardPayload,
+  AnalyticsDashboardRequestPayload,
   AnalyticsDashboardResponse,
   RegionDashboardResponse,
   ReportsByOrgUnitsPayload,
@@ -39,10 +40,20 @@ const REPORTS_NOT_COMPLETED_ENDPOINT = '/api/v1/crm/analytics/reports/overdue-an
 const REPORTS_RETURNED_FOR_REVISION_ENDPOINT = '/api/v1/crm/analytics/reports/returned-for-revision';
 
 export async function getAnalyticsDashboard(payload: AnalyticsDashboardPayload) {
+  const requestPayload = toAnalyticsDashboardRequestPayload(payload);
+
   return http<AnalyticsDashboardResponse>(ANALYTICS_DASHBOARD_ENDPOINT, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(requestPayload),
   });
+}
+
+function toAnalyticsDashboardRequestPayload(
+  payload: AnalyticsDashboardPayload,
+): AnalyticsDashboardRequestPayload {
+  const { period_type: _periodType, ...requestPayload } = payload;
+
+  return requestPayload;
 }
 
 export async function getRegionDashboard(

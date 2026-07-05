@@ -22,6 +22,8 @@ export type AnalyticsDashboardPayload = {
   only_current_report_version: boolean;
 };
 
+export type AnalyticsDashboardRequestPayload = Omit<AnalyticsDashboardPayload, 'period_type'>;
+
 export type AnalyticsDashboardResponse = {
   filters_applied: AnalyticsDashboardPayload & {
     source?: string;

@@ -20,12 +20,15 @@ import {NavLink, useLocation} from "react-router";
 import {clsx} from 'clsx'
 import {useState} from "react";
 import { useAuth } from '@/features/auth/model/AuthContext';
+import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 
 export function NavigationSidebar() {
   const location = useLocation();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const { session } = useAuth();
   const roleCode = session?.role?.code;
+  const isRegionalManager = roleCode === 'regional_manager' || session?.role?.id === 2;
+  const { regionId: currentUserRegionId } = useCurrentUserRegion();
 
   return (
     <Sidebar collapsible="icon">
@@ -46,11 +49,18 @@ export function NavigationSidebar() {
                     .filter((item) => !('roles' in item) || !item.roles || item.roles.includes(roleCode ?? ''))
                     .map((item, navIndex) => {
                     const Icon = item.icon;
+                    const itemHref = getNavigationItemHref(
+                      item.href,
+                      isRegionalManager,
+                      currentUserRegionId,
+                    );
                     const itemKey = `${index}-${navIndex}`;
                     const isNested = 'items' in item && Array.isArray(item.items);
 
                     if (isNested) {
-                      const isActive = item.items.some((child) => location.pathname === child.href);
+                      const isActive = item.items.some((child) =>
+                        isNavigationItemActive(child.href, location.pathname, isRegionalManager),
+                      );
                       const isOpen = openItems[itemKey] ?? isActive;
 
                       return (
@@ -77,7 +87,11 @@ export function NavigationSidebar() {
                                 <SidebarMenuSubItem key={child.href}>
                                   <SidebarMenuSubButton
                                     asChild
-                                    className={clsx(location.pathname === child.href ? "bg-[#465cd3]" : "")}
+                                    className={clsx(
+                                      isNavigationItemActive(child.href, location.pathname, isRegionalManager)
+                                        ? "bg-[#465cd3]"
+                                        : "",
+                                    )}
                                   >
                                     <NavLink to={child.href}>
                                       <span className="text-[15px] text-white">{child.label}</span>
@@ -96,9 +110,14 @@ export function NavigationSidebar() {
                         <SidebarMenuButton
                           asChild
                           tooltip={item.label}
-                          className={clsx(location.pathname === item.href ? "bg-[#465cd3]" : "", "rounded-[0px]")}
+                          className={clsx(
+                            isNavigationItemActive(item.href, location.pathname, isRegionalManager)
+                              ? "bg-[#465cd3]"
+                              : "",
+                            "rounded-[0px]",
+                          )}
                         >
-                          <NavLink to={item.href}>
+                          <NavLink to={itemHref}>
                             {Icon && <Icon size={16} />}
                             <span className="text-[15px] text-white">{item.label}</span>
                           </NavLink>
@@ -117,4 +136,34 @@ export function NavigationSidebar() {
       <SidebarFooter />
     </Sidebar>
   )
+}
+
+function getNavigationItemHref(
+  href: string | undefined,
+  isRegionalManager: boolean,
+  regionId: number | null,
+) {
+  if (href === '/stats/dashboard' && isRegionalManager && regionId) {
+    return `/stats/dashboard/region/${regionId}`;
+  }
+
+  return href ?? '#';
+}
+
+function isNavigationItemActive(
+  href: string | undefined,
+  pathname: string,
+  isRegionalManager: boolean,
+) {
+  if (!href) {
+    return false;
+  }
+
+  if (href === '/stats/dashboard') {
+    return isRegionalManager
+      ? pathname.startsWith('/stats/dashboard/region/')
+      : pathname === '/stats/dashboard';
+  }
+
+  return pathname === href;
 }

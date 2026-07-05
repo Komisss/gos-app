@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { geoIdentity } from 'd3-geo';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
 
@@ -28,7 +29,16 @@ type MapTooltipState = {
   externalCode: number | null;
 };
 
-const RUSSIA_REGIONS_GEOJSON_URL = '/maps/russia-regions.geojson';
+const RUSSIA_REGIONS_GEOJSON_URL = '/maps/rus_simple_highcharts.geojson';
+const MAP_WIDTH = 1040;
+const MAP_HEIGHT = 540;
+const MAP_PADDING = 28;
+const HIGHCHARTS_GEOJSON_BOUNDS = {
+  minX: 4442516.475810701,
+  maxX: 12170895.8584538,
+  minY: -6596301.773082556,
+  maxY: -1071269.821194106,
+};
 const MAX_REGION_EXTERNAL_CODE = 1500;
 const REGION_EXTERNAL_CODE_STEP = 100;
 
@@ -37,6 +47,26 @@ export function RussiaRegionsMap({
   onRegionClick,
 }: RussiaRegionsMapProps) {
   const [tooltip, setTooltip] = useState<MapTooltipState | null>(null);
+  const mapProjection = useMemo(() => {
+    const boundsWidth = HIGHCHARTS_GEOJSON_BOUNDS.maxX - HIGHCHARTS_GEOJSON_BOUNDS.minX;
+    const boundsHeight = HIGHCHARTS_GEOJSON_BOUNDS.maxY - HIGHCHARTS_GEOJSON_BOUNDS.minY;
+    const scale = Math.min(
+      (MAP_WIDTH - MAP_PADDING * 2) / boundsWidth,
+      (MAP_HEIGHT - MAP_PADDING * 2) / boundsHeight,
+    );
+    const translatedWidth = boundsWidth * scale;
+    const translatedHeight = boundsHeight * scale;
+    const offsetX = (MAP_WIDTH - translatedWidth) / 2;
+    const offsetY = (MAP_HEIGHT - translatedHeight) / 2;
+
+    return geoIdentity()
+      .reflectY(true)
+      .scale(scale)
+      .translate([
+        offsetX - HIGHCHARTS_GEOJSON_BOUNDS.minX * scale,
+        offsetY + HIGHCHARTS_GEOJSON_BOUNDS.maxY * scale,
+      ]);
+  }, []);
   const regionByName = useMemo(() => {
     const map = new Map<string, Region>();
 
@@ -96,14 +126,9 @@ export function RussiaRegionsMap({
         onMouseLeave={() => setTooltip(null)}
       >
         <ComposableMap
-          projection="geoMercator"
-          projectionConfig={{
-            center: [95, 67],
-            rotate: [-20, 0, 0],
-            scale: 250,
-          }}
-          width={1040}
-          height={540}
+          projection={mapProjection}
+          width={MAP_WIDTH}
+          height={MAP_HEIGHT}
           className="h-[360px] w-full sm:h-[460px]"
         >
           <ZoomableGroup

@@ -53,31 +53,6 @@ export default function RegionDashboardPage() {
           </p>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2">
-            <DateFilter
-              label="Дата с"
-              value={filters.date_from}
-              onChange={(date_from) => setFilters((current) => ({ ...current, date_from }))}
-            />
-            <DateFilter
-              label="Дата по"
-              value={filters.date_to}
-              onChange={(date_to) => setFilters((current) => ({ ...current, date_to }))}
-            />
-          </div>
-          <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
-            <Button
-              type="button"
-              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={regionDashboardQuery.isFetching}
-              onClick={() => setAppliedFilters(filters)}
-            >
-              {regionDashboardQuery.isFetching ? 'Загрузка...' : 'Получить дашборд'}
-            </Button>
-          </div>
-        </section>
-
         <section className="grid gap-4 lg:grid-cols-3">
           <RegionMetricCard title="КПЭ региона">
             <MetricRow label="КПЭ" value={formatNumber(regionDashboard?.kpe.region_kpe)} />
@@ -111,11 +86,36 @@ export default function RegionDashboardPage() {
           </RegionMetricCard>
         </section>
 
+                <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-2">
+            <DateFilter
+              label="Дата с"
+              value={filters.date_from}
+              onChange={(date_from) => setFilters((current) => ({ ...current, date_from }))}
+            />
+            <DateFilter
+              label="Дата по"
+              value={filters.date_to}
+              onChange={(date_to) => setFilters((current) => ({ ...current, date_to }))}
+            />
+          </div>
+          <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
+            <Button
+              type="button"
+              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+              disabled={regionDashboardQuery.isFetching}
+              onClick={() => setAppliedFilters(filters)}
+            >
+              {regionDashboardQuery.isFetching ? 'Загрузка...' : 'Получить дашборд'}
+            </Button>
+          </div>
+        </section>
+
         <TasksBarChart
           title="Онлайн задачи"
           emptyText="Нет данных по онлайн задачам."
           metricLabel="Процент выполнения"
-          yAxisLabel="Процент"
+          yAxisLabel="% выполнения"
           valueFormatter={formatPercent}
           isCompleteValue={(value) => value >= 100}
           tasks={(regionDashboard?.online.tasks ?? []).map((task) => ({

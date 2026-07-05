@@ -29,10 +29,10 @@ export const AppRouter = () => {
         <Route element={<ProtectedRoute />}>
           <Route element={<MainLayout />}>
             <Route path="/stats/by_region" element={<TaskRegionReportsPage />} />
+            <Route path="/stats/dashboard" element={<ReportsPage />} />
+            <Route path="/stats/dashboard/region/:regionId" element={<RegionDashboardPage />} />
             <Route element={<StatisticsRoute />}>
               <Route path="/stats" element={<StatsPage />} />
-              <Route path="/stats/dashboard" element={<ReportsPage />} />
-              <Route path="/stats/dashboard/region/:regionId" element={<RegionDashboardPage />} />
               <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
               <Route path="/" element={<StatsPage />} />
             </Route>
