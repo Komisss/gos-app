@@ -1,30 +1,17 @@
 ﻿import { useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
-import { getAnalyticsDashboard } from '@/entities/analytics/api/dashboard';
-import type { AnalyticsDashboardPayload } from '@/entities/analytics/model/types';
-import { getRegions } from '@/entities/region/api/regions';
-import { getUsers } from '@/entities/user/api/users';
+import { getRegionDashboard } from '@/entities/analytics/api/dashboard';
 
 export default function RegionDashboardPage() {
   const { regionId } = useParams();
   const parsedRegionId = Number(regionId);
   const isValidRegionId = Number.isInteger(parsedRegionId) && parsedRegionId > 0;
 
-  const regionsQuery = useQuery({
-    queryKey: ['regions'],
-    queryFn: getRegions,
-  });
-
-  const dashboardQuery = useQuery({
+  const regionDashboardQuery = useQuery({
     queryKey: ['analytics-dashboard', 'region', parsedRegionId],
-    queryFn: () => getAnalyticsDashboard(createRegionDashboardFilters(parsedRegionId)),
-    enabled: isValidRegionId,
-  });
-
-  const usersQuery = useQuery({
-    queryKey: ['users', 'regional-manager', parsedRegionId],
-    queryFn: () => getUsers({ region_ids: String(parsedRegionId), roles: '2' }),
+    queryFn: () => getRegionDashboard(parsedRegionId),
     enabled: isValidRegionId,
   });
 
@@ -32,10 +19,9 @@ export default function RegionDashboardPage() {
     return <RegionDashboardMessage text="Некорректный id региона." tone="error" />;
   }
 
-  const region = regionsQuery.data?.find((item) => item.id === parsedRegionId);
-  const regionalManager = usersQuery.data?.find(
-    (user) => user.role?.code === 'regional_manager' || user.role?.id === 2,
-  );
+  const regionDashboard = regionDashboardQuery.data;
+  const region = regionDashboard?.region;
+  const regionalManager = regionDashboard?.regional_manager;
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -44,18 +30,18 @@ export default function RegionDashboardPage() {
           <p className="text-sm text-slate-500">Дашборд региона</p>
           <h1 className="mt-1 text-3xl font-semibold !text-slate-900">
             {region?.name ??
-              (regionsQuery.isLoading ? 'Загружаем регион...' : `Регион #${parsedRegionId}`)}
+              (regionDashboardQuery.isLoading ? 'Загружаем регион...' : `Регион #${parsedRegionId}`)}
           </h1>
           <p className="mt-4 text-sm text-slate-700">
             Региональный руководитель -{' '}
-            {usersQuery.isLoading ? (
+            {regionDashboardQuery.isLoading ? (
               <span className="text-slate-500">загружаем...</span>
             ) : regionalManager ? (
               <Link
                 className="font-medium text-[#465cd3] hover:text-[#3c50bd] hover:underline"
                 to={`/users/${regionalManager.id}`}
               >
-                {regionalManager.fullName}
+                {regionalManager.full_name}
               </Link>
             ) : (
               <span className="text-slate-500">не найден</span>
@@ -63,7 +49,40 @@ export default function RegionDashboardPage() {
           </p>
         </section>
 
-        {dashboardQuery.isError && (
+        <section className="grid gap-4 lg:grid-cols-3">
+          <RegionMetricCard title="КПЭ региона">
+            <MetricRow label="КПЭ" value={formatNumber(regionDashboard?.kpe.region_kpe)} />
+            <MetricRow label="Факт" value={formatNumber(regionDashboard?.kpe.region_fact)} />
+            <MetricRow
+              label="Процент факта"
+              value={formatPercent(regionDashboard?.kpe.region_fact_percent)}
+            />
+          </RegionMetricCard>
+
+          <RegionMetricCard title="Онлайн задачи">
+            <MetricRow
+              label="За всё время"
+              value={formatNumber(regionDashboard?.summary.online_tasks_count)}
+            />
+            <MetricRow
+              label="Общий процент выполнения"
+              value={formatPercent(regionDashboard?.summary.completed_tasks_percent)}
+            />
+          </RegionMetricCard>
+
+          <RegionMetricCard title="Уличные задачи">
+            <MetricRow
+              label="За всё время"
+              value={formatNumber(regionDashboard?.summary.street_tasks_count)}
+            />
+            <MetricRow
+              label="Общее количество человек"
+              value={formatNumber(regionDashboard?.summary.street_people_count)}
+            />
+          </RegionMetricCard>
+        </section>
+
+        {regionDashboardQuery.isError && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             Не удалось загрузить дашборд региона.
           </div>
@@ -73,26 +92,32 @@ export default function RegionDashboardPage() {
   );
 }
 
-function createRegionDashboardFilters(regionId: number): AnalyticsDashboardPayload {
-  const now = new Date();
-  const dateFrom = new Date(now);
-  dateFrom.setMonth(dateFrom.getMonth() - 3);
+function RegionMetricCard({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      {title && <h2 className="text-base font-semibold !text-slate-900">{title}</h2>}
+      <div className="mt-4 space-y-3">{children}</div>
+    </div>
+  );
+}
 
-  return {
-    date_from: dateFrom.toISOString(),
-    date_to: now.toISOString(),
-    period_type: 'assignment_created',
-    region_ids: [regionId],
-    task_ids: [],
-    org_unit_ids: [],
-    user_ids: [],
-    task_types: [],
-    task_scope: [],
-    report_types: [],
-    include_archived_tasks: false,
-    include_removed_assignments: false,
-    only_current_report_version: true,
-  };
+function MetricRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-3 first:border-t-0 first:pt-0">
+      <span className="text-sm text-slate-500">{label}</span>
+      <span className="text-base font-semibold text-slate-900">{value}</span>
+    </div>
+  );
+}
+
+function formatNumber(value?: number | null) {
+  return value === undefined || value === null ? '—' : new Intl.NumberFormat('ru-RU').format(value);
+}
+
+function formatPercent(value?: number | null) {
+  return value === undefined || value === null
+    ? '—'
+    : `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value)}%`;
 }
 
 function RegionDashboardMessage({

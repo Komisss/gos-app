@@ -75,6 +75,93 @@ export type AnalyticsDashboardResponse = {
   updated_at: string;
 };
 
+export type RegionDashboardResponse = {
+  region: {
+    id: number;
+    name: string;
+    external_code: number | null;
+  };
+  regional_manager: {
+    id: number;
+    full_name: string;
+    phone: string | null;
+    email: string | null;
+    status: string;
+    role_code: string;
+    region_id: number;
+    org_unit_id: number | null;
+  } | null;
+  period: {
+    date_from: string;
+    date_to: string;
+    date_field: string;
+  };
+  kpe: {
+    region_kpe: number;
+    region_fact: number;
+    region_fact_percent: number;
+  };
+  summary: {
+    region_users_count: number;
+    total_assignments: number;
+    accepted_reports: number;
+    completed_tasks_percent: number;
+    online_tasks_count: number;
+    online_assignments_count: number;
+    online_accepted_reports_count: number;
+    online_accepted_reports_percent: number;
+    street_tasks_count: number;
+    street_people_count: number;
+    street_unique_people_count: number;
+  };
+  street: {
+    street_tasks_count: number;
+    street_people_count: number;
+    street_unique_people_count: number;
+    tasks: Array<{
+      task_id: number;
+      task_title: string;
+      task_type: ReportTaskType;
+      task_subtype: string | null;
+      online_task_subtype: string | null;
+      people_count: number;
+      unique_people_count: number;
+    }>;
+  };
+  online: {
+    online_tasks_count: number;
+    online_assignments_count: number;
+    online_reports_count: number;
+    online_accepted_reports_count: number;
+    online_accepted_reports_percent: number;
+    tasks: Array<{
+      task_id: number;
+      task_title: string;
+      task_type: ReportTaskType;
+      task_subtype: string | null;
+      online_task_subtype: string | null;
+      assignments_count: number;
+      reports_count: number;
+      accepted_reports_count: number;
+      accepted_reports_percent: number;
+    }>;
+  };
+  filters_applied: {
+    region_id: number;
+    date_from: string;
+    date_to: string;
+    period_type: DashboardPeriodType | null;
+    task_ids: number[];
+    org_unit_ids: number[];
+    user_ids: number[];
+    task_types: ReportTaskType[];
+    task_scope: ReportTaskScope[];
+    report_types: ReportType[];
+    source: string;
+  };
+  updated_at: string;
+};
+
 export type ReportAnalyticsTaskStatus = 'draft' | 'scheduled' | 'active' | 'completed' | 'archived';
 
 export type ReportAnalyticsAssignmentStatus =

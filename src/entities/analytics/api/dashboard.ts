@@ -1,6 +1,7 @@
 import type {
   AnalyticsDashboardPayload,
   AnalyticsDashboardResponse,
+  RegionDashboardResponse,
   ReportsByOrgUnitsPayload,
   ReportsByOrgUnitsResponse,
   ReportsByRegionsPayload,
@@ -25,6 +26,7 @@ import type {
 import { http } from '@/shared/api/http';
 
 const ANALYTICS_DASHBOARD_ENDPOINT = '/api/v1/crm/analytics/dashboard';
+const REGION_DASHBOARD_ENDPOINT = '/api/v1/crm/analytics/dashboard/region';
 const REPORTS_BY_ORG_UNITS_ENDPOINT = '/api/v1/crm/analytics/reports/by-org-units';
 const REPORTS_BY_REGIONS_ENDPOINT = '/api/v1/crm/analytics/reports/by-regions';
 const REPORTS_BY_TASKS_ENDPOINT = '/api/v1/crm/analytics/reports/by-tasks';
@@ -41,6 +43,10 @@ export async function getAnalyticsDashboard(payload: AnalyticsDashboardPayload) 
     method: 'POST',
     body: JSON.stringify(payload),
   });
+}
+
+export async function getRegionDashboard(regionId: number) {
+  return http<RegionDashboardResponse>(`${REGION_DASHBOARD_ENDPOINT}/${regionId}/`);
 }
 
 export async function getReportsByOrgUnits(payload: ReportsByOrgUnitsPayload) {
