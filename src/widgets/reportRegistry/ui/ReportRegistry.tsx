@@ -1181,6 +1181,7 @@ function TaskRegionReportsTable({
                   </TableCell>
                   <TableCell>
                     {report.reportId ? (
+                      !report.isCurrentVersion ||
                       shouldHideRegionalModerationActions(report, isRegionalManager) ? null : (
                         <ReportModerationActions
                           reportId={report.reportId}

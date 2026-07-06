@@ -42,6 +42,7 @@ export type ReportsExportPayload = {
   exportType: 'reports_registry';
   format: 'xlsx';
   filters: {
+    task_ids?: number[];
     region_ids: number[];
     report_statuses: Array<'accepted' | 'revision_requested' | 'under_review'>;
     only_current_version: boolean;
@@ -121,6 +122,7 @@ export type CrmReportDto = {
   } | null;
   last_moderation: ReportLastModeration | null;
   available_actions: string[];
+  is_current_version: boolean;
 };
 
 export type ReportLastModeration = {
@@ -197,6 +199,7 @@ export type CrmReport = {
     description: string | null;
   } | null;
   availableActions: string[];
+  isCurrentVersion: boolean;
   raw: CrmReportDto;
 };
 

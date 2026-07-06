@@ -468,7 +468,6 @@ function AssignmentCombobox({
     const nextTarget = nextIds.length > 0 ? { kind: item.kind, ids: nextIds } : null;
 
     onChange(nextTarget);
-    setQuery('');
 
     if (item.kind === 'region' && scope === 'regional') {
       setOpen(false);

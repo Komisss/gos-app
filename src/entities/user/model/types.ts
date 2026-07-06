@@ -100,6 +100,7 @@ export type UserPatchPayload = Partial<{
   external_employee_id: string;
   phone: string;
   birthday: string | null;
+  link_vk?: string;
   max_username: string;
   max_user_id: string;
   max_chat_id: string;
@@ -119,6 +120,7 @@ export type RegisterUserPayload = {
   full_name: string;
   phone: string;
   birthday: string;
+  link_vk?: string;
   max_user_id: number | null;
   role: RegisterUserRoleId;
   region: number | null;

@@ -46,6 +46,7 @@ type UserFormState = {
   max_user_id: string;
   phone: string;
   birthday: string;
+  link_vk: string;
   role: number | null;
   org_unit: number | null;
 };
@@ -204,6 +205,7 @@ export function UserProfileCard() {
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
       birthday: form.birthday || null,
+      link_vk: form.link_vk.trim(),
       role: effectiveRoleId,
       org_unit: userQuery.data?.orgUnit ? toEntityId(userQuery.data.orgUnit.id) : null,
       parent_org_unit: canSelectOrgUnit(effectiveRoleId) ? effectiveOrgUnitId : null,
@@ -360,7 +362,16 @@ export function UserProfileCard() {
                   {phoneError && <p className="text-sm text-red-600">{phoneError}</p>}
                 </Field>
 
-                <ReadonlyLinkField label="ВК" value={user.linkVk} />
+                <Field label="ВК">
+                  <Input
+                    disabled={isLockedFederalManager}
+                    placeholder="Нет ссылки"
+                    value={form.link_vk}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, link_vk: event.target.value }))
+                    }
+                  />
+                </Field>
 
                 <Field label="Дата рождения">
                   <DatePicker
@@ -718,6 +729,7 @@ function getInitialForm(user: UserDetails): UserFormState {
     max_user_id: user.maxUserId ?? '',
     phone: formatRussianPhone(user.phone ?? ''),
     birthday: user.birthday ?? '',
+    link_vk: user.linkVk ?? '',
     role: toEntityId(user.role?.id),
     org_unit: user.orgUnit ? getUserOrgUnitSelectionId(user.orgUnit) : null,
   };
@@ -729,6 +741,7 @@ const emptyForm: UserFormState = {
   max_user_id: '',
   phone: '',
   birthday: '',
+  link_vk: '',
   role: null,
   org_unit: null,
 };

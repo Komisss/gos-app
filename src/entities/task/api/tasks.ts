@@ -206,7 +206,8 @@ export function mapTaskDtoToTask(task: TaskDto): Task {
     failedNotificationsCount: task.failed_notifications_count,
     taskAssignmentIds: task.task_assignment_ids,
     taskAssignments: task.task_assignments,
-    regionsStatistics: task.regions_statistics,
+    assignedRegions: task.assigned_regions,
+    regionsStatistics: task.regions_statistics ?? task.assigned_regions,
     taskReports: task.reports,
     answerFormat: `Формат отчета: ${getReportFormatLabel(task.report_format)}`,
   };

@@ -14,6 +14,7 @@ import {
 
 import { searchReports } from '@/entities/report/api/reports';
 import type { CrmReport, ReportSearchPayload } from '@/entities/report/model/types';
+import type { ReportsExportResponse, ReportStatus } from '@/entities/report/model/types';
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
@@ -49,6 +50,8 @@ import { Separator } from '@/shared/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { ReportDetailsDialog } from '@/widgets/reportDetails/ui/ReportDetailsDialog';
 import { ReportModerationActions } from '@/widgets/reportDetails/ui/ReportModerationActions';
+import { ReportExportPopover } from '@/widgets/reportRegistry/ui/ReportExportPopover';
+import { AnalyticsExportStatusToast } from '@/widgets/reports/ui/AnalyticsExportStatusToast';
 import { TaskEditDialog } from '@/widgets/taskRegistry/ui/TaskEditDialog';
 import { getStatusClassName } from '@/widgets/taskRegistry/ui/TaskRegistryTable';
 
@@ -62,6 +65,13 @@ type Props = {
 
 type TaskRegionStatistic = NonNullable<Task['regionsStatistics']>[number];
 
+const taskDetailsReportStatusOptions: Array<{ value: ReportStatus; label: string }> = [
+  { value: 'pending', label: 'На проверке' },
+  { value: 'accepted', label: 'Принят' },
+  { value: 'revision_requested', label: 'Нужна доработка' },
+  { value: 'not_completed', label: 'Не выполнен' },
+];
+
 export function TaskDetailsCard({
   task,
   isTogglingArchive,
@@ -74,6 +84,7 @@ export function TaskDetailsCard({
   const [toggleArchiveConfirmOpen, setToggleArchiveConfirmOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
+  const [exportJob, setExportJob] = useState<ReportsExportResponse | null>(null);
   const authorQuery = useQuery({
     queryKey: ['user', task.createdByUserId],
     queryFn: () => getUserById(task.createdByUserId ?? 0),
@@ -89,7 +100,6 @@ export function TaskDetailsCard({
   const regionsQuery = useQuery({
     queryKey: ['regions'],
     queryFn: getRegions,
-    enabled: Boolean(task.targets?.some((target) => target.target_type === 'region' || target.target_type === 'org_unit')),
   });
 
   const orgUnitsQuery = useQuery({
@@ -126,6 +136,8 @@ export function TaskDetailsCard({
     (isFederalTaskAuthor || isDifferentRegionalTaskAuthor || isAuthorRoleLoading);
   const shouldHideAuthorIdentity =
     isCurrentUserRegionalManager && (isFederalTaskAuthor || isAuthorRoleLoading);
+  const underReviewReportsCount = getTaskUnderReviewReportsCount(task);
+  const reportExportFilters = createTaskDetailsReportExportFilters(task.id);
 
   const updateMutation = useMutation({
     mutationFn: ({ taskId, payload }: { taskId: number; payload: TaskPayload }) =>
@@ -168,6 +180,17 @@ export function TaskDetailsCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <ReportExportPopover
+            reportFilters={reportExportFilters}
+            regionOptions={(regionsQuery.data ?? []).map((region) => ({
+              value: String(region.id),
+              label: region.name,
+              description: region.code,
+            }))}
+            reportStatusOptions={taskDetailsReportStatusOptions}
+            initialFiltersFromReportFilters
+            onExportStarted={setExportJob}
+          />
           <Button
             type="button"
             size="icon"
@@ -236,7 +259,7 @@ export function TaskDetailsCard({
           }
         />
         <InfoItem label="Назначений" value={formatNumber(task.assignmentsCount)} />
-        <InfoItem label="Ожидают проверки" value={formatNumber(task.pendingNotificationsCount)} />
+        <InfoItem label="Ожидают проверки" value={formatNumber(underReviewReportsCount)} />
         <InfoItem
           label="Адресаты"
           value={<TargetsPopover targets={targetItems} />}
@@ -312,6 +335,12 @@ export function TaskDetailsCard({
           }
         }}
       />
+      <AnalyticsExportStatusToast
+        exportJob={exportJob}
+        title="Экспорт отчетов"
+        defaultFileName={`task-${task.id}-reports.xlsx`}
+        onClose={() => setExportJob(null)}
+      />
     </>
   );
 }
@@ -384,10 +413,10 @@ function TaskRegionsStatisticsTable({
           <TableRow className="bg-slate-50/80 hover:bg-slate-50/80">
             <TableHead>Регион</TableHead>
             <TableHead>Назначения</TableHead>
-            <TableHead>Отчеты</TableHead>
+            <TableHead>Отчитались</TableHead>
             <TableHead>На проверке</TableHead>
             <TableHead>Принято</TableHead>
-            <TableHead>На доработке</TableHead>
+            <TableHead>Отклонено</TableHead>
             <TableHead>Выполнение</TableHead>
           </TableRow>
         </TableHeader>
@@ -758,6 +787,37 @@ function createTaskRegionReportsPayload({
   };
 }
 
+function createTaskDetailsReportExportFilters(taskId: number): ReportSearchPayload {
+  const dateRange = createTenYearDateRange();
+
+  return {
+    search: '',
+    region_ids: [],
+    task_ids: [taskId],
+    user_ids: [],
+    org_unit_ids: [],
+    role_ids: [],
+    task_types: [],
+    task_scope: [],
+    report_types: [],
+    report_statuses: [],
+    assignment_statuses: [],
+    submitted_from: dateRange.from,
+    submitted_to: dateRange.to,
+    deadline_from: dateRange.from,
+    deadline_to: dateRange.to,
+    created_from: dateRange.from,
+    created_to: dateRange.to,
+    has_report: true,
+    only_current_version: true,
+    include_removed: false,
+    page: 1,
+    page_size: 50,
+    sort_by: 'submitted_at',
+    sort_direction: 'desc',
+  };
+}
+
 function getReportRowKey(report: CrmReport) {
   return report.reportId ?? `${report.assignmentId}-${report.versionNumber ?? 'no-version'}`;
 }
@@ -963,6 +1023,12 @@ function formatNumber(value?: number | null) {
   }
 
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
+}
+
+function getTaskUnderReviewReportsCount(task: Task) {
+  const regions = task.assignedRegions ?? task.regionsStatistics ?? [];
+
+  return regions.reduce((total, region) => total + (region.under_review_reports ?? 0), 0);
 }
 
 function formatPercent(value?: number | null) {

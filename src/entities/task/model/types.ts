@@ -116,6 +116,7 @@ export interface TaskDto {
   failed_notifications_count?: number;
   task_assignment_ids?: number[];
   task_assignments?: TaskAssignmentDto[];
+  assigned_regions?: TaskRegionStatisticsDto[];
   regions_statistics?: TaskRegionStatisticsDto[];
   reports?: TaskReportDto[];
   created_at: string;
@@ -182,6 +183,7 @@ export interface Task {
   failedNotificationsCount?: number;
   taskAssignmentIds?: number[];
   taskAssignments?: TaskAssignmentDto[];
+  assignedRegions?: TaskRegionStatisticsDto[];
   regionsStatistics?: TaskRegionStatisticsDto[];
   region: string;
   assignee: string;

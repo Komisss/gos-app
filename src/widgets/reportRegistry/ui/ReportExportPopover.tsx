@@ -29,6 +29,7 @@ type SelectOption = {
 type ExportReportStatus = 'accepted' | 'revision_requested' | 'under_review';
 
 type ExportFilters = {
+  task_ids: number[];
   region_ids: number[];
   report_statuses: ReportStatus[];
   only_current_version: boolean;
@@ -40,15 +41,16 @@ type ExportFilters = {
 type Props = {
   reportFilters: ReportSearchPayload;
   regionOptions: SelectOption[];
-  taskOptions: SelectOption[];
-  userOptions: SelectOption[];
-  orgUnitOptions: SelectOption[];
-  roleOptions: SelectOption[];
-  taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
-  taskScopeOptions: Array<{ value: ReportTaskScope; label: string }>;
-  reportTypeOptions: Array<{ value: ReportType; label: string }>;
+  taskOptions?: SelectOption[];
+  userOptions?: SelectOption[];
+  orgUnitOptions?: SelectOption[];
+  roleOptions?: SelectOption[];
+  taskTypeOptions?: Array<{ value: ReportTaskType; label: string }>;
+  taskScopeOptions?: Array<{ value: ReportTaskScope; label: string }>;
+  reportTypeOptions?: Array<{ value: ReportType; label: string }>;
   reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
-  assignmentStatusOptions: Array<{ value: AssignmentStatus; label: string }>;
+  assignmentStatusOptions?: Array<{ value: AssignmentStatus; label: string }>;
+  initialFiltersFromReportFilters?: boolean;
   onExportStarted: (job: ReportsExportResponse) => void;
 };
 
@@ -87,10 +89,13 @@ export function ReportExportPopover({
   reportFilters,
   regionOptions,
   reportStatusOptions,
+  initialFiltersFromReportFilters = false,
   onExportStarted,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [filters, setFilters] = useState<ExportFilters>(() => createEmptyExportFilters());
+  const [filters, setFilters] = useState<ExportFilters>(() =>
+    initialFiltersFromReportFilters ? createExportFiltersFromReportFilters(reportFilters) : createEmptyExportFilters(),
+  );
 
   const exportMutation = useMutation({
     mutationFn: () =>
@@ -98,6 +103,7 @@ export function ReportExportPopover({
         exportType: 'reports_registry',
         format: 'xlsx',
         filters: {
+          task_ids: filters.task_ids,
           region_ids: filters.region_ids,
           report_statuses: toExportReportStatuses(filters.report_statuses),
           only_current_version: filters.only_current_version,
@@ -122,6 +128,7 @@ export function ReportExportPopover({
 
   function copyTableFilters() {
     setFilters({
+      task_ids: reportFilters.task_ids,
       region_ids: reportFilters.region_ids,
       report_statuses: reportFilters.report_statuses,
       only_current_version: reportFilters.only_current_version,
@@ -237,12 +244,25 @@ export function ReportExportPopover({
 
 function createEmptyExportFilters(): ExportFilters {
   return {
+    task_ids: [],
     region_ids: [],
     report_statuses: [],
     only_current_version: true,
     include_removed: false,
     sort_by: 'submitted_at',
     sort_direction: 'desc',
+  };
+}
+
+function createExportFiltersFromReportFilters(reportFilters: ReportSearchPayload): ExportFilters {
+  return {
+    task_ids: reportFilters.task_ids,
+    region_ids: reportFilters.region_ids,
+    report_statuses: reportFilters.report_statuses,
+    only_current_version: reportFilters.only_current_version,
+    include_removed: reportFilters.include_removed,
+    sort_by: reportFilters.sort_by,
+    sort_direction: reportFilters.sort_direction,
   };
 }
 

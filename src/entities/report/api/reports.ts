@@ -215,6 +215,7 @@ function mapReportDto(report: CrmReportDto): CrmReport {
         }
       : null,
     availableActions: report.available_actions,
+    isCurrentVersion: report.is_current_version,
     raw: report,
   };
 }

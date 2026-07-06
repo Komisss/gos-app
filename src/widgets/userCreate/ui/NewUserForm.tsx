@@ -42,6 +42,7 @@ const initialForm: RegisterUserPayload = {
   full_name: '',
   phone: '',
   birthday: '',
+  link_vk: '',
   max_user_id: null,
   role: 2,
   region: null,
@@ -187,6 +188,7 @@ export function NewUserForm() {
       full_name: form.full_name.trim(),
       phone: form.phone.trim(),
       birthday: form.birthday,
+      link_vk: form.link_vk?.trim() ?? '',
       max_user_id: null,
       region: form.role === 1 ? null : form.region,
       org_unit: canSelectOrgUnit(form.role) ? form.org_unit || null : null,
@@ -345,6 +347,15 @@ export function NewUserForm() {
               {birthdayError && <p className="text-sm text-red-600">{birthdayError}</p>}
             </Field>
           </div>
+
+          <Field label="Ссылка ВК">
+            <Input
+              className="border-slate-200"
+              placeholder="https://vk.com/..."
+              value={form.link_vk ?? ''}
+              onChange={(event) => setForm((current) => ({ ...current, link_vk: event.target.value }))}
+            />
+          </Field>
 
           {showCredentials && (
             <div className="grid gap-5 md:grid-cols-2">
