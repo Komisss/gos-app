@@ -1,7 +1,13 @@
 export type ReportTaskType = 'online_action' | 'street_action';
 export type ReportTaskScope = 'federal' | 'regional';
 export type ReportType = 'link' | 'image';
-export type ReportStatus = 'pending' | 'under_review' | 'accepted' | 'revision_requested' | 'not_completed';
+export type ReportStatus =
+  | 'pending'
+  | 'under_review'
+  | 'accepted'
+  | 'revision_requested'
+  | 'rejected'
+  | 'not_completed';
 export type AssignmentStatus =
   | 'assigned'
   | 'in_progress'
@@ -39,20 +45,24 @@ export type ReportSearchPayload = {
 };
 
 export type ReportsExportPayload = {
-  exportType: 'reports_registry';
+  exportType?: 'reports_registry';
   format: 'xlsx';
   filters: {
     task_ids?: number[];
     region_ids: number[];
-    report_statuses: Array<'accepted' | 'revision_requested' | 'under_review'>;
-    only_current_version: boolean;
-    include_removed: boolean;
+    report_statuses: Array<'accepted' | 'revision_requested' | 'under_review' | 'rejected'>;
+    assigned_at_from?: string | null;
+    assigned_at_to?: string | null;
+    assignment_deadline_at_from?: string | null;
+    assignment_deadline_at_to?: string | null;
+    only_current_version?: boolean;
+    include_removed?: boolean;
   };
-  columns: string[];
-  sortBy: string;
-  sortDirection: 'asc' | 'desc';
-  includeTechnicalFields: boolean;
-  includeHistory: boolean;
+  columns?: string[];
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+  includeTechnicalFields?: boolean;
+  includeHistory?: boolean;
   asyncMode: true;
 };
 

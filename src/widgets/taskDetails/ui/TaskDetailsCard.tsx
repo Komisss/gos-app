@@ -66,10 +66,10 @@ type Props = {
 type TaskRegionStatistic = NonNullable<Task['regionsStatistics']>[number];
 
 const taskDetailsReportStatusOptions: Array<{ value: ReportStatus; label: string }> = [
-  { value: 'pending', label: 'На проверке' },
+  { value: 'under_review', label: 'На проверке' },
   { value: 'accepted', label: 'Принят' },
-  { value: 'revision_requested', label: 'Нужна доработка' },
-  { value: 'not_completed', label: 'Не выполнен' },
+  { value: 'revision_requested', label: 'На доработке' },
+  { value: 'rejected', label: 'Отклонен' },
 ];
 
 export function TaskDetailsCard({
@@ -189,6 +189,7 @@ export function TaskDetailsCard({
             }))}
             reportStatusOptions={taskDetailsReportStatusOptions}
             initialFiltersFromReportFilters
+            variant="task-details"
             onExportStarted={setExportJob}
           />
           <Button
