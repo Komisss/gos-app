@@ -55,6 +55,8 @@ export type ReportsExportPayload = {
     assigned_at_to?: string | null;
     assignment_deadline_at_from?: string | null;
     assignment_deadline_at_to?: string | null;
+    export_with_structures?: boolean;
+    include_without_report?: boolean;
     only_current_version?: boolean;
     include_removed?: boolean;
   };

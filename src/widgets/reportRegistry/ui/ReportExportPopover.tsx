@@ -38,6 +38,8 @@ type ExportFilters = {
   assigned_at_to: string;
   assignment_deadline_at_from: string;
   assignment_deadline_at_to: string;
+  export_with_structures: boolean;
+  include_without_report: boolean;
   only_current_version: boolean;
   include_removed: boolean;
   sort_by: string;
@@ -100,6 +102,12 @@ export function ReportExportPopover({
           assigned_at_to: filters.assigned_at_to || null,
           assignment_deadline_at_from: filters.assignment_deadline_at_from || null,
           assignment_deadline_at_to: filters.assignment_deadline_at_to || null,
+          ...(isTaskDetailsVariant
+            ? {
+                export_with_structures: filters.export_with_structures,
+                include_without_report: filters.include_without_report,
+              }
+            : {}),
         },
         asyncMode: true,
       } as const;
@@ -125,6 +133,8 @@ export function ReportExportPopover({
       assigned_at_to: '',
       assignment_deadline_at_from: '',
       assignment_deadline_at_to: '',
+      export_with_structures: false,
+      include_without_report: false,
       only_current_version: reportFilters.only_current_version,
       include_removed: reportFilters.include_removed,
       sort_by: reportFilters.sort_by,
@@ -221,6 +231,24 @@ export function ReportExportPopover({
           </div>
 
           <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+            {isTaskDetailsVariant && (
+              <>
+                <BooleanFilter
+                  label="Выгружать со структурами"
+                  checked={filters.export_with_structures}
+                  onChange={(export_with_structures) =>
+                    updateFilters({ export_with_structures })
+                  }
+                />
+                <BooleanFilter
+                  label="Включать без отчета"
+                  checked={filters.include_without_report}
+                  onChange={(include_without_report) =>
+                    updateFilters({ include_without_report })
+                  }
+                />
+              </>
+            )}
             {!isTaskDetailsVariant && (
               <BooleanFilter
                 label="Только текущая версия"
@@ -274,6 +302,8 @@ function createEmptyExportFilters(): ExportFilters {
     assigned_at_to: '',
     assignment_deadline_at_from: '',
     assignment_deadline_at_to: '',
+    export_with_structures: false,
+    include_without_report: false,
     only_current_version: true,
     include_removed: false,
     sort_by: 'submitted_at',
@@ -290,6 +320,8 @@ function createExportFiltersFromReportFilters(reportFilters: ReportSearchPayload
     assigned_at_to: '',
     assignment_deadline_at_from: '',
     assignment_deadline_at_to: '',
+    export_with_structures: false,
+    include_without_report: false,
     only_current_version: reportFilters.only_current_version,
     include_removed: reportFilters.include_removed,
     sort_by: reportFilters.sort_by,

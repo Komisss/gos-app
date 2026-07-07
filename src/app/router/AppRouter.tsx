@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { MainLayout } from '@app/layouts/layout.tsx';
 import LoginPage from '@pages/login/ui/LoginPage';
 // import NewOrgUnitPage from '@pages/newOrgUnit/ui/NewOrgUnitPage';
@@ -34,8 +34,8 @@ export const AppRouter = () => {
             <Route element={<StatisticsRoute />}>
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/stats/reports/:section" element={<ReportStatisticsPage />} />
-              <Route path="/" element={<StatsPage />} />
             </Route>
+            <Route path="/" element={<Navigate to="/users" replace />} />
             <Route path="/reports/:reportId" element={<ReportDetailsPage />} />
             <Route path="/tasks" element={<TasksListPage />} />
             <Route path="/tasks/new" element={<NewTaskPage />} />
