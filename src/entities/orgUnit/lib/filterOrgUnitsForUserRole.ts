@@ -1,11 +1,17 @@
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 
 export function filterOrgUnitsForUserRole(
   orgUnits: OrgUnit[],
   roleId: number | null,
   regionId: number | null,
 ) {
-  if (!roleId || !regionId || roleId === 1 || roleId === 2) {
+  if (
+    !roleId ||
+    !regionId ||
+    roleId === USER_ROLE_IDS.federalManager ||
+    roleId === USER_ROLE_IDS.regionalManager
+  ) {
     return [];
   }
 
@@ -29,19 +35,19 @@ export function filterOrgUnitsForUserRole(
 }
 
 export function getOrgUnitHeadRoleCodesForUserRole(roleId: number) {
-  if (roleId === 4) {
+  if (roleId === USER_ROLE_IDS.mainManager) {
     return ['federal_manager', 'regional_manager'];
   }
 
-  if (roleId === 5 || roleId === 6) {
+  if (roleId === USER_ROLE_IDS.assistant || roleId === USER_ROLE_IDS.unitHead) {
     return ['main_manager'];
   }
 
-  if (roleId === 7) {
+  if (roleId === USER_ROLE_IDS.departmentHead) {
     return ['unit_head'];
   }
 
-  if (roleId === 8) {
+  if (roleId === USER_ROLE_IDS.employee) {
     return ['department_head'];
   }
 
@@ -53,7 +59,7 @@ export function getAutoLockedOrgUnitForUserRole(
   roleId: number | null,
   regionId: number | null,
 ) {
-  if (roleId !== 4 || !regionId) {
+  if (roleId !== USER_ROLE_IDS.mainManager || !regionId) {
     return null;
   }
 

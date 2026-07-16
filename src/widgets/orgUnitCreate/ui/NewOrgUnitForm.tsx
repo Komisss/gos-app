@@ -6,6 +6,7 @@ import { createOrgUnit, getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits'
 import type { CreateOrgUnitPayload, OrgUnitType } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getUsers } from '@/entities/user/api/users';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import { Button } from '@/shared/ui/button';
 import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
 import { Input } from '@/shared/ui/input';
@@ -237,14 +238,14 @@ function getHeadRoleCodeForOrgUnitType(type: OrgUnitType) {
 
 function getParentHeadRoleId(type: OrgUnitType) {
   if (type === 'department') {
-    return 6;
+    return USER_ROLE_IDS.unitHead;
   }
 
   if (type === 'unit') {
-    return 4;
+    return USER_ROLE_IDS.mainManager;
   }
 
-  return 2;
+  return USER_ROLE_IDS.regionalManager;
 }
 
 function getParentOrgUnitPlaceholder(type: OrgUnitType, regionId: string) {

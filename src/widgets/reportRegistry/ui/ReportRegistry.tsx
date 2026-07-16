@@ -17,6 +17,7 @@ import type {
 import { getRegions } from '@/entities/region/api/regions';
 import { getReportFormatLabel, getTaskTypeLabel, getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
+import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { cn } from '@/shared/lib/utils';
@@ -71,16 +72,7 @@ type SelectOption = {
   description?: string;
 };
 
-const roleOptions = [
-  { value: '1', label: 'Федеральный управляющий' },
-  { value: '2', label: 'Региональный руководитель' },
-  { value: '3', label: 'Исполнитель' },
-  { value: '4', label: 'Б3' },
-  { value: '5', label: 'Помощник Б3' },
-  { value: '6', label: 'Б2' },
-  { value: '7', label: 'Б1' },
-  { value: '8', label: 'Активист' },
-];
+const roleOptions = userRoleFilterOptions;
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
   { value: 'online_action', label: 'Онлайн-акция' },

@@ -13,6 +13,7 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getUserById, registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
+import { USER_ROLE_IDS, userRoleOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
 import { getUsernameError } from '@/shared/lib/username';
@@ -26,16 +27,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { USER_IMPORT_TEMPLATE_URL } from '../model/userImportTemplate';
 import { UserBulkImportDropzone } from './UserBulkImportDropzone';
 
-const roleOptions: Array<{ id: RegisterUserRoleId; code: string; label: string }> = [
-  { id: 1, code: 'federal_manager', label: 'Федеральный управляющий' },
-  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: 4, code: 'main_manager', label: 'Б3' },
-  { id: 5, code: 'assistant', label: 'Помощник Б3' },
-  { id: 6, code: 'unit_head', label: 'Б2' },
-  { id: 7, code: 'department_head', label: 'Б1' },
-  { id: 8, code: 'employee', label: 'Активист' },
-];
-
 const initialForm: RegisterUserPayload = {
   username: '',
   password: '',
@@ -44,7 +35,7 @@ const initialForm: RegisterUserPayload = {
   birthday: '',
   link_vk: '',
   max_user_id: null,
-  role: 2,
+  role: USER_ROLE_IDS.regionalManager,
   region: null,
   org_unit: 0,
 };
@@ -64,14 +55,14 @@ export function NewUserForm() {
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
   const availableRoleOptions = useMemo(() => {
     if (isFederalManager) {
-      return roleOptions;
+      return userRoleOptions;
     }
 
     if (isRegionalManager) {
-      return roleOptions.filter((role) => role.id >= 4);
+      return userRoleOptions.filter((role) => role.id >= USER_ROLE_IDS.mainManager);
     }
 
-    return roleOptions.filter((role) => role.code !== 'federal_manager');
+    return userRoleOptions.filter((role) => role.code !== 'federal_manager');
   }, [isFederalManager, isRegionalManager]);
   const selectedRoleOption = availableRoleOptions.find((role) => role.id === form.role);
 
@@ -244,7 +235,7 @@ export function NewUserForm() {
                   setForm((current) => ({
                     ...current,
                     role: nextRole,
-                    region: nextRole === 1 ? null : current.region,
+                    region: nextRole === USER_ROLE_IDS.federalManager ? null : current.region,
                     org_unit: 0,
                   }));
                 }}
@@ -262,7 +253,7 @@ export function NewUserForm() {
               </Select>
             </Field>
 
-            {form.role !== 1 && (
+            {form.role !== USER_ROLE_IDS.federalManager && (
               <Field label="Регион">
                 <SearchSelect
                   placeholder="Выберите регион"
@@ -536,7 +527,7 @@ function getOrgUnitDescription(orgUnit: OrgUnit) {
 }
 
 function canSelectOrgUnit(role: RegisterUserRoleId) {
-  return role !== 1 && role !== 2;
+  return role !== USER_ROLE_IDS.federalManager && role !== USER_ROLE_IDS.regionalManager;
 }
 
 function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null) {
@@ -552,7 +543,7 @@ function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null
 }
 
 function shouldUseCredentials(role: RegisterUserRoleId) {
-  return role === 1 || role === 2;
+  return role === USER_ROLE_IDS.federalManager || role === USER_ROLE_IDS.regionalManager;
 }
 
 function getAdultMaxBirthdayDate() {

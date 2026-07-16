@@ -18,6 +18,7 @@ import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/rep
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
 import { getUsers } from '@/entities/user/api/users';
+import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
 import { cn } from '@/shared/lib/utils';
 import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
@@ -42,10 +43,7 @@ const periodTypeOptions: Array<{ value: DashboardPeriodType; label: string }> = 
   { value: 'moderation_action', label: 'Действие модерации' },
 ];
 
-const roleOptions = [
-  { value: '1', label: 'Региональный' },
-  { value: '2', label: 'Федеральный' },
-];
+const roleOptions = userRoleFilterOptions;
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
   { value: 'online_action', label: 'Онлайн-акция' },

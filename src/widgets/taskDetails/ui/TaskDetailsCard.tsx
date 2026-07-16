@@ -31,6 +31,7 @@ import {
 import type { TaskPayload } from '@/entities/task/model/types';
 import { getUserById, getUsers } from '@/entities/user/api/users';
 import type { UserDetails, UserListItem } from '@/entities/user/model/types';
+import { getRoleLabelByCode } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { copyToClipboard } from '@/shared/lib/copyToClipboard';
 import { Badge } from '@/shared/ui/badge';
@@ -961,18 +962,7 @@ function buildTargetItems(
 }
 
 function formatRole(value?: string | null) {
-  const labels: Record<string, string> = {
-    federal_manager: 'Федеральный управляющий',
-    regional_manager: 'Региональный руководитель',
-    executor: 'Исполнитель',
-    main_manager: 'Б3',
-    assistant: 'Помощник Б3',
-    unit_head: 'Б2',
-    department_head: 'Б1',
-    employee: 'Активист',
-  };
-
-  return value ? labels[value] ?? value : 'Не указана';
+  return value ? getRoleLabelByCode(value) ?? value : 'Не указана';
 }
 
 function formatAssignmentStatus(value?: string | null) {

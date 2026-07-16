@@ -19,6 +19,7 @@ import {
 } from '@/entities/user/api/users';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
 import { isManagementRole } from '@/entities/user/lib/isManagementRole';
+import { USER_ROLE_IDS, editableUserRoleOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
 import { getUsernameError } from '@/shared/lib/username';
@@ -50,15 +51,6 @@ type UserFormState = {
   role: number | null;
   org_unit: number | null;
 };
-
-const roleOptions: Array<{ id: number; code: string; label: string }> = [
-  { id: 2, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: 4, code: 'main_manager', label: 'Б3' },
-  { id: 5, code: 'assistant', label: 'Помощник Б3' },
-  { id: 6, code: 'unit_head', label: 'Б2' },
-  { id: 7, code: 'department_head', label: 'Б1' },
-  { id: 8, code: 'employee', label: 'Активист' },
-];
 
 export function UserProfileCard() {
   const { userId } = useParams();
@@ -125,10 +117,10 @@ export function UserProfileCard() {
 
   const availableRoleOptions = useMemo(() => {
     if (isCurrentUserRegionalManager) {
-      return roleOptions.filter((role) => role.id >= 4);
+      return editableUserRoleOptions.filter((role) => role.id >= USER_ROLE_IDS.mainManager);
     }
 
-    return roleOptions;
+    return editableUserRoleOptions;
   }, [isCurrentUserRegionalManager]);
 
   const availableOrgUnits = useMemo(() => {
@@ -802,7 +794,11 @@ function getUserOrgUnitFallbackOption(
 }
 
 function canSelectOrgUnit(role: number | null) {
-  return role !== null && role !== 1 && role !== 2;
+  return (
+    role !== null &&
+    role !== USER_ROLE_IDS.federalManager &&
+    role !== USER_ROLE_IDS.regionalManager
+  );
 }
 
 function getEffectiveOrgUnitId(
@@ -880,7 +876,7 @@ function toDateOnly(value: Date) {
 }
 
 function isFederalManager(user: Pick<UserDetails, 'role'>) {
-  return user.role?.code === 'federal_manager' || user.role?.id === 1;
+  return user.role?.code === 'federal_manager' || user.role?.id === USER_ROLE_IDS.federalManager;
 }
 
 function isTopManager(user: Pick<UserDetails, 'role'>) {
@@ -891,7 +887,7 @@ function isTopManagerByRole(role: UserDetails['role']) {
   return (
     role?.code === 'federal_manager' ||
     role?.code === 'regional_manager' ||
-    role?.id === 1 ||
-    role?.id === 2
+    role?.id === USER_ROLE_IDS.federalManager ||
+    role?.id === USER_ROLE_IDS.regionalManager
   );
 }
