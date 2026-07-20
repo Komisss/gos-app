@@ -1,22 +1,51 @@
 ﻿import { useQuery } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { getRegionDashboard } from '@/entities/analytics/api/dashboard';
+import { getTasks } from '@/entities/task/api/tasks';
+import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
+import { Input } from '@/shared/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { ScrollArea } from '@/shared/ui/scroll-area';
+
+type RegionDashboardFilters = ReturnType<typeof createInitialRegionDashboardFilters>;
+type SelectOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
 
 export default function RegionDashboardPage() {
   const { regionId } = useParams();
   const parsedRegionId = Number(regionId);
   const isValidRegionId = Number.isInteger(parsedRegionId) && parsedRegionId > 0;
-  const [filters, setFilters] = useState(() => createInitialRegionDashboardFilters());
-  const [appliedFilters, setAppliedFilters] = useState(() => createInitialRegionDashboardFilters());
+  const [onlineFilters, setOnlineFilters] = useState(() => createInitialRegionDashboardFilters());
+  const [appliedOnlineFilters, setAppliedOnlineFilters] = useState(() =>
+    createInitialRegionDashboardFilters(),
+  );
+  const [streetFilters, setStreetFilters] = useState(() => createInitialRegionDashboardFilters());
+  const [appliedStreetFilters, setAppliedStreetFilters] = useState(() =>
+    createInitialRegionDashboardFilters(),
+  );
 
-  const regionDashboardQuery = useQuery({
-    queryKey: ['analytics-dashboard', 'region', parsedRegionId, appliedFilters],
-    queryFn: () => getRegionDashboard(parsedRegionId, appliedFilters),
+  const onlineDashboardQuery = useQuery({
+    queryKey: ['analytics-dashboard', 'region', parsedRegionId, 'online', appliedOnlineFilters],
+    queryFn: () => getRegionDashboard(parsedRegionId, appliedOnlineFilters),
+    enabled: isValidRegionId,
+  });
+  const streetDashboardQuery = useQuery({
+    queryKey: ['analytics-dashboard', 'region', parsedRegionId, 'street', appliedStreetFilters],
+    queryFn: () => getRegionDashboard(parsedRegionId, appliedStreetFilters),
+    enabled: isValidRegionId,
+  });
+  const tasksQuery = useQuery({
+    queryKey: ['tasks', 'region-dashboard-filter'],
+    queryFn: () => getTasks(),
     enabled: isValidRegionId,
   });
 
@@ -24,9 +53,21 @@ export default function RegionDashboardPage() {
     return <RegionDashboardMessage text="Некорректный id региона." tone="error" />;
   }
 
-  const regionDashboard = regionDashboardQuery.data;
+  const regionDashboard = onlineDashboardQuery.data ?? streetDashboardQuery.data;
+  const onlineDashboard = onlineDashboardQuery.data;
+  const streetDashboard = streetDashboardQuery.data;
   const region = regionDashboard?.region;
   const regionalManager = regionDashboard?.regional_manager;
+  const isLoadingRegion = onlineDashboardQuery.isLoading && streetDashboardQuery.isLoading;
+  const taskOptions = useMemo(
+    () =>
+      (tasksQuery.data ?? []).map((task) => ({
+        value: String(task.id),
+        label: `#${task.id} ${task.title}`,
+        description: task.statusLabel,
+      })),
+    [tasksQuery.data],
+  );
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -34,11 +75,11 @@ export default function RegionDashboardPage() {
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-3xl font-semibold !text-slate-900">
             {region?.name ??
-              (regionDashboardQuery.isLoading ? 'Загружаем регион...' : `Регион #${parsedRegionId}`)}
+              (isLoadingRegion ? 'Загружаем регион...' : `Регион #${parsedRegionId}`)}
           </h1>
           <p className="mt-4 text-sm text-slate-700">
             Региональный руководитель -{' '}
-            {regionDashboardQuery.isLoading ? (
+            {isLoadingRegion ? (
               <span className="text-slate-500">загружаем...</span>
             ) : regionalManager ? (
               <Link
@@ -66,58 +107,38 @@ export default function RegionDashboardPage() {
           <RegionMetricCard title="Онлайн задачи">
             <MetricRow
               label="За всё время"
-              value={formatNumber(regionDashboard?.summary.online_tasks_count)}
+              value={formatNumber(onlineDashboard?.summary.online_tasks_count)}
             />
             <MetricRow
               label="Общий процент выполнения"
-              value={formatPercent(regionDashboard?.summary.online_completed_tasks_percent)}
+              value={formatPercent(onlineDashboard?.summary.online_completed_tasks_percent)}
             />
           </RegionMetricCard>
 
           <RegionMetricCard title="Уличные задачи">
             <MetricRow
               label="За всё время"
-              value={formatNumber(regionDashboard?.summary.street_tasks_count)}
+              value={formatNumber(streetDashboard?.summary.street_tasks_count)}
             />
             <MetricRow
               label="Общее количество человек"
-              value={formatNumber(regionDashboard?.summary.street_people_count)}
+              value={formatNumber(streetDashboard?.summary.street_people_count)}
             />
           </RegionMetricCard>
         </section>
 
-                <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-4 md:grid-cols-2">
-            <DateFilter
-              label="Дата с"
-              value={filters.date_from}
-              onChange={(date_from) => setFilters((current) => ({ ...current, date_from }))}
-            />
-            <DateFilter
-              label="Дата по"
-              value={filters.date_to}
-              onChange={(date_to) => setFilters((current) => ({ ...current, date_to }))}
-            />
-          </div>
-          <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
-            <Button
-              type="button"
-              className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
-              disabled={regionDashboardQuery.isFetching}
-              onClick={() => setAppliedFilters(filters)}
-            >
-              {regionDashboardQuery.isFetching ? 'Загрузка...' : 'Получить дашборд'}
-            </Button>
-          </div>
-        </section>
-
         <TasksBarChart
           title="Онлайн задачи"
+          filters={onlineFilters}
+          taskOptions={taskOptions}
+          isFetching={onlineDashboardQuery.isFetching}
+          onFiltersChange={setOnlineFilters}
+          onApplyFilters={() => setAppliedOnlineFilters(onlineFilters)}
           metricLabel="Процент выполнения"
           yAxisLabel="% выполнения"
           valueFormatter={formatPercent}
           isCompleteValue={(value) => value >= 100}
-          tasks={(regionDashboard?.online.tasks ?? []).map((task) => ({
+          tasks={(onlineDashboard?.online.tasks ?? []).map((task) => ({
             taskId: task.task_id,
             title: task.task_title,
             value: task.accepted_reports_percent,
@@ -129,11 +150,16 @@ export default function RegionDashboardPage() {
 
         <TasksBarChart
           title="Уличные задачи"
+          filters={streetFilters}
+          taskOptions={taskOptions}
+          isFetching={streetDashboardQuery.isFetching}
+          onFiltersChange={setStreetFilters}
+          onApplyFilters={() => setAppliedStreetFilters(streetFilters)}
           metricLabel="Количество человек"
           yAxisLabel="Кол-во чел."
           valueFormatter={formatNumber}
           isCompleteValue={(_, task) => task.acceptedReportsPercent >= 100}
-          tasks={(regionDashboard?.street.tasks ?? []).map((task) => ({
+          tasks={(streetDashboard?.street.tasks ?? []).map((task) => ({
             taskId: task.task_id,
             title: task.task_title,
             value: task.people_count,
@@ -144,7 +170,7 @@ export default function RegionDashboardPage() {
           }))}
         />
 
-        {regionDashboardQuery.isError && (
+        {(onlineDashboardQuery.isError || streetDashboardQuery.isError) && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-sm text-red-700">
             Не удалось загрузить дашборд региона.
           </div>
@@ -162,6 +188,7 @@ function createInitialRegionDashboardFilters() {
   return {
     date_from: dateFrom.toISOString(),
     date_to: now.toISOString(),
+    task_ids: [] as number[],
   };
 }
 
@@ -182,8 +209,123 @@ function DateFilter({
   );
 }
 
+function MultiSearchSelect({
+  label,
+  values,
+  placeholder,
+  searchPlaceholder,
+  options,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  placeholder: string;
+  searchPlaceholder: string;
+  options: SelectOption[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const selectedOptions = options.filter((option) => values.includes(option.value));
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) =>
+      `${option.label} ${option.description ?? ''}`.toLowerCase().includes(normalizedQuery),
+    );
+  }, [options, query]);
+
+  function toggleValue(value: string) {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="mt-3 flex justify-between gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onChange(options.map((option) => option.value))}
+            >
+              Выбрать все
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
+              Очистить
+            </Button>
+          </div>
+          <ScrollArea className="mt-3 h-64 rounded-md border border-slate-200">
+            <div className="p-1">
+              {filteredOptions.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
+              ) : (
+                filteredOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                    onClick={() => toggleValue(option.value)}
+                  >
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-slate-900">{option.label}</span>
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 function TasksBarChart({
   title,
+  filters,
+  taskOptions,
+  isFetching,
+  onFiltersChange,
+  onApplyFilters,
   metricLabel,
   yAxisLabel,
   valueFormatter,
@@ -191,6 +333,11 @@ function TasksBarChart({
   tasks,
 }: {
   title: string;
+  filters: RegionDashboardFilters;
+  taskOptions: SelectOption[];
+  isFetching: boolean;
+  onFiltersChange: (filters: RegionDashboardFilters) => void;
+  onApplyFilters: () => void;
   metricLabel: string;
   yAxisLabel: string;
   valueFormatter: (value?: number | null) => string;
@@ -230,6 +377,44 @@ function TasksBarChart({
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-semibold !text-slate-900">{title}</h2>
+      </div>
+
+      <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <DateFilter
+            label="Дата с"
+            value={filters.date_from}
+            onChange={(date_from) => onFiltersChange({ ...filters, date_from })}
+          />
+          <DateFilter
+            label="Дата по"
+            value={filters.date_to}
+            onChange={(date_to) => onFiltersChange({ ...filters, date_to })}
+          />
+          <MultiSearchSelect
+            label="Задачи"
+            values={filters.task_ids.map(String)}
+            placeholder="Все задачи"
+            searchPlaceholder="Поиск по id или названию"
+            options={taskOptions}
+            onChange={(taskIds) =>
+              onFiltersChange({
+                ...filters,
+                task_ids: taskIds.map(Number).filter((taskId) => Number.isFinite(taskId)),
+              })
+            }
+          />
+        </div>
+        <div className="mt-4 flex justify-end border-t border-slate-200 pt-4">
+          <Button
+            type="button"
+            className="bg-[#465cd3] text-white hover:bg-[#3c50bd]"
+            disabled={isFetching}
+            onClick={onApplyFilters}
+          >
+            {isFetching ? 'Загрузка...' : 'Получить данные'}
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4 overflow-x-auto pb-2">

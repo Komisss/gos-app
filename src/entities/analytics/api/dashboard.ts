@@ -58,7 +58,7 @@ function toAnalyticsDashboardRequestPayload(
 
 export async function getRegionDashboard(
   regionId: number,
-  filters: { date_from?: string; date_to?: string } = {},
+  filters: { date_from?: string; date_to?: string; task_ids?: number[] } = {},
 ) {
   const params = new URLSearchParams();
 
@@ -68,6 +68,10 @@ export async function getRegionDashboard(
 
   if (filters.date_to) {
     params.set('date_to', filters.date_to);
+  }
+
+  if (filters.task_ids?.length) {
+    params.set('task_ids', filters.task_ids.join(','));
   }
 
   const queryString = params.toString();
