@@ -113,7 +113,6 @@ export default function RegionDashboardPage() {
 
         <TasksBarChart
           title="Онлайн задачи"
-          emptyText="Нет данных по онлайн задачам."
           metricLabel="Процент выполнения"
           yAxisLabel="% выполнения"
           valueFormatter={formatPercent}
@@ -130,7 +129,6 @@ export default function RegionDashboardPage() {
 
         <TasksBarChart
           title="Уличные задачи"
-          emptyText="Нет данных по уличным задачам."
           metricLabel="Количество человек"
           yAxisLabel="Кол-во чел."
           valueFormatter={formatNumber}
@@ -186,7 +184,6 @@ function DateFilter({
 
 function TasksBarChart({
   title,
-  emptyText,
   metricLabel,
   yAxisLabel,
   valueFormatter,
@@ -194,7 +191,6 @@ function TasksBarChart({
   tasks,
 }: {
   title: string;
-  emptyText: string;
   metricLabel: string;
   yAxisLabel: string;
   valueFormatter: (value?: number | null) => string;
@@ -236,80 +232,74 @@ function TasksBarChart({
         <h2 className="text-base font-semibold !text-slate-900">{title}</h2>
       </div>
 
-      {chartData.length === 0 ? (
-        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-          {emptyText}
-        </div>
-      ) : (
-        <div className="mt-4 overflow-x-auto pb-2">
-          <BarChart
-            width={chartWidth}
-            height={320}
-            data={chartData}
-            margin={{ top: 16, right: 24, bottom: 40, left: 0 }}
+      <div className="mt-4 overflow-x-auto pb-2">
+        <BarChart
+          width={chartWidth}
+          height={320}
+          data={chartData}
+          margin={{ top: 16, right: 24, bottom: 40, left: 0 }}
+          className="cursor-pointer outline-none focus:outline-none"
+          onClick={(data) => {
+            const taskId = Number(data?.activePayload?.[0]?.payload?.taskId);
+
+            if (Number.isFinite(taskId)) {
+              openTask(taskId);
+            }
+          }}
+        >
+          <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" />
+          <XAxis
+            dataKey="id"
+            tick={<TaskTitleTick tasks={chartData} onTaskClick={openTask} />}
+            interval={0}
+            height={72}
+            label={{
+              value: 'Задачи',
+              position: 'insideBottom',
+              offset: -8,
+              fill: '#475569',
+              fontSize: 13,
+            }}
+          />
+          <YAxis
+            allowDecimals={false}
+            tick={{ fill: '#64748b', fontSize: 12 }}
+            tickFormatter={(value) => valueFormatter(Number(value))}
+            width={72}
+            label={{
+              value: yAxisLabel,
+              angle: -90,
+              position: 'insideLeft',
+              fill: '#475569',
+              fontSize: 13,
+            }}
+          />
+          <Tooltip
+            content={
+              <TaskChartTooltip metricLabel={metricLabel} valueFormatter={valueFormatter} />
+            }
+          />
+          <Bar
+            dataKey="value"
+            fill="#465cd3"
+            radius={[6, 6, 0, 0]}
+            maxBarSize={56}
             className="cursor-pointer outline-none focus:outline-none"
+            background={(props) => <ClickableBarBackground {...props} onTaskClick={openTask} />}
             onClick={(data) => {
-              const taskId = Number(data?.activePayload?.[0]?.payload?.taskId);
+              const taskId = Number(data?.payload?.taskId);
 
               if (Number.isFinite(taskId)) {
                 openTask(taskId);
               }
             }}
           >
-            <CartesianGrid stroke="#e2e8f0" strokeDasharray="4 4" />
-            <XAxis
-              dataKey="id"
-              tick={<TaskTitleTick tasks={chartData} onTaskClick={openTask} />}
-              interval={0}
-              height={72}
-              label={{
-                value: 'Задачи',
-                position: 'insideBottom',
-                offset: -8,
-                fill: '#475569',
-                fontSize: 13,
-              }}
-            />
-            <YAxis
-              allowDecimals={false}
-              tick={{ fill: '#64748b', fontSize: 12 }}
-              tickFormatter={(value) => valueFormatter(Number(value))}
-              width={72}
-              label={{
-                value: yAxisLabel,
-                angle: -90,
-                position: 'insideLeft',
-                fill: '#475569',
-                fontSize: 13,
-              }}
-            />
-            <Tooltip
-              content={
-                <TaskChartTooltip metricLabel={metricLabel} valueFormatter={valueFormatter} />
-              }
-            />
-            <Bar
-              dataKey="value"
-              fill="#465cd3"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={56}
-              className="cursor-pointer outline-none focus:outline-none"
-              background={(props) => <ClickableBarBackground {...props} onTaskClick={openTask} />}
-              onClick={(data) => {
-                const taskId = Number(data?.payload?.taskId);
-
-                if (Number.isFinite(taskId)) {
-                  openTask(taskId);
-                }
-              }}
-            >
-              {chartData.map((task) => (
-                <Cell key={task.id} fill={getTaskBarFill(task.isOverdue, task.isComplete)} />
-              ))}
-            </Bar>
-          </BarChart>
-        </div>
-      )}
+            {chartData.map((task) => (
+              <Cell key={task.id} fill={getTaskBarFill(task.isOverdue, task.isComplete)} />
+            ))}
+          </Bar>
+        </BarChart>
+      </div>
     </section>
   );
 }
