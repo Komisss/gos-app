@@ -7,9 +7,11 @@ import type {
   UserListItem,
   RegisterUserPayload,
   UserPatchPayload,
+  UserRole,
 } from '@/entities/user/model/types';
 
 const USERS_ENDPOINT = '/api/v1/users';
+const ROLES_ENDPOINT = '/api/v1/roles';
 const USERS_EXPORT_ENDPOINT = '/api/v1/users/export';
 const USERS_IMPORT_ENDPOINT = '/api/v1/users/import';
 const REGISTER_ENDPOINT = '/api/v1/auth/register';
@@ -66,6 +68,10 @@ export async function getUsers(filters: UserFilters = {}) {
   const response = await http<UsersResponse>(`${USERS_ENDPOINT}${buildQueryString(filters)}`);
 
   return normalizeUsersResponse(response).map(mapUserListDto);
+}
+
+export async function getRoles() {
+  return http<UserRole[]>(ROLES_ENDPOINT);
 }
 
 export async function getUsersPage(filters: UserFilters = {}, page = 1, pageSize = 25): Promise<UsersPage> {

@@ -3,8 +3,8 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import { getRegions } from '@/entities/region/api/regions';
-import { getUsersPage, type UserFilters } from '@/entities/user/api/users';
-import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
+import { getRoles, getUsersPage, type UserFilters } from '@/entities/user/api/users';
+import { mapRolesToFilterOptions } from '@/entities/user/model/roleOptions';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
@@ -65,12 +65,20 @@ export function UserRegistry({
   const userExport = useUserExport();
   const enforcedRegionIds =
     isRegionalManager && currentUserRegionId ? String(currentUserRegionId) : '';
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: getRoles,
+  });
+  const roleFilterOptions = useMemo(
+    () => mapRolesToFilterOptions(rolesQuery.data ?? []),
+    [rolesQuery.data],
+  );
   const availableRoleFilterOptions = useMemo(
     () =>
       isRegionalManager
-        ? userRoleFilterOptions.filter((role) => role.value !== '1' && role.value !== '2')
-        : userRoleFilterOptions,
-    [isRegionalManager],
+        ? roleFilterOptions.filter((role) => role.value !== '1' && role.value !== '2')
+        : roleFilterOptions,
+    [isRegionalManager, roleFilterOptions],
   );
   const queryFilters = useMemo(
     () => ({
@@ -84,7 +92,7 @@ export function UserRegistry({
   );
 
   useEffect(() => {
-    if (!isRegionalManager || !currentUserRegionId) {
+    if (!isRegionalManager || !currentUserRegionId || availableRoleFilterOptions.length === 0) {
       return;
     }
 

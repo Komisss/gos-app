@@ -9,6 +9,7 @@ import { getRegions } from '@/entities/region/api/regions';
 import type { Region } from '@/entities/region/model/types';
 import type { Task, TaskPayload, TaskTargetPayload, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import type { UserListItem } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { toApiDateTime } from '@/shared/lib/dateTime';
@@ -38,7 +39,7 @@ type Props = {
 
 export function TaskEditDialog({ task, open, isSubmitting, onOpenChange, onSubmit }: Props) {
   const { session } = useAuth();
-  const isFederalManager = session?.role?.code === 'federal_manager';
+  const isFederalManager = session?.role?.id === USER_ROLE_IDS.federalManager;
   const [form, setForm] = useState<TaskPayload>(() => getInitialForm(task));
   const [descriptionError, setDescriptionError] = useState(false);
   const [deadlineError, setDeadlineError] = useState(false);

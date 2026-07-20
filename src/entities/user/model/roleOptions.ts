@@ -1,4 +1,4 @@
-import type { RegisterUserRoleId } from './types';
+import type { RegisterUserRoleId, UserRole } from './types';
 
 export const USER_ROLE_IDS = {
   federalManager: 1,
@@ -12,30 +12,38 @@ export const USER_ROLE_IDS = {
 
 export const userRoleOptions: Array<{
   id: RegisterUserRoleId;
-  code: string;
   label: string;
 }> = [
-  { id: USER_ROLE_IDS.federalManager, code: 'federal_manager', label: 'Федеральный руководитель' },
-  { id: USER_ROLE_IDS.regionalManager, code: 'regional_manager', label: 'Региональный руководитель' },
-  { id: USER_ROLE_IDS.mainManager, code: 'main_manager', label: 'Б3' },
-  { id: USER_ROLE_IDS.assistant, code: 'assistant', label: 'Помощник Б3' },
-  { id: USER_ROLE_IDS.unitHead, code: 'unit_head', label: 'Б2' },
-  { id: USER_ROLE_IDS.departmentHead, code: 'department_head', label: 'Б1' },
-  { id: USER_ROLE_IDS.employee, code: 'employee', label: 'Активист' },
+  { id: USER_ROLE_IDS.federalManager, label: 'Федеральный руководитель' },
+  { id: USER_ROLE_IDS.regionalManager, label: 'Региональный руководитель' },
+  { id: USER_ROLE_IDS.mainManager, label: 'Б3' },
+  { id: USER_ROLE_IDS.assistant, label: 'Помощник Б3' },
+  { id: USER_ROLE_IDS.unitHead, label: 'Б2' },
+  { id: USER_ROLE_IDS.departmentHead, label: 'Б1' },
+  { id: USER_ROLE_IDS.employee, label: 'Активист' },
 ];
 
-export const userRoleFilterOptions = userRoleOptions
-  .slice()
-  .reverse()
-  .map((role) => ({
-    value: String(role.id),
-    label: role.label,
-  }));
+export function getRoleLabelById(id?: number | null) {
+  return userRoleOptions.find((role) => role.id === id)?.label;
+}
 
-export const editableUserRoleOptions = userRoleOptions.filter(
-  (role) => role.id !== USER_ROLE_IDS.federalManager,
-);
+export function mapRolesToOptions(roles: UserRole[]) {
+  return roles
+    .slice()
+    .sort((first, second) => first.id - second.id)
+    .map((role) => ({
+      id: role.id as RegisterUserRoleId,
+      code: role.code,
+      label: role.name || getRoleLabelById(role.id) || `Роль #${role.id}`,
+    }));
+}
 
-export function getRoleLabelByCode(code?: string | null) {
-  return userRoleOptions.find((role) => role.code === code)?.label;
+export function mapRolesToFilterOptions(roles: UserRole[]) {
+  return mapRolesToOptions(roles)
+    .slice()
+    .reverse()
+    .map((role) => ({
+      value: String(role.id),
+      label: role.label,
+    }));
 }

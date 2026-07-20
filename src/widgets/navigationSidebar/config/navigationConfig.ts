@@ -1,4 +1,5 @@
 import { BarChart, ClipboardList, LayoutDashboard, UserPlus, Users } from 'lucide-react';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 
 export const sidebarSections = [
   {
@@ -36,7 +37,7 @@ export const sidebarSections = [
       { label: 'Новый пользователь', icon: UserPlus, href: '/users/new' },
       // { label: 'Новая структура подчинения', icon: Building2, href: '/org-units/new' },
       { label: 'Список пользователей', icon: Users, href: '/users' },
-      { label: 'Регионы с управляющими', icon: Users, href: '/users/region-managers', roles: ['federal_manager'] },
+      { label: 'Регионы с управляющими', icon: Users, href: '/users/region-managers', roleIds: [USER_ROLE_IDS.federalManager] },
     ],
   },
 ];

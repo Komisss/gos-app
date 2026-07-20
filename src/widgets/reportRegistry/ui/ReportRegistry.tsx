@@ -16,8 +16,8 @@ import type {
 } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getReportFormatLabel, getTaskTypeLabel, getTasks } from '@/entities/task/api/tasks';
-import { getUsers } from '@/entities/user/api/users';
-import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
+import { getRoles, getUsers } from '@/entities/user/api/users';
+import { USER_ROLE_IDS, mapRolesToFilterOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 import { cn } from '@/shared/lib/utils';
@@ -71,8 +71,6 @@ type SelectOption = {
   label: string;
   description?: string;
 };
-
-const roleOptions = userRoleFilterOptions;
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
   { value: 'online_action', label: 'Онлайн-акция' },
@@ -186,6 +184,11 @@ export function ReportRegistry({
     queryFn: () => getUsers(),
   });
 
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: getRoles,
+  });
+
   const orgUnitsQuery = useQuery({
     queryKey: ['org-units-tree'],
     queryFn: getOrgUnitsTree,
@@ -277,6 +280,10 @@ export function ReportRegistry({
           description: orgUnit.regionName ?? 'Регион не указан',
         })),
     [filters.region_ids, orgUnitsQuery.data],
+  );
+  const roleOptions = useMemo(
+    () => mapRolesToFilterOptions(rolesQuery.data ?? []),
+    [rolesQuery.data],
   );
 
   useEffect(() => {
@@ -1066,8 +1073,8 @@ function TaskRegionReportsTable({
 }) {
   const { session } = useAuth();
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-  const isFederalManager = session?.role?.code === 'federal_manager' || session?.role?.id === 1;
-  const isRegionalManager = session?.role?.code === 'regional_manager' || session?.role?.id === 2;
+  const isFederalManager = session?.role?.id === USER_ROLE_IDS.federalManager;
+  const isRegionalManager = session?.role?.id === USER_ROLE_IDS.regionalManager;
 
   return (
     <>

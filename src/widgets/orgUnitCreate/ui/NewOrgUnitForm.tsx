@@ -50,10 +50,10 @@ export function NewOrgUnitForm() {
     queryFn: () => getUsers(),
   });
   const headUserOptions = useMemo(() => {
-    const headRoleCode = getHeadRoleCodeForOrgUnitType(form.type);
+    const headRoleId = getHeadRoleIdForOrgUnitType(form.type);
 
     return (usersQuery.data ?? [])
-      .filter((user) => user.role?.code === headRoleCode)
+      .filter((user) => user.role?.id === headRoleId)
       .map((user) => ({
         value: String(user.id),
         label: user.fullName,
@@ -224,16 +224,16 @@ export function NewOrgUnitForm() {
   );
 }
 
-function getHeadRoleCodeForOrgUnitType(type: OrgUnitType) {
+function getHeadRoleIdForOrgUnitType(type: OrgUnitType) {
   if (type === 'main_branch') {
-    return 'main_manager';
+    return USER_ROLE_IDS.mainManager;
   }
 
   if (type === 'unit') {
-    return 'unit_head';
+    return USER_ROLE_IDS.unitHead;
   }
 
-  return 'department_head';
+  return USER_ROLE_IDS.departmentHead;
 }
 
 function getParentHeadRoleId(type: OrgUnitType) {

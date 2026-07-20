@@ -31,7 +31,7 @@ import {
 import type { TaskPayload } from '@/entities/task/model/types';
 import { getUserById, getUsers } from '@/entities/user/api/users';
 import type { UserDetails, UserListItem } from '@/entities/user/model/types';
-import { getRoleLabelByCode } from '@/entities/user/model/roleOptions';
+import { USER_ROLE_IDS, getRoleLabelById } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { copyToClipboard } from '@/shared/lib/copyToClipboard';
 import { Badge } from '@/shared/ui/badge';
@@ -114,9 +114,9 @@ export function TaskDetailsCard({
     regions: regionsQuery.data ?? [],
     orgUnits: orgUnitsQuery.data ?? [],
   });
-  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
-  const taskAuthorRole = task.createdByRole ?? authorQuery.data?.role?.code;
-  const isFederalTaskAuthor = taskAuthorRole === 'federal_manager';
+  const isCurrentUserRegionalManager = session?.role?.id === USER_ROLE_IDS.regionalManager;
+  const taskAuthorRoleId = authorQuery.data?.role?.id ?? null;
+  const isFederalTaskAuthor = taskAuthorRoleId === USER_ROLE_IDS.federalManager;
   const isDifferentTaskAuthor =
     authorQuery.data?.username && session?.username
       ? authorQuery.data.username !== session.username
@@ -126,11 +126,10 @@ export function TaskDetailsCard({
           task.createdByUserId !== session.userId,
         );
   const isDifferentRegionalTaskAuthor =
-    taskAuthorRole === 'regional_manager' && isDifferentTaskAuthor;
+    taskAuthorRoleId === USER_ROLE_IDS.regionalManager && isDifferentTaskAuthor;
   const isAuthorRoleLoading =
     isCurrentUserRegionalManager &&
     Boolean(task.createdByUserId) &&
-    !task.createdByRole &&
     authorQuery.isLoading;
   const areTaskActionsRestricted =
     isCurrentUserRegionalManager &&
@@ -727,10 +726,12 @@ function AuthorLink({
   role?: string | null;
   hideIdentity?: boolean;
 }) {
-  const authorRole = author?.role?.code ?? role;
+  const authorRole = author?.role
+    ? author.role.name || getRoleLabelById(author.role.id) || 'Не указана'
+    : role ?? 'Не указана';
 
   if (hideIdentity) {
-    return <>{formatRole(authorRole)}</>;
+    return <>{authorRole}</>;
   }
 
   if (!authorId) {
@@ -742,7 +743,7 @@ function AuthorLink({
       <Link to={`/users/${authorId}`} className="text-[#465cd3] hover:underline">
         {author ? `${author.fullName} (@${author.username})` : `Пользователь #${authorId}`}
       </Link>
-      <div className="text-xs font-normal text-slate-500">{formatRole(authorRole)}</div>
+      <div className="text-xs font-normal text-slate-500">{authorRole}</div>
     </div>
   );
 }
@@ -959,10 +960,6 @@ function buildTargetItems(
       description: region ? `Регион: ${region.name}` : 'Регион не указан',
     }];
   });
-}
-
-function formatRole(value?: string | null) {
-  return value ? getRoleLabelByCode(value) ?? value : 'Не указана';
 }
 
 function formatAssignmentStatus(value?: string | null) {

@@ -19,6 +19,7 @@ import {sidebarSections} from '../config/navigationConfig.ts';
 import {NavLink, useLocation} from "react-router";
 import {clsx} from 'clsx'
 import {useState} from "react";
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
 
@@ -26,8 +27,8 @@ export function NavigationSidebar() {
   const location = useLocation();
   const [openItems, setOpenItems] = useState<Record<string, boolean>>({});
   const { session } = useAuth();
-  const roleCode = session?.role?.code;
-  const isRegionalManager = roleCode === 'regional_manager' || session?.role?.id === 2;
+  const roleId = session?.role?.id;
+  const isRegionalManager = roleId === USER_ROLE_IDS.regionalManager;
   const { regionId: currentUserRegionId } = useCurrentUserRegion();
 
   return (
@@ -46,7 +47,7 @@ export function NavigationSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu className="gap-0">
                   {section.items
-                    .filter((item) => !('roles' in item) || !item.roles || item.roles.includes(roleCode ?? ''))
+                    .filter((item) => !('roleIds' in item) || !item.roleIds || item.roleIds.includes(roleId ?? 0))
                     .map((item, navIndex) => {
                     const Icon = item.icon;
                     const itemHref = getNavigationItemHref(

@@ -16,8 +16,8 @@ import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
-import { getUsers } from '@/entities/user/api/users';
-import { userRoleFilterOptions } from '@/entities/user/model/roleOptions';
+import { getRoles, getUsers } from '@/entities/user/api/users';
+import { mapRolesToFilterOptions } from '@/entities/user/model/roleOptions';
 import { cn } from '@/shared/lib/utils';
 import { useRetainedValue } from '@/shared/lib/useRetainedValue';
 import { Button } from '@/shared/ui/button';
@@ -45,8 +45,6 @@ const exportPeriodTypeOptions: Array<{ value: DashboardPeriodType | 'link_checke
   ...periodTypeOptions,
   { value: 'link_checked', label: 'Проверка ссылки' },
 ];
-
-const roleOptions = userRoleFilterOptions;
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
   { value: 'online_action', label: 'Онлайн-акция' },
@@ -132,8 +130,13 @@ export function ReportsLinkValidationStatistics() {
   const orgUnitsQuery = useQuery({ queryKey: ['org-units-tree'], queryFn: getOrgUnitsTree });
   const usersQuery = useQuery({ queryKey: ['users', 'reports-link-validation-filter'], queryFn: () => getUsers() });
   const tasksQuery = useQuery({ queryKey: ['tasks', 'reports-link-validation-filter'], queryFn: () => getTasks() });
+  const rolesQuery = useQuery({ queryKey: ['roles'], queryFn: getRoles });
   const reportsMutation = useMutation({ mutationFn: getReportsLinkValidation });
   const result = useRetainedValue(reportsMutation.data);
+  const roleOptions = useMemo(
+    () => mapRolesToFilterOptions(rolesQuery.data ?? []),
+    [rolesQuery.data],
+  );
   const regionOptions = (regionsQuery.data ?? []).map((region) => ({
     value: String(region.id),
     label: region.name,

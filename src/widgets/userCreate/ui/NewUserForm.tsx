@@ -7,13 +7,13 @@ import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import {
   filterOrgUnitsForUserRole,
   getAutoLockedOrgUnitForUserRole,
-  getOrgUnitHeadRoleCodesForUserRole,
+  getOrgUnitHeadRoleIdsForUserRole,
 } from '@/entities/orgUnit/lib/filterOrgUnitsForUserRole';
 import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import { getRegions } from '@/entities/region/api/regions';
-import { getUserById, registerUser } from '@/entities/user/api/users';
+import { getRoles, getUserById, registerUser } from '@/entities/user/api/users';
 import type { RegisterUserPayload, RegisterUserRoleId } from '@/entities/user/model/types';
-import { USER_ROLE_IDS, userRoleOptions } from '@/entities/user/model/roleOptions';
+import { USER_ROLE_IDS, mapRolesToOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
 import { getUsernameError } from '@/shared/lib/username';
@@ -44,8 +44,8 @@ export function NewUserForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  const isFederalManager = session?.role?.code === 'federal_manager';
-  const isRegionalManager = session?.role?.code === 'regional_manager';
+  const isFederalManager = session?.role?.id === USER_ROLE_IDS.federalManager;
+  const isRegionalManager = session?.role?.id === USER_ROLE_IDS.regionalManager;
   const [form, setForm] = useState<RegisterUserPayload>(initialForm);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -53,17 +53,22 @@ export function NewUserForm() {
   const [birthdayError, setBirthdayError] = useState<string | null>(null);
   const showCredentials = shouldUseCredentials(form.role);
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: getRoles,
+  });
+  const roleOptions = useMemo(() => mapRolesToOptions(rolesQuery.data ?? []), [rolesQuery.data]);
   const availableRoleOptions = useMemo(() => {
     if (isFederalManager) {
-      return userRoleOptions;
+      return roleOptions;
     }
 
     if (isRegionalManager) {
-      return userRoleOptions.filter((role) => role.id >= USER_ROLE_IDS.mainManager);
+      return roleOptions.filter((role) => role.id >= USER_ROLE_IDS.mainManager);
     }
 
-    return userRoleOptions.filter((role) => role.code !== 'federal_manager');
-  }, [isFederalManager, isRegionalManager]);
+    return roleOptions.filter((role) => role.id !== USER_ROLE_IDS.federalManager);
+  }, [isFederalManager, isRegionalManager, roleOptions]);
   const selectedRoleOption = availableRoleOptions.find((role) => role.id === form.role);
 
   const regionsQuery = useQuery({
@@ -114,6 +119,10 @@ export function NewUserForm() {
   }, [availableOrgUnits, form.org_unit]);
 
   useEffect(() => {
+    if (availableRoleOptions.length === 0) {
+      return;
+    }
+
     if (!availableRoleOptions.some((role) => role.id === form.role)) {
       setForm((current) => ({
         ...current,
@@ -155,7 +164,8 @@ export function NewUserForm() {
     const nextPhoneError = getPhoneError(form.phone);
     const trimmedUsername = form.username?.trim() ?? '';
     const nextUsernameError = showCredentials ? getUsernameError(trimmedUsername) : null;
-    const nextRegionError = form.role !== 1 && !form.region ? 'Выберите регион.' : null;
+    const nextRegionError =
+      form.role !== USER_ROLE_IDS.federalManager && !form.region ? 'Выберите регион.' : null;
     const nextBirthdayError = form.birthday ? null : 'Выберите день рождения.';
 
     setPhoneError(nextPhoneError);
@@ -535,7 +545,7 @@ function getOrgUnitPlaceholder(role: RegisterUserRoleId, regionId: number | null
     return 'Сначала выберите регион';
   }
 
-  if (getOrgUnitHeadRoleCodesForUserRole(role).length > 0) {
+  if (getOrgUnitHeadRoleIdsForUserRole(role).length > 0) {
     return 'Выберите доступную подгруппу';
   }
 

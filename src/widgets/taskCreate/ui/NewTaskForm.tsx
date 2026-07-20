@@ -8,6 +8,7 @@ import type { Region } from '@/entities/region/model/types';
 import { createTask, materializeTaskAssignments } from '@/entities/task/api/tasks';
 import type { TaskPayload, TaskTargetType } from '@/entities/task/model/types';
 import { getUsers } from '@/entities/user/api/users';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import type { UserListItem } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { toApiDateTime } from '@/shared/lib/dateTime';
@@ -42,7 +43,7 @@ export function NewTaskForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { session } = useAuth();
-  const isFederalManager = session?.role?.code === 'federal_manager';
+  const isFederalManager = session?.role?.id === USER_ROLE_IDS.federalManager;
   const [form, setForm] = useState<TaskPayload>(initialForm);
   const [assignmentTarget, setAssignmentTarget] = useState<AssignmentTarget>(null);
   const [deadlineError, setDeadlineError] = useState(false);

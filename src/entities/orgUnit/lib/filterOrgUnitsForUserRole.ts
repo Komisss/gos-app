@@ -15,7 +15,7 @@ export function filterOrgUnitsForUserRole(
     return [];
   }
 
-  const targetHeadRoleCodes = getOrgUnitHeadRoleCodesForUserRole(roleId);
+  const targetHeadRoleIds = getOrgUnitHeadRoleIdsForUserRole(roleId);
 
   return orgUnits.filter((orgUnit) => {
     if (
@@ -26,29 +26,29 @@ export function filterOrgUnitsForUserRole(
       return false;
     }
 
-    if (targetHeadRoleCodes.length === 0) {
+    if (targetHeadRoleIds.length === 0) {
       return true;
     }
 
-    return targetHeadRoleCodes.includes(orgUnit.headUser?.role?.code ?? '');
+    return targetHeadRoleIds.includes(orgUnit.headUser?.role?.role_id ?? 0);
   });
 }
 
-export function getOrgUnitHeadRoleCodesForUserRole(roleId: number) {
+export function getOrgUnitHeadRoleIdsForUserRole(roleId: number) {
   if (roleId === USER_ROLE_IDS.mainManager) {
-    return ['federal_manager', 'regional_manager'];
+    return [USER_ROLE_IDS.federalManager, USER_ROLE_IDS.regionalManager];
   }
 
   if (roleId === USER_ROLE_IDS.assistant || roleId === USER_ROLE_IDS.unitHead) {
-    return ['main_manager'];
+    return [USER_ROLE_IDS.mainManager];
   }
 
   if (roleId === USER_ROLE_IDS.departmentHead) {
-    return ['unit_head'];
+    return [USER_ROLE_IDS.unitHead];
   }
 
   if (roleId === USER_ROLE_IDS.employee) {
-    return ['department_head'];
+    return [USER_ROLE_IDS.departmentHead];
   }
 
   return [];
@@ -68,7 +68,7 @@ export function getAutoLockedOrgUnitForUserRole(
       orgUnit.regionId === regionId &&
       orgUnit.isActive !== false &&
       orgUnit.headUser?.status === 'active' &&
-      orgUnit.headUser?.role?.code === 'regional_manager',
+      orgUnit.headUser?.role?.role_id === USER_ROLE_IDS.regionalManager,
   );
 
   return regionalManagerOrgUnits.length === 1 ? regionalManagerOrgUnits[0] : null;

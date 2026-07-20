@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import { useAuth } from './AuthContext';
 
 export function ProtectedRoute() {
@@ -34,8 +35,7 @@ export function PublicOnlyRoute() {
 
 export function StatisticsRoute() {
   const { session } = useAuth();
-  const isRegionalManager =
-    session?.role?.code === 'regional_manager' || session?.role?.id === 2;
+  const isRegionalManager = session?.role?.id === USER_ROLE_IDS.regionalManager;
 
   if (isRegionalManager) {
     return <Navigate to="/tasks" replace />;

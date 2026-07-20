@@ -4,6 +4,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 
 import type { ReportDetails } from '@/entities/report/model/types';
 import { getReportFormatLabel, getTaskTypeLabel } from '@/entities/task/api/tasks';
+import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { copyToClipboard } from '@/shared/lib/copyToClipboard';
 import { toast } from '@/shared/ui/sonner';
@@ -24,8 +25,8 @@ export function ReportDetailsCard({ report, showOpenPageLink = false }: Props) {
   const reportPageLink = `/reports/${report.id}`;
   const moderationReportId = report.reportId ?? Number(report.id);
   // report.reportStatus - under_review для обратной совместимости. В будущем, когда under_review не будет, убрать его
-  const isFederalAdmin = session?.role?.code === 'federal_manager' || session?.role?.id === 1;
-  const isRegionalAdmin = session?.role?.code === 'regional_manager' || session?.role?.id === 2;
+  const isFederalAdmin = session?.role?.id === USER_ROLE_IDS.federalManager;
+  const isRegionalAdmin = session?.role?.id === USER_ROLE_IDS.regionalManager;
   const canUseModerationEndpoint = Number.isFinite(moderationReportId);
   const isPendingReport = report.reportStatus === 'pending' || report.reportStatus === 'under_review';
   const canModeratePendingReport =

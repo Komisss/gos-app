@@ -13,13 +13,14 @@ import type { OrgUnit } from '@/entities/orgUnit/model/types';
 import {
   activateUser,
   deactivateUser,
+  getRoles,
   getUserById,
   getUserStatusLabel,
   updateUser,
 } from '@/entities/user/api/users';
 import type { UserDetails, UserPatchPayload } from '@/entities/user/model/types';
 import { isManagementRole } from '@/entities/user/lib/isManagementRole';
-import { USER_ROLE_IDS, editableUserRoleOptions } from '@/entities/user/model/roleOptions';
+import { USER_ROLE_IDS, mapRolesToOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { formatRussianPhone, isCompleteRussianPhone } from '@/shared/lib/russianPhone';
 import { getUsernameError } from '@/shared/lib/username';
@@ -62,7 +63,7 @@ export function UserProfileCard() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   const [isOrgUnitTouched, setIsOrgUnitTouched] = useState(false);
   const [toggleActiveConfirmOpen, setToggleActiveConfirmOpen] = useState(false);
-  const isCurrentUserRegionalManager = session?.role?.code === 'regional_manager';
+  const isCurrentUserRegionalManager = session?.role?.id === USER_ROLE_IDS.regionalManager;
   const maxBirthdayDate = useMemo(() => getAdultMaxBirthdayDate(), []);
 
   const userQuery = useQuery({
@@ -74,6 +75,11 @@ export function UserProfileCard() {
   const orgUnitsQuery = useQuery({
     queryKey: ['org-units-tree'],
     queryFn: getOrgUnitsTree,
+  });
+
+  const rolesQuery = useQuery({
+    queryKey: ['roles'],
+    queryFn: getRoles,
   });
 
   const effectiveFormRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
@@ -116,12 +122,16 @@ export function UserProfileCard() {
   });
 
   const availableRoleOptions = useMemo(() => {
+    const editableUserRoleOptions = mapRolesToOptions(rolesQuery.data ?? []).filter(
+      (role) => role.id !== USER_ROLE_IDS.federalManager,
+    );
+
     if (isCurrentUserRegionalManager) {
       return editableUserRoleOptions.filter((role) => role.id >= USER_ROLE_IDS.mainManager);
     }
 
     return editableUserRoleOptions;
-  }, [isCurrentUserRegionalManager]);
+  }, [isCurrentUserRegionalManager, rolesQuery.data]);
 
   const availableOrgUnits = useMemo(() => {
     const effectiveRoleId = getEffectiveRoleId(form.role, userQuery.data?.role);
@@ -876,7 +886,7 @@ function toDateOnly(value: Date) {
 }
 
 function isFederalManager(user: Pick<UserDetails, 'role'>) {
-  return user.role?.code === 'federal_manager' || user.role?.id === USER_ROLE_IDS.federalManager;
+  return user.role?.id === USER_ROLE_IDS.federalManager;
 }
 
 function isTopManager(user: Pick<UserDetails, 'role'>) {
@@ -885,8 +895,6 @@ function isTopManager(user: Pick<UserDetails, 'role'>) {
 
 function isTopManagerByRole(role: UserDetails['role']) {
   return (
-    role?.code === 'federal_manager' ||
-    role?.code === 'regional_manager' ||
     role?.id === USER_ROLE_IDS.federalManager ||
     role?.id === USER_ROLE_IDS.regionalManager
   );
