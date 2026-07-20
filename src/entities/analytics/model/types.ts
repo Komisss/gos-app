@@ -32,7 +32,9 @@ export type AnalyticsDashboardResponse = {
     date_from: string;
     date_to: string;
   };
+  total_tasks: number;
   kpi: {
+    total_tasks: number;
     total_assignments: number;
     assignments_with_reports: number;
     assignments_without_reports: number;
@@ -40,7 +42,14 @@ export type AnalyticsDashboardResponse = {
     accepted_reports: number;
     under_review_reports: number;
     revision_requested_reports: number;
+    rejected_reports: number;
+    not_completed_reports: number;
     not_completed_assignments: number;
+    current_report_status_total: number;
+    active_users: number;
+    kpe: number;
+    fact: number;
+    fact_percent: number;
   };
   completion: {
     completion_rate: number;

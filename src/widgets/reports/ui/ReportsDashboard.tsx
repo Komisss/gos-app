@@ -1,16 +1,7 @@
 ﻿import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import {
-  BarChart3,
-  Check,
-  ChevronsUpDown,
-  Clock3,
-  FileCheck2,
-  Link2,
-  ListChecks,
-  Search,
-} from 'lucide-react';
+import { BarChart3, Check, ChevronsUpDown, Search, Users } from 'lucide-react';
 
 import { getAnalyticsDashboard } from '@/entities/analytics/api/dashboard';
 import type {
@@ -215,92 +206,45 @@ export function ReportsDashboard() {
 function DashboardResult({ data }: { data: AnalyticsDashboardResponse }) {
   const items = [
     {
-      label: 'KPI',
+      label: 'Активные пользователи',
+      value: data.kpi.active_users,
+      icon: Users,
+    },
+    {
+      label: 'КПЭ',
+      value: formatNumber(data.kpi.kpe),
       icon: BarChart3,
-      metrics: [
-        { label: 'Всего назначений', value: data.kpi.total_assignments },
-        { label: 'С отчетами', value: data.kpi.assignments_with_reports },
-        { label: 'Без отчетов', value: data.kpi.assignments_without_reports },
-        { label: 'Всего отчетов', value: data.kpi.total_reports },
-        { label: 'Принято', value: data.kpi.accepted_reports },
-        { label: 'На проверке', value: data.kpi.under_review_reports },
-        { label: 'На доработке', value: data.kpi.revision_requested_reports },
-        { label: 'Не выполнено', value: data.kpi.not_completed_assignments },
-      ],
     },
     {
-      label: 'Модерация',
-      icon: FileCheck2,
-      metrics: [
-        { label: 'Проверено отчетов', value: data.moderation.moderated_reports },
-        { label: 'Принято модерацией', value: data.moderation.accepted_by_moderation },
-        { label: 'Возвращено', value: data.moderation.revision_requested_by_moderation },
-        { label: 'Ожидает', value: data.moderation.pending_moderation },
-        { label: 'Принятие', value: formatPercent(data.moderation.moderation_acceptance_rate) },
-        { label: 'Доработки', value: formatPercent(data.moderation.moderation_revision_rate) },
-      ],
+      label: 'Факт',
+      value: formatNumber(data.kpi.fact),
+      icon: BarChart3,
     },
     {
-      label: 'Выполнение',
-      icon: ListChecks,
-      metrics: [
-        { label: 'Выполнение', value: formatPercent(data.completion.completion_rate) },
-        { label: 'Отправка отчетов', value: formatPercent(data.completion.report_submission_rate) },
-        { label: 'Не выполнено', value: formatPercent(data.completion.not_completed_rate) },
-      ],
-    },
-    {
-      label: 'Просрочки',
-      icon: Clock3,
-      metrics: [
-        { label: 'Просрочено', value: data.overdue.overdue_assignments },
-        { label: 'Без отчета', value: data.overdue.overdue_without_report },
-        { label: 'С отчетом', value: data.overdue.overdue_with_report },
-        { label: 'Доля просрочек', value: formatPercent(data.overdue.overdue_rate) },
-      ],
-    },
-    {
-      label: 'Доработки',
-      icon: FileCheck2,
-      metrics: [
-        { label: 'Назначений с доработкой', value: data.revision.assignments_with_revision },
-        { label: 'Всего запросов', value: data.revision.total_revision_requests },
-        { label: 'Среднее число правок', value: formatNumber(data.revision.avg_revision_used) },
-        { label: 'Доля доработок', value: formatPercent(data.revision.revision_rate) },
-      ],
-    },
-    {
-      label: 'Ссылки',
-      icon: Link2,
-      metrics: [
-        { label: 'Ссылочных отчетов', value: data.links.link_reports },
-        { label: 'Доступные ссылки', value: data.links.reachable_links },
-        { label: 'Недоступные ссылки', value: data.links.unreachable_links },
-        { label: 'Разрешенный домен', value: data.links.allowed_domain_links },
-        { label: 'Успешность ссылок', value: formatPercent(data.links.link_success_rate) },
-      ],
+      label: 'Процент факта',
+      value: formatPercent(data.kpi.fact_percent),
+      icon: BarChart3,
     },
   ];
 
   return (
-    <section className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <section>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {items.map((item) => (
-          <DashboardCard key={item.label} {...item} />
+          <DashboardMetricCard key={item.label} {...item} />
         ))}
       </div>
-
     </section>
   );
 }
 
-function DashboardCard({
+function DashboardMetricCard({
   label,
-  metrics,
+  value,
   icon: Icon,
 }: {
   label: string;
-  metrics: Array<{ label: string; value: React.ReactNode }>;
+  value: React.ReactNode;
   icon: React.ComponentType<{ className?: string }>;
 }) {
   return (
@@ -311,14 +255,7 @@ function DashboardCard({
         </div>
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{label}</h3>
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {metrics.map((metric) => (
-          <div key={metric.label} className="rounded-md bg-slate-50 px-3 py-2">
-            <div className="text-xs text-slate-500">{metric.label}</div>
-            <div className="mt-1 text-lg font-semibold text-slate-900">{metric.value}</div>
-          </div>
-        ))}
-      </div>
+      <div className="mt-4 text-3xl font-semibold text-slate-900">{value}</div>
     </div>
   );
 }
