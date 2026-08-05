@@ -20,7 +20,7 @@ export type ReportSearchPayload = {
   search: string;
   region_ids: number[];
   task_ids: number[];
-  user_ids: number[];
+  executor_user_ids: number[];
   org_unit_ids: number[];
   role_ids: number[];
   task_types: ReportTaskType[];

@@ -716,10 +716,11 @@ export function ReportRegistry({
 }
 
 function toReportPayload(filters: ReportFilters): ReportSearchPayload {
-  const { overdue, ...restFilters } = filters;
+  const { overdue, user_ids: executor_user_ids, ...restFilters } = filters;
 
   return {
     ...restFilters,
+    executor_user_ids,
     report_statuses: normalizeReportStatusesForRequest(filters.report_statuses),
     ...(overdue === '' ? {} : { overdue: overdue === 'true' }),
     submitted_from: filters.submitted_from || null,
