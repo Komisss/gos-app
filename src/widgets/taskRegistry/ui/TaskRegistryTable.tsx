@@ -1,4 +1,6 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState, type UIEvent } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { Check, ChevronsUpDown, Search } from 'lucide-react';
 
 import {
   getScopeLabel,
@@ -7,13 +9,18 @@ import {
   type TaskFilters,
 } from '@/entities/task/api/tasks';
 import type { Task } from '@/entities/task/model/types';
+import { getUsersPage } from '@/entities/user/api/users';
 import type { UserListItem } from '@/entities/user/model/types';
+import { cn } from '@/shared/lib/utils';
 import { Badge } from '@/shared/ui/badge';
-import { FilterSearchSelect } from '@/shared/ui/filter-search-select';
+import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/shared/ui/table';
 import { TableScrollArea } from '@/shared/ui/table-scroll-area';
+
+const AUTHOR_FILTER_PAGE_SIZE = 50;
 
 type Props = {
   tasks: Task[];
@@ -65,16 +72,12 @@ const TaskRegistryTableHeader = memo(function TaskRegistryTableHeader({
           />
         </TableHead>
         <TableHead className="min-w-[220px] align-bottom">
-          <FilterSearchSelect
+          <InfiniteAuthorSearchSelect
             label=""
             value={filters.created_by_user_id}
             placeholder="Все авторы"
             searchPlaceholder="Поиск по ФИО или логину"
-            options={users.map((user) => ({
-              value: String(user.id),
-              label: user.fullName,
-              description: `@${user.username}`,
-            }))}
+            fallbackUsers={users}
             onChange={(created_by_user_id) => onFiltersChange({ created_by_user_id })}
           />
         </TableHead>
@@ -200,6 +203,152 @@ const TaskRegistryTableBody = memo(function TaskRegistryTableBody({
   );
 });
 
+function InfiniteAuthorSearchSelect({
+  label,
+  value,
+  placeholder,
+  searchPlaceholder,
+  fallbackUsers,
+  onChange,
+}: {
+  label?: string;
+  value?: string;
+  placeholder: string;
+  searchPlaceholder: string;
+  fallbackUsers: UserListItem[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 500);
+  const usersQuery = useInfiniteQuery({
+    queryKey: ['task-author-filter-users', debouncedQuery.trim()],
+    queryFn: ({ pageParam }) =>
+      getUsersPage({ search: debouncedQuery.trim(), statuses: 'active' }, Number(pageParam), AUTHOR_FILTER_PAGE_SIZE),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    enabled: open,
+  });
+  const options = useMemo(
+    () =>
+      usersQuery.data?.pages.flatMap((page) =>
+        page.items.map((user) => ({
+          value: String(user.id),
+          label: user.fullName,
+          description: `@${user.username}`,
+        })),
+      ) ?? [],
+    [usersQuery.data],
+  );
+  const selectedOption =
+    options.find((option) => option.value === value) ??
+    fallbackUsers
+      .map((user) => ({
+        value: String(user.id),
+        label: user.fullName,
+        description: `@${user.username}`,
+      }))
+      .find((option) => option.value === value);
+
+  function handleSelect(nextValue: string) {
+    onChange(nextValue);
+    setOpen(false);
+  }
+
+  function handleScroll(event: UIEvent<HTMLDivElement>) {
+    if (!usersQuery.hasNextPage || usersQuery.isFetchingNextPage) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    if (scrollHeight - scrollTop - clientHeight < 48) {
+      void usersQuery.fetchNextPage();
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      {label && <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">{selectedOption?.label.trim() ?? placeholder}</span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(420px,calc(100vw-3rem))] p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+
+          <div className="mt-3 h-64 overflow-y-auto rounded-md border border-slate-200" onScroll={handleScroll}>
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                onClick={() => handleSelect('')}
+              >
+                <Check
+                  className={cn('size-4 text-[#465cd3]', !value ? 'opacity-100' : 'opacity-0')}
+                />
+                <span className="font-medium text-slate-900">{placeholder}</span>
+              </button>
+
+              {usersQuery.isLoading ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Загружаем список...
+                </div>
+              ) : options.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
+              ) : (
+                options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                    onClick={() => handleSelect(option.value)}
+                  >
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        value === option.value ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="font-medium text-slate-900">{option.label}</span>
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
+                    </span>
+                  </button>
+                ))
+              )}
+              {usersQuery.isFetchingNextPage && (
+                <div className="px-3 py-3 text-center text-sm text-slate-500">
+                  Загружаем еще...
+                </div>
+              )}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 function HeaderSelect({
   value,
   placeholder,
@@ -261,6 +410,18 @@ function HeaderSearchInput({
       onChange={(event) => setInputValue(event.target.value)}
     />
   );
+}
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }
 
 function getTaskAuthorLabel(task: Task, users: UserListItem[]) {

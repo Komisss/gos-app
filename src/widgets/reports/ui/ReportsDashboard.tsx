@@ -14,7 +14,6 @@ import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
 import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getTasks } from '@/entities/task/api/tasks';
-import { getUsers } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
@@ -73,11 +72,6 @@ export function ReportsDashboard() {
     queryFn: () => getTasks(),
   });
 
-  const usersQuery = useQuery({
-    queryKey: ['users', 'analytics-dashboard-filter'],
-    queryFn: () => getUsers(),
-  });
-
   const orgUnitsQuery = useQuery({
     queryKey: ['org-units-tree'],
     queryFn: getOrgUnitsTree,
@@ -106,11 +100,6 @@ export function ReportsDashboard() {
     value: String(orgUnit.id),
     label: `${'  '.repeat(orgUnit.depth)}${orgUnit.name}`,
   }));
-  const userOptions = (usersQuery.data ?? []).map((user) => ({
-    value: String(user.id),
-    label: user.fullName,
-    description: `@${user.username}`,
-  }));
 
   return (
     <div className="min-h-full bg-slate-50">
@@ -128,7 +117,6 @@ export function ReportsDashboard() {
               regionOptions={regionOptions}
               taskOptions={taskOptions}
               orgUnitOptions={orgUnitOptions}
-              userOptions={userOptions}
               periodTypeOptions={periodTypeOptions}
               taskTypeOptions={taskTypeOptions}
               taskScopeOptions={taskScopeOptions}

@@ -1,13 +1,13 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode, type UIEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 
 import { getRegions } from '@/entities/region/api/regions';
 import type { Region } from '@/entities/region/model/types';
 import { createTask, materializeTaskAssignments } from '@/entities/task/api/tasks';
 import type { TaskPayload, TaskTargetType } from '@/entities/task/model/types';
-import { getUsers } from '@/entities/user/api/users';
+import { getUsersPage } from '@/entities/user/api/users';
 import { USER_ROLE_IDS } from '@/entities/user/model/roleOptions';
 import type { UserListItem } from '@/entities/user/model/types';
 import { useAuth } from '@/features/auth/model/AuthContext';
@@ -17,7 +17,6 @@ import { Button } from '@/shared/ui/button';
 import { DateTimePicker } from '@/shared/ui/date-time-picker';
 import { Input } from '@/shared/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
-import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 
 type AssignmentKind = Exclude<TaskTargetType, 'org_unit'>;
@@ -39,6 +38,8 @@ const initialForm: TaskPayload = {
   scheduled_at: toApiDateTime(new Date()),
 };
 
+const ASSIGNMENT_USERS_PAGE_SIZE = 10;
+
 export function NewTaskForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -50,11 +51,6 @@ export function NewTaskForm() {
   const [activationTimeError, setActivationTimeError] = useState(false);
   const [dateTimeOrderError, setDateTimeOrderError] = useState<string | null>(null);
   const minActivationDate = useMemo(() => new Date(), []);
-
-  const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: () => getUsers(),
-  });
 
   const regionsQuery = useQuery({
     queryKey: ['regions'],
@@ -170,9 +166,8 @@ export function NewTaskForm() {
           <Field label="Адресат задачи">
             <AssignmentCombobox
               scope={form.scope}
-              users={usersQuery.data ?? []}
               regions={regionsQuery.data ?? []}
-              isLoading={usersQuery.isLoading || regionsQuery.isLoading}
+              isLoading={regionsQuery.isLoading}
               value={assignmentTarget}
               onChange={handleAssignmentChange}
             />
@@ -437,14 +432,12 @@ function omitTargets(payload: TaskPayload): TaskPayload {
 
 function AssignmentCombobox({
   scope,
-  users,
   regions,
   isLoading,
   value,
   onChange,
 }: {
   scope: TaskPayload['scope'];
-  users: UserListItem[];
   regions: Region[];
   isLoading: boolean;
   value: AssignmentTarget;
@@ -453,11 +446,41 @@ function AssignmentCombobox({
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<AssignmentKind>(value?.kind ?? 'region');
   const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 500);
+  const usersQuery = useInfiniteQuery({
+    queryKey: ['task-assignment-users', debouncedQuery.trim()],
+    queryFn: ({ pageParam }) =>
+      getUsersPage(
+        { search: debouncedQuery.trim(), statuses: 'active' },
+        Number(pageParam),
+        ASSIGNMENT_USERS_PAGE_SIZE,
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    enabled: open && kind === 'user',
+  });
+  const users = useMemo(
+    () => usersQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [usersQuery.data],
+  );
 
   const data = { users, regions };
   const selectedLabel = getAssignmentLabel(value, data);
   const selectedNames = getAssignmentNames(value, data);
   const list = useAssignmentList(kind, query, data);
+  const listIsLoading = kind === 'user' ? usersQuery.isLoading : isLoading;
+
+  function handleListScroll(event: UIEvent<HTMLDivElement>) {
+    if (kind !== 'user' || !usersQuery.hasNextPage || usersQuery.isFetchingNextPage) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    if (scrollHeight - scrollTop - clientHeight < 48) {
+      void usersQuery.fetchNextPage();
+    }
+  }
 
   function handleSelect(item: AssignmentOption) {
     const currentIds = value?.kind === item.kind ? value.ids : [];
@@ -516,15 +539,18 @@ function AssignmentCombobox({
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
             <Input
               className="h-9 border-slate-200 pl-9"
-              placeholder="Поиск по названию"
+              placeholder="Поиск по ФИО или логину"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
 
-          <ScrollArea className="h-64 rounded-md border border-slate-200">
+          <div
+            className="h-64 overflow-y-auto rounded-md border border-slate-200"
+            onScroll={handleListScroll}
+          >
             <div className="p-1">
-              {isLoading ? (
+              {listIsLoading ? (
                 <div className="px-3 py-8 text-center text-sm text-slate-500">
                   Загружаем список...
                 </div>
@@ -555,8 +581,13 @@ function AssignmentCombobox({
                   </button>
                 ))
               )}
+              {kind === 'user' && usersQuery.isFetchingNextPage && (
+                <div className="px-3 py-3 text-center text-sm text-slate-500">
+                  Загружаем еще...
+                </div>
+              )}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </PopoverContent>
       </Popover>
@@ -584,7 +615,7 @@ function useAssignmentList(
   return useMemo(() => {
     const items = getAssignmentOptions(kind, data);
 
-    if (!normalizedQuery) {
+    if (!normalizedQuery || kind === 'user') {
       return items;
     }
 
@@ -671,6 +702,18 @@ function isReportFormatLocked(form: TaskPayload) {
 
 function isActiveUser(user: UserListItem) {
   return user.status === 'active' || (user.active && !user.status);
+}
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {

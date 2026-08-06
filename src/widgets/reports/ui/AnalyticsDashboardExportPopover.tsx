@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useEffect, useMemo, useState, type UIEvent } from 'react';
+import { useInfiniteQuery, useMutation } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Download, Search } from 'lucide-react';
 
 import type {
@@ -9,6 +9,7 @@ import type {
 import { createAnalyticsDashboardExport } from '@/entities/export/api/exports';
 import type { ExportCreateResponse } from '@/entities/export/model/types';
 import type { ReportTaskScope, ReportTaskType, ReportType } from '@/entities/report/model/types';
+import { getUsersPage } from '@/entities/user/api/users';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/ui/button';
 import { Checkbox } from '@/shared/ui/checkbox';
@@ -29,7 +30,6 @@ type Props = {
   regionOptions: SelectOption[];
   taskOptions: SelectOption[];
   orgUnitOptions: SelectOption[];
-  userOptions: SelectOption[];
   periodTypeOptions: Array<{ value: DashboardPeriodType; label: string }>;
   taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
   taskScopeOptions: Array<{ value: ReportTaskScope; label: string }>;
@@ -37,12 +37,13 @@ type Props = {
   onExportStarted: (job: ExportCreateResponse) => void;
 };
 
+const USERS_SELECT_PAGE_SIZE = 50;
+
 export function AnalyticsDashboardExportPopover({
   dashboardFilters,
   regionOptions,
   taskOptions,
   orgUnitOptions,
-  userOptions,
   periodTypeOptions,
   taskTypeOptions,
   taskScopeOptions,
@@ -134,12 +135,11 @@ export function AnalyticsDashboardExportPopover({
               options={orgUnitOptions}
               onChange={(org_unit_ids) => updateFilters({ org_unit_ids: toNumbers(org_unit_ids) })}
             />
-            <MultiSearchSelect
+            <InfiniteUsersMultiSearchSelect
               label="Пользователи"
               values={filters.user_ids.map(String)}
               placeholder="Все пользователи"
-              searchPlaceholder="Поиск по ФИО или username"
-              options={userOptions}
+              searchPlaceholder="Поиск по ФИО или логину"
               onChange={(user_ids) => updateFilters({ user_ids: toNumbers(user_ids) })}
             />
             <MultiSelect
@@ -246,6 +246,138 @@ function createEmptyExportFilters(): AnalyticsDashboardPayload {
     include_removed_assignments: false,
     only_current_report_version: true,
   };
+}
+
+function InfiniteUsersMultiSearchSelect({
+  label,
+  values,
+  placeholder,
+  searchPlaceholder,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  placeholder: string;
+  searchPlaceholder: string;
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 500);
+  const usersQuery = useInfiniteQuery({
+    queryKey: ['dashboard-export-users', debouncedQuery.trim()],
+    queryFn: ({ pageParam }) =>
+      getUsersPage({ search: debouncedQuery.trim(), statuses: 'active' }, Number(pageParam), USERS_SELECT_PAGE_SIZE),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    enabled: open,
+  });
+  const options = useMemo(
+    () =>
+      usersQuery.data?.pages.flatMap((page) =>
+        page.items.map((user) => ({
+          value: String(user.id),
+          label: user.fullName,
+          description: `@${user.username}`,
+        })),
+      ) ?? [],
+    [usersQuery.data],
+  );
+
+  function toggleValue(value: string) {
+    onChange(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
+  }
+
+  function handleScroll(event: UIEvent<HTMLDivElement>) {
+    if (!usersQuery.hasNextPage || usersQuery.isFetchingNextPage) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    if (scrollHeight - scrollTop - clientHeight < 48) {
+      void usersQuery.fetchNextPage();
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {values.length ? `Выбрано: ${values.length}` : placeholder}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={() => onChange([])}>
+              Очистить
+            </Button>
+          </div>
+          <div
+            className="mt-3 h-64 overflow-y-auto rounded-md border border-slate-200"
+            onScroll={handleScroll}
+          >
+            <div className="p-1">
+              {usersQuery.isLoading ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Загружаем список...
+                </div>
+              ) : options.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
+              ) : (
+                options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                    onClick={() => toggleValue(option.value)}
+                  >
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(option.value) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-slate-900">{option.label}</span>
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
+                    </span>
+                  </button>
+                ))
+              )}
+              {usersQuery.isFetchingNextPage && (
+                <div className="px-3 py-3 text-center text-sm text-slate-500">
+                  Загружаем еще...
+                </div>
+              )}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 function MultiSearchSelect({
@@ -480,6 +612,18 @@ function BooleanFilter({
       {label}
     </label>
   );
+}
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }
 
 function toNumbers(values: string[]) {
