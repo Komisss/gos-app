@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { memo, useCallback, useEffect, useMemo, useState, type UIEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, ListFilter, Search, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 import { getOrgUnitsTree } from '@/entities/orgUnit/api/orgUnits';
@@ -16,7 +16,8 @@ import type {
 } from '@/entities/report/model/types';
 import { getRegions } from '@/entities/region/api/regions';
 import { getReportFormatLabel, getTaskTypeLabel, getTasks } from '@/entities/task/api/tasks';
-import { getRoles, getUsers } from '@/entities/user/api/users';
+import { getRoles, getUsers, getUsersPage } from '@/entities/user/api/users';
+import type { UserListItem } from '@/entities/user/model/types';
 import { USER_ROLE_IDS, mapRolesToFilterOptions } from '@/entities/user/model/roleOptions';
 import { useAuth } from '@/features/auth/model/AuthContext';
 import { useCurrentUserRegion } from '@/features/auth/model/useCurrentUserRegion';
@@ -71,6 +72,8 @@ type SelectOption = {
   label: string;
   description?: string;
 };
+
+const TASK_REGION_EXECUTOR_FILTER_PAGE_SIZE = 50;
 
 const taskTypeOptions: Array<{ value: ReportTaskType; label: string }> = [
   { value: 'online_action', label: 'Онлайн-акция' },
@@ -177,16 +180,19 @@ export function ReportRegistry({
   const tasksQuery = useQuery({
     queryKey: ['tasks', 'report-filter'],
     queryFn: () => getTasks(),
+    enabled: tableVariant !== 'task-region',
   });
 
   const usersQuery = useQuery({
     queryKey: ['users', 'report-filter'],
     queryFn: () => getUsers(),
+    enabled: tableVariant !== 'task-region' && !userOptionsOverride,
   });
 
   const rolesQuery = useQuery({
     queryKey: ['roles'],
     queryFn: getRoles,
+    enabled: tableVariant !== 'task-region',
   });
 
   const orgUnitsQuery = useQuery({
@@ -651,7 +657,6 @@ export function ReportRegistry({
           <TaskRegionReportsTable
             reports={reports}
             filters={filters}
-            taskOptions={taskOptions}
             userOptions={userOptions}
             reportStatusOptions={reportStatusOptions}
             onFiltersChange={handleTableFiltersChange}
@@ -740,7 +745,6 @@ const ReportRegistryTable = memo(function ReportRegistryTable({
   reports,
   filters,
   regionOptions,
-  taskOptions,
   userOptions,
   orgUnitOptions,
   taskTypeOptions,
@@ -759,7 +763,6 @@ const ReportRegistryTable = memo(function ReportRegistryTable({
   reports: CrmReport[];
   filters: ReportFilters;
   regionOptions: SelectOption[];
-  taskOptions: SelectOption[];
   userOptions: SelectOption[];
   orgUnitOptions: SelectOption[];
   taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
@@ -808,7 +811,6 @@ const ReportRegistryTable = memo(function ReportRegistryTable({
 const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
   filters,
   regionOptions,
-  taskOptions,
   userOptions,
   orgUnitOptions,
   taskTypeOptions,
@@ -823,7 +825,6 @@ const ReportRegistryTableHeader = memo(function ReportRegistryTableHeader({
 }: {
   filters: ReportFilters;
   regionOptions: SelectOption[];
-  taskOptions: SelectOption[];
   userOptions: SelectOption[];
   orgUnitOptions: SelectOption[];
   taskTypeOptions: Array<{ value: ReportTaskType; label: string }>;
@@ -1058,7 +1059,6 @@ const ReportRegistryTableBody = memo(function ReportRegistryTableBody({
 function TaskRegionReportsTable({
   reports,
   filters,
-  taskOptions,
   userOptions,
   reportStatusOptions,
   onFiltersChange,
@@ -1066,7 +1066,6 @@ function TaskRegionReportsTable({
 }: {
   reports: CrmReport[];
   filters: ReportFilters;
-  taskOptions: SelectOption[];
   userOptions: SelectOption[];
   reportStatusOptions: Array<{ value: ReportStatus; label: string }>;
   onFiltersChange: (filters: Partial<ReportFilters>) => void;
@@ -1084,16 +1083,7 @@ function TaskRegionReportsTable({
           <TableHeader>
             <TableRow className="border-b-slate-200 bg-white hover:bg-white">
               <TableHead className="w-28" />
-              <TableHead className="min-w-[320px] align-bottom">
-                <MultiSearchSelect
-                  label=""
-                  values={filters.task_ids.map(String)}
-                  placeholder="Все задачи"
-                  searchPlaceholder="Поиск задачи"
-                  options={taskOptions}
-                  onChange={(task_ids) => onFiltersChange({ task_ids: toNumbers(task_ids) })}
-                />
-              </TableHead>
+              <TableHead className="min-w-[320px]" />
               <TableHead className="min-w-[280px] align-bottom">
                 <DebouncedFilterText
                   label=""
@@ -1103,13 +1093,14 @@ function TaskRegionReportsTable({
                 />
               </TableHead>
               <TableHead className="min-w-[240px] align-bottom">
-                <MultiSearchSelect
+                <InfiniteTaskRegionExecutorSelect
                   label=""
-                  values={filters.user_ids.map(String)}
+                  values={filters.user_ids}
+                  regionIds={filters.region_ids}
+                  fallbackOptions={userOptions}
                   placeholder="Все исполнители"
                   searchPlaceholder="Поиск исполнителя"
-                  options={userOptions}
-                  onChange={(user_ids) => onFiltersChange({ user_ids: toNumbers(user_ids) })}
+                  onChange={(user_ids) => onFiltersChange({ user_ids })}
                 />
               </TableHead>
               <TableHead className="w-24" />
@@ -1221,6 +1212,183 @@ function TaskRegionReportsTable({
       </Dialog>
     </>
   );
+}
+
+function InfiniteTaskRegionExecutorSelect({
+  label,
+  values,
+  regionIds,
+  fallbackOptions,
+  placeholder,
+  searchPlaceholder,
+  onChange,
+}: {
+  label: string;
+  values: number[];
+  regionIds: number[];
+  fallbackOptions: SelectOption[];
+  placeholder: string;
+  searchPlaceholder: string;
+  onChange: (values: number[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebouncedValue(query, 500);
+  const regionIdsKey = regionIds.join(',');
+  const usersQuery = useInfiniteQuery({
+    queryKey: ['task-region-report-executors', regionIdsKey, debouncedQuery.trim()],
+    queryFn: ({ pageParam }) =>
+      getUsersPage(
+        {
+          region_ids: regionIdsKey,
+          search: debouncedQuery.trim(),
+          statuses: 'active',
+        },
+        Number(pageParam),
+        TASK_REGION_EXECUTOR_FILTER_PAGE_SIZE,
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.page + 1 : undefined),
+    enabled: open && regionIds.length > 0,
+  });
+  const options = useMemo(
+    () =>
+      usersQuery.data?.pages.flatMap((page) => page.items.map(mapUserToSelectOption)) ?? [],
+    [usersQuery.data],
+  );
+  const selectedOptions = useMemo(() => {
+    const allOptions = [...options, ...fallbackOptions];
+    const optionsByValue = new Map(allOptions.map((option) => [option.value, option]));
+
+    return values
+      .map((value) => optionsByValue.get(String(value)))
+      .filter((option): option is SelectOption => Boolean(option));
+  }, [fallbackOptions, options, values]);
+
+  function toggleValue(value: string) {
+    const nextValue = Number(value);
+
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+
+    onChange(values.includes(nextValue) ? values.filter((item) => item !== nextValue) : [...values, nextValue]);
+  }
+
+  function handleScroll(event: UIEvent<HTMLDivElement>) {
+    if (!usersQuery.hasNextPage || usersQuery.isFetchingNextPage) {
+      return;
+    }
+
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+
+    if (scrollHeight - scrollTop - clientHeight < 48) {
+      void usersQuery.fetchNextPage();
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-slate-500 !mb-1">{label}</p>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-9 w-full justify-between border-slate-200 bg-white text-left text-sm font-normal"
+          >
+            <span className="min-w-0 truncate">
+              {selectedOptions.length ? `Выбрано: ${selectedOptions.length}` : placeholder}
+            </span>
+            <ChevronsUpDown className="size-4 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(520px,calc(100vw-3rem))] p-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              className="h-9 border-slate-200 pl-9 text-sm"
+              placeholder={searchPlaceholder}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+
+          <div className="mt-3 h-64 overflow-y-auto rounded-md border border-slate-200" onScroll={handleScroll}>
+            <div className="p-1">
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                onClick={() => onChange([])}
+              >
+                <Check className={cn('size-4 text-[#465cd3]', values.length === 0 ? 'opacity-100' : 'opacity-0')} />
+                <span className="font-medium text-slate-900">{placeholder}</span>
+              </button>
+
+              {usersQuery.isLoading ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Загружаем список...
+                </div>
+              ) : options.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-500">
+                  Ничего не найдено.
+                </div>
+              ) : (
+                options.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-100"
+                    onClick={() => toggleValue(option.value)}
+                  >
+                    <Check
+                      className={cn(
+                        'mt-0.5 size-4 text-[#465cd3]',
+                        values.includes(Number(option.value)) ? 'opacity-100' : 'opacity-0',
+                      )}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium text-slate-900">{option.label}</span>
+                      {option.description && (
+                        <span className="block text-xs text-slate-500">{option.description}</span>
+                      )}
+                    </span>
+                  </button>
+                ))
+              )}
+              {usersQuery.isFetchingNextPage && (
+                <div className="px-3 py-3 text-center text-sm text-slate-500">
+                  Загружаем еще...
+                </div>
+              )}
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+function mapUserToSelectOption(user: UserListItem): SelectOption {
+  return {
+    value: String(user.id),
+    label: user.fullName,
+    description: [user.role?.name, user.username ? `@${user.username}` : null, user.region?.name]
+      .filter(Boolean)
+      .join(' • '),
+  };
+}
+
+function useDebouncedValue(value: string, delayMs: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedValue(value), delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [delayMs, value]);
+
+  return debouncedValue;
 }
 
 function ReportPreviewLink({
