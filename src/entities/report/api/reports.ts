@@ -38,8 +38,10 @@ type ReportsSearchResponse =
       results?: CrmReportDto[];
       data?: CrmReportDto[];
       total?: number;
+      count?: number;
       page?: number;
       page_size?: number;
+      total_pages?: number;
       has_more?: boolean;
       summary?: ReportsSummary;
     };
@@ -64,10 +66,14 @@ export async function searchReports(payload: ReportSearchPayload): Promise<Repor
 
   return {
     items: items.map(mapReportDto),
-    total: response.total ?? items.length,
+    total: response.total ?? response.count ?? items.length,
     page: response.page ?? payload.page,
     pageSize: response.page_size ?? payload.page_size,
-    hasMore: response.has_more ?? false,
+    hasMore:
+      response.has_more ??
+      (typeof response.total_pages === 'number'
+        ? (response.page ?? payload.page) < response.total_pages
+        : false),
     summary: response.summary ?? null,
   };
 }
